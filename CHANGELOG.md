@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-beta.5 – Lovelace mobile editor fix (Candidate)
+
+- Keep the editor DOM stable during `setConfig()` updates so mobile focus and
+  unsaved input survive Home Assistant background updates.
+- Add iPhone/iPad Playwright coverage for empty/unknown entities, browser errors,
+  failed requests, and the editor lifecycle.
+
 ## 0.1.0-beta.4 – Lovelace-Dashboard (Prerelease)
 
 - Read-only Lovelace-Karte für Proxmox-Host, VMs, LXC-Container und

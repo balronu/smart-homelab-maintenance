@@ -139,7 +139,7 @@ async def test_setup_registers_entities_devices_services_and_survives_reload(has
     from custom_components import smart_homelab_maintenance as integration
     assert await integration.async_setup(hass, {})
     assert hass.data[DOMAIN]["card_registered"] is True
-    assert "/smart_homelab_maintenance/smart-homelab-maintenance-card.js?v=0.1.0-beta.4" in hass.data[DATA_EXTRA_MODULE_URL].urls
+    assert "/smart_homelab_maintenance/smart-homelab-maintenance-card.js?v=0.1.0-beta.5" in hass.data[DATA_EXTRA_MODULE_URL].urls
     result = await _create_entry(hass)
     entry = result["result"]
     await hass.async_block_till_done()
