@@ -1,7 +1,7 @@
 # Phase 4.19b – Lokales HTTPS ohne eigene Zertifizierungsstelle
 
 **Projekt:** Smart Homelab Maintenance  
-**Referenzstand:** `05f42ef`  
+**Implementierungsstand:** `8dbaded`  
 **Scope:** ausschließlich Offline-Implementierung und Mock-/Loopback-Tests
 
 ## Ergebnis
@@ -108,9 +108,14 @@ python3 -m unittest -v tests.test_tls_self_signed tests.test_core tests.test_fir
 Zusätzlich erfolgreich: Shell-Syntaxprüfung von `scripts/tls-agent.sh` sowie
 manuelle Prüfung der Zertifikats- und Dateirechte im isolierten Temp-Verzeichnis.
 
-GitHub Actions wurden für diese lokale Implementierungsphase nicht gestartet;
-es wurde kein Merge und kein Release durchgeführt. Die vollständige CI ist vor
-einem späteren PR-Merge erneut erforderlich.
+Remote-CI für den exakten HEAD `8dbaded6f33fd1f6412656cb43234badeb5ae683`:
+
+- Push-Lauf [42238471543](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42238471543): **PASS**
+- PR-Lauf [42238480420](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42238480420): **PASS**
+- Python-Regression, API-Vertrag, Security, Browser, HACS, Hassfest und
+  HA-Runtime einschließlich `ha-runtime-tests`: **PASS**
+
+Es wurde kein Merge und kein Release durchgeführt.
 
 ## Schlussentscheidung
 
