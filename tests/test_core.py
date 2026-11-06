@@ -46,6 +46,7 @@ from agent.smart_homelab_maintenance.types import (
 )
 from agent.smart_homelab_maintenance.versions import Version, compare_versions
 from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url
+from custom_components.smart_homelab_maintenance.http_transport import validate_ca_file
 from custom_components.smart_homelab_maintenance.config_flow import validate_config
 from custom_components.smart_homelab_maintenance.update import update_value
 from custom_components.smart_homelab_maintenance.coordinator import SmartHomelabCoordinator
@@ -244,6 +245,13 @@ class CoreTests(unittest.TestCase):
             TransportConfig("http://127.0.0.1", "fixture")
         with self.assertRaises(ValueError):
             validate_agent_url("https://public.example")
+
+    def test_private_ca_path_is_bounded_to_ha_ssl_directory(self) -> None:
+        self.assertEqual(validate_ca_file("/ssl/agent-ca.pem"), "/ssl/agent-ca.pem")
+        self.assertEqual(validate_ca_file(""), None)
+        for value in ("agent-ca.pem", "/config/secrets.yaml", "/ssl/../config/ca.pem", "/ssl/ca.txt"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                validate_ca_file(value)
 
     def test_mock_agent_to_coordinator_to_entity_data_flow(self) -> None:
         class FakeTransport:

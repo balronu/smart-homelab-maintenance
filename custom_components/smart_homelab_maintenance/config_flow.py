@@ -4,19 +4,20 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .const import CONF_AGENT_URL, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL
-from .http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url
+from .const import CONF_AGENT_URL, CONF_CA_FILE, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL
+from .http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url, validate_ca_file
 
 
 def validate_config(data: Mapping[str, Any]) -> dict[str, Any]:
     url = validate_agent_url(str(data.get(CONF_AGENT_URL, "")))
+    ca_file = validate_ca_file(data.get(CONF_CA_FILE))
     token = str(data.get(CONF_TOKEN, ""))
     interval = int(data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
     if not token or len(token) > 512:
         raise ValueError("token is required")
     if not MIN_SCAN_INTERVAL <= interval <= MAX_SCAN_INTERVAL:
         raise ValueError("scan interval is out of range")
-    return {CONF_AGENT_URL: url, CONF_TOKEN: token, CONF_SCAN_INTERVAL: interval}
+    return {CONF_AGENT_URL: url, CONF_TOKEN: token, CONF_CA_FILE: ca_file, CONF_SCAN_INTERVAL: interval}
 
 
 try:
@@ -24,7 +25,7 @@ try:
     import voluptuous as vol
 
     async def _check_agent(data: Mapping[str, Any]) -> None:
-        transport = AgentHttpTransport(TransportConfig(data[CONF_AGENT_URL], data[CONF_TOKEN]))
+        transport = AgentHttpTransport(TransportConfig(data[CONF_AGENT_URL], data[CONF_TOKEN], ca_file=data.get(CONF_CA_FILE)))
         await transport.health()
         await transport.capabilities()
 
@@ -51,6 +52,7 @@ try:
             return self.async_show_form(step_id="user", data_schema=vol.Schema({
                 vol.Required(CONF_AGENT_URL): str,
                 vol.Required(CONF_TOKEN): str,
+                vol.Optional(CONF_CA_FILE, default=""): str,
                 vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)),
             }))
 

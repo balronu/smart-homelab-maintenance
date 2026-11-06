@@ -14,11 +14,28 @@ import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit
 
 
 PRIVATE_DNS_SUFFIXES = (".home.arpa", ".lan", ".local")
+
+
+def validate_ca_file(value: str | None) -> str | None:
+    """Allow only an explicit CA file in HA's persistent SSL directory."""
+
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if ".." in raw.split("/"):
+        raise ValueError("ca_file must not contain path traversal")
+    path = PurePosixPath(raw)
+    if not path.is_absolute() or path.parts[:2] != ("/", "ssl"):
+        raise ValueError("ca_file must be an absolute path below /ssl")
+    if ".." in path.parts or path.suffix.lower() not in {".pem", ".crt", ".cer"}:
+        raise ValueError("ca_file must be a certificate file below /ssl")
+    return str(path)
 
 
 def validate_agent_url(value: str) -> str:
@@ -70,6 +87,7 @@ class TransportConfig:
 
     def __post_init__(self) -> None:
         validate_agent_url(self.base_url)
+        validate_ca_file(self.ca_file)
         if not self.token or len(self.token) > 512:
             raise ValueError("token is required and bounded")
         if not 0.1 <= self.timeout_seconds <= 30:
