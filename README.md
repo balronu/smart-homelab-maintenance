@@ -30,8 +30,8 @@ Eintrag ist daher nicht vorausgesetzt.
    einbinden und `custom_components/smart_homelab_maintenance/` installieren.
 2. Die Lovelace-Datei `frontend/smart-homelab-maintenance-card.js` aus derselben
    Version als lokale Dashboard-Ressource vom Typ `module` registrieren.
-3. Erst danach die Integration über den Config Flow mit einem abgesicherten
-   Agent-Endpunkt verbinden.
+3. Erst danach die Integration über den Config Flow mit einer privaten
+   HTTPS-Agent-Adresse und vertrauenswürdiger Zertifikatskette verbinden.
 
 Für eine spätere Veröffentlichung müssen die Marketplace-Struktur, die
 Release-Artefakte und der Installationsweg erneut gegen die Zielversion von
@@ -41,10 +41,14 @@ Home Assistant geprüft werden.
 
 - passive Beta; keine Updateausführung
 - keine freien Shell-Kommandos über die API
-- Agent-Kommunikation authentifiziert und größen-/timeoutbegrenzt
+- Agent-Kommunikation nur über private HTTPS-Ziele, authentifiziert und
+  größen-/timeoutbegrenzt
 - unbekannte oder blockierte Anwendungen bleiben lesend
 - Zugangsdaten gehören ausschließlich in die lokale Konfiguration und dürfen
   nicht in Logs, Issues, Screenshots oder Diagnosen erscheinen
+- der vorbereitete Agent-Server erzwingt TLS, bindet nicht an unbeschränkte
+  Adressen und nutzt systemd-Credentials; Server und Proxmox-Live-Backend sind
+  noch nicht produktiv installiert
 
 ## Entwicklung und Tests
 

@@ -51,6 +51,10 @@ class ContainerObservation:
 class ProxmoxDiscoveryBackend(Protocol):
     def containers(self) -> list[Mapping[str, Any]]: ...
 
+    def host(self) -> Mapping[str, Any]: ...
+
+    def virtual_machines(self) -> list[Mapping[str, Any]]: ...
+
 
 class FixtureProxmoxBackend:
     """A deterministic backend; it never calls Proxmox or a shell."""
@@ -60,6 +64,12 @@ class FixtureProxmoxBackend:
 
     def containers(self) -> list[Mapping[str, Any]]:
         return [dict(item) for item in self._fixture]
+
+    def host(self) -> Mapping[str, Any]:
+        return {"name": "fixture", "release": "unknown", "kernel": "unknown", "online": True}
+
+    def virtual_machines(self) -> list[Mapping[str, Any]]:
+        return []
 
 
 def phase1_fixture() -> list[dict[str, Any]]:
@@ -102,6 +112,12 @@ class DiscoveryService:
                 if app.app_id == app_id:
                     return app
         raise KeyError(app_id)
+
+    def host(self) -> dict[str, Any]:
+        return dict(self.backend.host())
+
+    def virtual_machines(self) -> list[dict[str, Any]]:
+        return [dict(item) for item in self.backend.virtual_machines()]
 
     def _app(self, raw: Mapping[str, Any], item: Mapping[str, Any]) -> ApplicationObservation:
         app_id = str(item["app_id"])

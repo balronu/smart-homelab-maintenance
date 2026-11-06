@@ -1,0 +1,37 @@
+[Unit]
+Description=Smart Homelab Maintenance Agent (template, not installed)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/smart-homelab-maintenance/venv/bin/python
+ConditionPathExists=/etc/smart-homelab-maintenance/agent.toml
+
+[Service]
+Type=simple
+User=smart-homelab-maintenance
+Group=smart-homelab-maintenance
+WorkingDirectory=/opt/smart-homelab-maintenance
+Environment=PYTHONUNBUFFERED=1
+Environment=SMART_HOMELAB_AGENT_CONFIG=/etc/smart-homelab-maintenance/agent.toml
+LoadCredential=api_token:/etc/smart-homelab-maintenance/api-token
+# The server module and live Proxmox backend are not part of this phase.
+ExecStart=/opt/smart-homelab-maintenance/venv/bin/python -m smart_homelab_maintenance.server
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/smart-homelab-maintenance
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

@@ -5,15 +5,13 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .const import CONF_AGENT_URL, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL
-from .http_transport import AgentHttpTransport, TransportConfig, TransportError
+from .http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url
 
 
 def validate_config(data: Mapping[str, Any]) -> dict[str, Any]:
-    url = str(data.get(CONF_AGENT_URL, "")).rstrip("/")
+    url = validate_agent_url(str(data.get(CONF_AGENT_URL, "")))
     token = str(data.get(CONF_TOKEN, ""))
     interval = int(data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
-    if not (url.startswith("http://127.0.0.1") or url.startswith("http://localhost")):
-        raise ValueError("agent_url must point to localhost in this offline phase")
     if not token or len(token) > 512:
         raise ValueError("token is required")
     if not MIN_SCAN_INTERVAL <= interval <= MAX_SCAN_INTERVAL:
@@ -42,10 +40,14 @@ try:
                     self._abort_if_unique_id_configured()
                     return self.async_create_entry(title=clean[CONF_AGENT_URL], data=clean)
                 except TransportError as err:
-                    error = "api_version" if err.code == "api_version" else "cannot_connect"
+                    error = {
+                        "api_version": "api_version",
+                        "authentication": "authentication",
+                        "tls_error": "tls_error",
+                    }.get(err.code, "cannot_connect")
                     return self.async_show_form(step_id="user", errors={"base": error})
-                except (TypeError, ValueError):
-                    return self.async_show_form(step_id="user", errors={"base": "cannot_connect"})
+                except ValueError:
+                    return self.async_show_form(step_id="user", errors={"base": "invalid_url"})
             return self.async_show_form(step_id="user", data_schema=vol.Schema({
                 vol.Required(CONF_AGENT_URL): str,
                 vol.Required(CONF_TOKEN): str,

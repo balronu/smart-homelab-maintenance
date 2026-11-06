@@ -4,13 +4,18 @@ import tempfile
 import threading
 import asyncio
 import json
+import ssl
+import urllib.error
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from agent.smart_homelab_maintenance.adapters import default_registry
 from agent.smart_homelab_maintenance.api import ApiApplication
 from agent.smart_homelab_maintenance.api_models import JobCreatePayload
 from agent.smart_homelab_maintenance.discovery import DiscoveryService, FixtureProxmoxBackend, phase1_fixture
+from agent.smart_homelab_maintenance.proxmox_backend import FixtureProxmoxClient, ProxmoxInventoryBackend
+from agent.smart_homelab_maintenance.server import AgentServerConfig, load_credential
 from agent.smart_homelab_maintenance.errors import (
     ConcurrentJobError,
     DuplicateJobError,
@@ -37,7 +42,7 @@ from agent.smart_homelab_maintenance.types import (
     Verification,
 )
 from agent.smart_homelab_maintenance.versions import Version, compare_versions
-from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportConfig, TransportError
+from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url
 from custom_components.smart_homelab_maintenance.config_flow import validate_config
 from custom_components.smart_homelab_maintenance.update import update_value
 from custom_components.smart_homelab_maintenance.coordinator import SmartHomelabCoordinator
@@ -194,7 +199,7 @@ class CoreTests(unittest.TestCase):
             controller.execute(self.request())
 
     def test_phase23_config_and_update_projection_are_safe(self) -> None:
-        clean = validate_config({"agent_url": "http://127.0.0.1:1", "token": "fixture", "scan_interval": 30})
+        clean = validate_config({"agent_url": "https://agent.home.arpa:1", "token": "fixture", "scan_interval": 30})
         self.assertEqual(clean["scan_interval"], 30)
         with self.assertRaises(ValueError):
             validate_config({"agent_url": "http://remote.invalid", "token": "fixture"})
@@ -203,26 +208,39 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(value.update_execution_enabled)
 
     def test_http_transport_uses_timeout_size_and_api_version_guards(self) -> None:
-        async def scenario() -> None:
-            async def handler(reader, writer):
-                request = await reader.read(4096)
-                self.assertIn(b"Authorization: Bearer fixture", request)
-                body = json.dumps({"schema_version": "1", "data": {"status": "ok"}}).encode()
-                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
-                await writer.drain()
-                writer.close()
+        class Response:
+            def __enter__(self):
+                return self
 
-            server = await asyncio.start_server(handler, "127.0.0.1", 0)
-            port = server.sockets[0].getsockname()[1]
-            client = AgentHttpTransport(TransportConfig(f"http://127.0.0.1:{port}", "fixture", timeout_seconds=2))
-            response = await client.health()
+            def __exit__(self, *args):
+                return False
+
+            def read(self, limit):
+                self.limit = limit
+                return json.dumps({"schema_version": "1", "data": {"status": "ok"}}).encode()
+
+        with patch("agent.smart_homelab_maintenance.http_transport.urllib.request.urlopen", return_value=Response()) as open_url:
+            client = AgentHttpTransport(TransportConfig("https://agent.home.arpa:443", "fixture", timeout_seconds=2))
+            response = asyncio.run(client.health())
             self.assertEqual(response["data"]["status"], "ok")
-            server.close()
-            await server.wait_closed()
-            with self.assertRaises(ValueError):
-                TransportConfig("http://remote.invalid", "fixture")
+            args, kwargs = open_url.call_args
+            request = args[0]
+            self.assertEqual(request.get_header("Authorization"), "Bearer fixture")
+            self.assertTrue(kwargs["context"].check_hostname)
+            self.assertEqual(kwargs["context"].verify_mode, ssl.CERT_REQUIRED)
 
-        asyncio.run(scenario())
+        with patch(
+            "agent.smart_homelab_maintenance.http_transport.urllib.request.urlopen",
+            side_effect=urllib.error.URLError(ssl.SSLCertVerificationError("fixture certificate")),
+        ):
+            with self.assertRaises(TransportError) as raised:
+                asyncio.run(AgentHttpTransport(TransportConfig("https://agent.home.arpa", "fixture")).health())
+            self.assertEqual(raised.exception.code, "tls_error")
+
+        with self.assertRaises(ValueError):
+            TransportConfig("http://127.0.0.1", "fixture")
+        with self.assertRaises(ValueError):
+            validate_agent_url("https://public.example")
 
     def test_mock_agent_to_coordinator_to_entity_data_flow(self) -> None:
         class FakeTransport:
@@ -234,7 +252,7 @@ class CoreTests(unittest.TestCase):
                 return {"data": {"execution_enabled": False}}
 
         async def scenario() -> None:
-            coordinator = SmartHomelabCoordinator(None, {"agent_url": "http://127.0.0.1:1", "token": "fixture"})
+            coordinator = SmartHomelabCoordinator(None, {"agent_url": "https://agent.home.arpa:1", "token": "fixture"})
             coordinator.transport = FakeTransport()
             data = await coordinator.async_update()
             self.assertTrue(data.connected)
@@ -287,6 +305,36 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(status, 400)
         status, _ = api.handle("GET", "/api/v1/containers", headers={"Authorization": "Bearer token"})
         self.assertEqual(status, 413)
+
+    def test_proxmox_backend_is_read_only_dynamic_and_includes_vms(self) -> None:
+        backend = ProxmoxInventoryBackend(FixtureProxmoxClient(
+            {"name": "fixture-node", "release": "9.x", "online": True},
+            lxcs=({"vmid": 101, "name": "fixture-lxc", "status": "stopped", "applications": []},),
+            vms=({"vmid": 104, "name": "fixture-vm", "status": "running"},),
+        ))
+        self.assertEqual(backend.host()["name"], "fixture-node")
+        self.assertFalse(backend.containers()[0]["running"])
+        self.assertEqual(backend.virtual_machines()[0]["vmid"], 104)
+
+    def test_api_exposes_host_and_virtual_machines_without_update_routes(self) -> None:
+        api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), self.repo, read_token="token")
+        status, body = api.handle("GET", "/api/v1/host", headers={"Authorization": "Bearer token"})
+        self.assertEqual(status, 200)
+        self.assertTrue(body["data"]["online"])
+        status, body = api.handle("GET", "/api/v1/virtual-machines", headers={"Authorization": "Bearer token"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["data"]["items"], [])
+        self.assertEqual(api.handle("POST", "/api/v1/update", headers={"Authorization": "Bearer token"})[0], 400)
+
+    def test_agent_server_requires_tls_and_systemd_credential_is_not_logged(self) -> None:
+        with self.assertRaises(ValueError):
+            AgentServerConfig(certificate=None, private_key=None)
+        credential = Path(self.tempdir.name) / "api-token"
+        credential.write_text("fixture-token\n", encoding="utf-8")
+        self.assertEqual(load_credential(credential), "fixture-token")
+        credential.write_text("fixture token\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            load_credential(credential)
 
 
 if __name__ == "__main__":

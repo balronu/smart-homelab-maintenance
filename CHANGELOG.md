@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased – Phase 4.4 Vorbereitung
+
+- Read-only Proxmox-Inventory-Backend mit injizierbarem Client für LXC und VMs
+- TLS-erzwingender Agent-Server mit Bearer-Authentifizierung und systemd-
+  Credential-Laden vorbereitet
+- Keine Update- oder Shell-Ausführung ergänzt; produktiver Listener bleibt
+  unimplementiert/ungeinstalliert
+
 ## 0.1.0-beta.2 – Config-Flow-Fix
 
 - Config Flow funktioniert als eigenständiges Home-Assistant-Paket ohne das

@@ -66,7 +66,7 @@ def patched_transport(monkeypatch):
 async def _create_entry(hass: HomeAssistant, token="fixture-token"):
     flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     return await hass.config_entries.flow.async_configure(flow["flow_id"], {
-        "agent_url": "http://127.0.0.1:8765", "token": token, "scan_interval": 30,
+        "agent_url": "https://agent.home.arpa:8765", "token": token, "scan_interval": 30,
     })
 
 
@@ -74,7 +74,7 @@ async def test_config_flow_creates_entry_rejects_duplicate_and_options(hass, pat
     result = await _create_entry(hass)
     assert result["type"] == "create_entry"
     entry = result["result"]
-    assert entry.unique_id == "http://127.0.0.1:8765"
+    assert entry.unique_id == "https://agent.home.arpa:8765"
     duplicate = await _create_entry(hass, "another-token")
     assert duplicate["type"] == "abort"
     assert duplicate["reason"] == "already_configured"

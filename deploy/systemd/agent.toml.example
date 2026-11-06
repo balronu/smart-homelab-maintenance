@@ -1,0 +1,12 @@
+# Template only. It is not installed or consumed by the current offline agent.
+
+# Bind the agent to a loopback-only port. A separately managed TLS reverse
+# proxy or private tunnel must terminate HTTPS and enforce the client policy.
+listen_host = "127.0.0.1"
+listen_port = 48128
+api_version = "1"
+state_directory = "/var/lib/smart-homelab-maintenance"
+execution_enabled = false
+
+# The API token is supplied through systemd LoadCredential=api_token:... and
+# must never be placed in this file.
