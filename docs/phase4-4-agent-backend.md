@@ -84,8 +84,8 @@ Wartungsjob über HTTP gestartet.
 | Echte HTTPS-End-to-End-Kette mit installiertem Agenten | **NOT RUN** – kein produktiver Listener vorhanden |
 
 Der PR [#2](https://github.com/balronu/smart-homelab-maintenance/pull/2) ist
-offen und zeigt auf den geprüften Commit
-`5c4014e52d67f6d0f387f1a97ee5869ded0e6f83`. Der terminale Pull-Request-Lauf
+offen und zeigt auf den geprüften Dokumentationsstand
+`cbcde15` (Implementierung `5c4014e`). Der terminale Pull-Request-Lauf
 [`42217832902`](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42217832902)
 ist vollständig erfolgreich. Der parallele Push-Lauf
 [`42217822601`](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42217822601)
