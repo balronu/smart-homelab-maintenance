@@ -2,7 +2,7 @@
 
 **Projekt:** `balronu/smart-homelab-maintenance`
 **Branch:** `phase4-4-agent-backend`
-**Status:** lokale Implementierung abgeschlossen; isolierte Installation **NO-GO**
+**Status:** Implementierung und isolierte CI abgeschlossen; isolierte Installation **NO-GO**
 
 ## 1. Implementierte API-Endpunkte
 
@@ -83,9 +83,17 @@ Wartungsjob über HTTP gestartet.
 | Produktiver Proxmox-Test | **NOT RUN** – ausdrücklich ausgeschlossen |
 | Echte HTTPS-End-to-End-Kette mit installiertem Agenten | **NOT RUN** – kein produktiver Listener vorhanden |
 
-Der Remote-CI-Status für diesen Branch ist vor dem Push **NOT RUN**. Ein
-historischer CI-Lauf eines anderen Commits wird nicht als Ergebnis dieses
-Kandidaten gewertet.
+Der PR [#2](https://github.com/balronu/smart-homelab-maintenance/pull/2) ist
+offen und zeigt auf den geprüften Commit
+`5c4014e52d67f6d0f387f1a97ee5869ded0e6f83`. Der terminale Pull-Request-Lauf
+[`42217832902`](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42217832902)
+ist vollständig erfolgreich. Der parallele Push-Lauf
+[`42217822601`](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42217822601)
+ist ebenfalls erfolgreich. Beide Läufe enthalten Python-Regression, API-
+Vertrag, HA-Runtime, HA-Runtime-Tests, Hassfest, HACS, Browser und Security.
+Die vorherigen Läufe auf dem Zwischenstand `7e395f2` waren wegen eines zu
+breiten statischen Security-Patterns fehlgeschlagen und werden nicht als
+Ergebnis des finalen Kandidaten gewertet.
 
 ## 6. Offene Infrastrukturvoraussetzungen
 
@@ -103,7 +111,7 @@ Vor einer isolierten Installation sind erforderlich:
 
 ## 7. Entscheidung
 
-**GO für den lokalen Entwicklungsstand und den PR zur isolierten CI-Prüfung.**
+**GO für den lokalen Entwicklungsstand und die isolierte CI-Prüfung.**
 
 **NO-GO für Installation oder produktiven Betrieb.** Der Servercode ist
 vorbereitet, aber der Live-Listener, das Proxmox-Backend, die Infrastruktur-
