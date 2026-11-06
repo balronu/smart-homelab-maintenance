@@ -9,7 +9,7 @@ const hass = { language: "de", locale: { language: "en" }, config: { language: "
   "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
   "sensor.smart_homelab_maintenance_running_jobs": { state: "0", attributes: {} },
   "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { cpu_percent: 20, memory_used_bytes: 100, memory_total_bytes: 200 } },
-  "sensor.smart_homelab_maintenance_vm_104": { state: "running", attributes: { vmid: 104, name: "haos" } }
+  "sensor.smart_homelab_maintenance_haos": { state: "running", attributes: { vmid: 104, name: "haos" } }
 } };
 class HaCardEditorDialog extends HTMLElement {
   connectedCallback() {
