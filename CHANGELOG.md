@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-beta.9 – Mobile Kartenstabilität (Kandidat)
+
+- Bewahrt den geöffneten Proxmox-Hostbereich über mehrere Home-Assistant-
+  Statusupdates hinweg.
+- Ermittelt das responsive Kartenraster anhand der tatsächlichen Kartenbreite:
+  eine, zwei oder bis zu drei Spalten.
+- Bricht lange VM-/LXC-Namen sicher um und begrenzt Status-Badges auf mobilen
+  Ansichten.
+- Blendet unbekannte OS-Werte aus, statt `unknown unknown` anzuzeigen, und
+  entfernt die doppelte Read-only-Anzeige.
+- Ergänzt Regressionen für wiederholte `hass`-Updates, lange Namen und
+  unbekannte Sensorwerte.
+
 ## 0.1.0-beta.8 – Lovelace-Entitätsdaten und Status (Kandidat)
 
 - Erkennt VMs und LXC-Container anhand ihrer tatsächlichen Attribute und nicht
