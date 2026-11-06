@@ -5,7 +5,7 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Passive Beta `0.1.0-beta.1`. Updateausführung ist deaktiviert. Agent-,
+Passive Beta `0.1.0-beta.2`. Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
 konfiguriert und geprüft werden.
 

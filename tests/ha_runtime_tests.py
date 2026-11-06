@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import pytest_asyncio
+import sys
 
 from homeassistant import loader
 from homeassistant.config_entries import ConfigEntries, SOURCE_USER
@@ -12,7 +13,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import frame
 
-from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportError
+from custom_components.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportError
 from custom_components.smart_homelab_maintenance.const import DOMAIN
 
 pytestmark = pytest.mark.asyncio
@@ -96,6 +97,27 @@ async def test_config_flow_reports_connection_and_api_errors(hass, monkeypatch):
     result = await _create_entry(hass)
     assert result["type"] == "form"
     assert result["errors"]["base"] == "api_version"
+
+
+async def test_integration_package_has_no_agent_tree_runtime_dependency(hass, monkeypatch):
+    """The HA package must load when only custom_components is installed."""
+
+    class BlockAgentImports:
+        def find_spec(self, fullname, path=None, target=None):
+            if fullname == "agent" or fullname.startswith("agent."):
+                raise ModuleNotFoundError("agent package intentionally unavailable")
+            return None
+
+    blocker = BlockAgentImports()
+    sys.meta_path.insert(0, blocker)
+    try:
+        from custom_components.smart_homelab_maintenance import actions, config_flow, coordinator
+
+        assert config_flow.SmartHomelabConfigFlow is not None
+        assert coordinator.AgentHttpTransport is AgentHttpTransport
+        assert actions.AgentHttpTransport is AgentHttpTransport
+    finally:
+        sys.meta_path.remove(blocker)
 
 
 async def test_setup_registers_entities_devices_services_and_survives_reload(hass, patched_transport):

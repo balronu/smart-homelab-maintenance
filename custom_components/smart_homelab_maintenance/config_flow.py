@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .const import CONF_AGENT_URL, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL
-from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportConfig, TransportError
+from .http_transport import AgentHttpTransport, TransportConfig, TransportError
 
 
 def validate_config(data: Mapping[str, Any]) -> dict[str, Any]:
