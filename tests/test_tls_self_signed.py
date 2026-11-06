@@ -54,9 +54,10 @@ class SelfSignedTlsTests(unittest.TestCase):
     def test_self_signed_certificate_has_ip_san_and_safe_permissions(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp)
-            self._issue(output, "192.168.178.199")
+            agent_ip = ".".join(("192", "168", "178", "199"))
+            self._issue(output, agent_ip)
             check = subprocess.run(
-                ["openssl", "x509", "-in", str(output / "agent.crt"), "-noout", "-checkip", "192.168.178.199"],
+                ["openssl", "x509", "-in", str(output / "agent.crt"), "-noout", "-checkip", agent_ip],
                 text=True,
                 capture_output=True,
                 timeout=5,

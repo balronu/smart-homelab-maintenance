@@ -2,7 +2,7 @@
 
 **Projekt:** Smart Homelab Maintenance  
 **Ausgangscommit:** `2b20e04`  
-**Geplante Agent-Adresse:** `https://192.168.178.199:48128`  
+**Geplante Agent-Adresse:** `https://<PRIVATE_AGENT_IP>:48128`
 **Ergebnis:** Vorbereitung **GO**, produktive Zertifikatserstellung **NO-GO**
 
 ## 1. Implementierte Werkzeuge
@@ -52,7 +52,7 @@ Vertrauenseinstellungen wurden nicht verändert.
 Mit einer temporären Testumgebung wurden ausgeführt:
 
 1. Test-CA erstellen;
-2. Zertifikat für `192.168.178.199` mit IP-SAN ausstellen;
+2. Zertifikat für `<PRIVATE_AGENT_IP>` mit IP-SAN ausstellen;
 3. Kette, IP-SAN und Schlüssel-Paar erfolgreich prüfen;
 4. falsche IP-Adresse ablehnen;
 5. Zertifikat einer unbekannten CA ablehnen;

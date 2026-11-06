@@ -48,7 +48,7 @@ ERROR: Abweichende eigene IPv4-Regel gefunden; manuell prüfen.
 
 Ursache ist ein Fehler in der bestehenden Konfliktprüfung von
 `agent-firewall-common.sh`: `iptables-save` stellt IPv4-Adressen als
-`192.168.178.126/32` und `192.168.178.199/32` dar, während die Prüfung die
+`<HA_PRIVATE_IP>/32` und `<PROXMOX_PRIVATE_IP>/32` dar, während die Prüfung die
 Adressen ohne CIDR-Suffix in der Regelzeile sucht. Dadurch wurde die bereits
 korrekte eigene Allow-Regel fälschlich als abweichend erkannt.
 

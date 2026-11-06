@@ -37,7 +37,7 @@ Prüfung. Öffentliche IP-Adressen und Klartext-HTTP bleiben gesperrt.
 
 Die bestehende Integration benötigte für die URL selbst keine Lockerung:
 
-- `https://192.168.178.199:48128` wird als private URL akzeptiert.
+- `https://<PRIVATE_AGENT_IP>:48128` wird als private URL akzeptiert.
 - `http://...` wird abgelehnt.
 - Öffentliche Ziele wie `https://8.8.8.8:48128` werden abgelehnt.
 - Der optionale CA-Pfad bleibt auf `/ssl/` begrenzt.

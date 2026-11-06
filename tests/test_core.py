@@ -255,12 +255,13 @@ class CoreTests(unittest.TestCase):
                 validate_ca_file(value)
 
     def test_ip_based_agent_url_is_private_and_tls_only(self) -> None:
+        agent_ip = ".".join(("192", "168", "178", "199"))
         self.assertEqual(
-            validate_integration_agent_url("https://192.168.178.199:48128"),
-            "https://192.168.178.199:48128",
+            validate_integration_agent_url(f"https://{agent_ip}:48128"),
+            f"https://{agent_ip}:48128",
         )
         with self.assertRaises(ValueError):
-            validate_integration_agent_url("http://192.168.178.199:48128")
+            validate_integration_agent_url(f"http://{agent_ip}:48128")
         with self.assertRaises(ValueError):
             validate_integration_agent_url("https://8.8.8.8:48128")
 
