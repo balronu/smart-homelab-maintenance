@@ -5,7 +5,7 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Passiver Beta-4-Kandidat `0.1.0-beta.4` (lokal, nicht veröffentlicht).
+Passives GitHub-Prerelease `0.1.0-beta.4`.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
 konfiguriert und geprüft werden.
