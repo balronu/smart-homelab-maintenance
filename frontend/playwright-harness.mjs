@@ -32,8 +32,13 @@ try {
     await page.goto(`http://127.0.0.1:${port}/frontend/browser-harness.html`);
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
     const result = JSON.parse(await page.locator("#result").textContent());
-    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.emptyCardSafe || !result.unknownSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
+    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.cardHasSize || !result.localizedEditor || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.reopenedEditorSafe || !result.emptyCardSafe || !result.unknownSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasTextOverlap || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
     await page.screenshot({ path: `/tmp/card-${name}.png`, fullPage: true });
+    await page.goto(`http://127.0.0.1:${port}/frontend/ha-editor-harness.html`);
+    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("pickerRegistered"), null, { timeout: 10000 });
+    const haResult = JSON.parse(await page.locator("#result").textContent());
+    if (!haResult.pickerRegistered || !haResult.editorVisible || !haResult.previewVisible || !haResult.savedAndReopened || !haResult.noHorizontalOverflow) throw new Error(`${name} HA editor harness failed: ${JSON.stringify(haResult)}`);
+    await page.screenshot({ path: `/tmp/card-${name}-ha-editor.png`, fullPage: true });
     await page.close();
     await context.close();
   }
