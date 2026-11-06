@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-beta.8 – Lovelace-Entitätsdaten und Status (Kandidat)
+
+- Erkennt VMs und LXC-Container anhand ihrer tatsächlichen Attribute und nicht
+  nur anhand historischer Entity-ID-Präfixe.
+- Zeigt vorhandene freie Ressourcenwerte an, ohne fehlende CPU-, RAM- oder
+  Speicherwerte zu simulieren.
+- Trennt Agent-Verbindung, Hostzustand sowie unbekannte/offline Fehlerzustände.
+- Ergänzt Regressionen mit anonymisierten Live-Entitätsstrukturen.
+
 ## 0.1.0-beta.7 – Robuste Lovelace-Spracherkennung (Kandidat)
 
 - Behebt den iPhone-Editorfehler `locale?.toLowerCase is not a function`.

@@ -20,7 +20,7 @@ Home-Assistant-Entitydaten (`hass`), niemals Agent-URLs oder Tokens.
 - `getConfigElement()`, `getStubConfig()` und idempotente Registrierung in
   `window.customCards`
 
-## Beta-7-Kandidat
+## Beta-8-Kandidat
 
 Die Datei wird ohne Buildschritt bytegleich in den Integrationspfad kopiert und
 über `add_extra_js_url` mit Versionsquery registriert. Der Kandidat führt keine
@@ -34,7 +34,9 @@ node --check frontend/card-state.js
 node --check frontend/smart-homelab-maintenance-card.js
 ```
 
-Beta.7 behebt den Laufzeitfehler bei einem objektförmigen `hass.locale`. Das
+Beta.8 erkennt VMs und Container aus den tatsächlich gelieferten
+`vmid`-/`container_id`-Attributen, unabhängig vom konkreten Entity-ID-Slug.
+Der Laufzeitfehler bei einem objektförmigen `hass.locale` bleibt behoben. Das
 Editor-DOM bleibt bei erneutem `setConfig()` stabil, sodass Fokus und
 ungespeicherte Eingaben bei mobilen HA-Updates erhalten bleiben. Der
 Playwright-Harness prüft zusätzlich iPhone-/iPad-Emulation, leere und unbekannte
