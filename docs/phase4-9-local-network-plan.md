@@ -51,8 +51,8 @@ benötigen eine separate Freigabe.
 ```text
 iptables -N SHM_AGENT
 iptables -A SHM_AGENT -p tcp -s <VM104_IP> -d <HOST_IP> --dport 48128 -j ACCEPT
-iptables -A SHM_AGENT -p tcp -d <HOST_IP> --dport 48128 -j DROP
-iptables -I INPUT 1 -p tcp -d <HOST_IP> --dport 48128 -j SHM_AGENT
+iptables -A SHM_AGENT -p tcp --dport 48128 -j DROP
+iptables -I INPUT 1 -p tcp --dport 48128 -j SHM_AGENT
 ```
 
 Die Einfügung an Position 1 ist wichtig, damit vorhandene generische oder
@@ -88,6 +88,20 @@ iptables -X SHM_AGENT
 Die echten Rücknahmebefehle müssen vor Ausführung gegen die tatsächlich
 installierten Regelzähler und Kommentare geprüft werden. Kein pauschales
 Flushen von INPUT, FORWARD oder der Tailscale-Ketten ist zulässig.
+
+Die vorbereiteten Skripte kapseln diese Regeln mit eindeutigen Kommentaren:
+
+- `scripts/apply-agent-firewall.sh` – standardmäßig Dry-Run; `--apply` verlangt
+  zusätzlich `--confirm`;
+- `scripts/remove-agent-firewall.sh` – entfernt ausschließlich die eigenen
+  markierten Chains und Sprungregeln;
+- `deploy/systemd/smart-homelab-maintenance-firewall.service.example` –
+  optionale, noch nicht aktivierte Boot-Persistenz nach `tailscaled`;
+- `deploy/firewall-agent.conf.example` – geheimnisfreie lokale Eingabevorlage.
+
+Beide Skripte verweigern unbekannte Backends, aktivierte Proxmox-Firewall-
+Konfigurationen, abweichende eigene Regeln und unmarkierte Regeln in den
+eigenen Chains.
 
 ## 5. TLS und DNS
 
