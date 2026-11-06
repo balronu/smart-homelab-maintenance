@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import importlib
+import shlex
 import tempfile
 import unittest
 from pathlib import Path
@@ -33,6 +34,10 @@ class FirewallScriptTests(unittest.TestCase):
         path = self.bin / name
         path.write_text(body, encoding="utf-8")
         path.chmod(0o755)
+
+    def _saved_rules(self, rules: str) -> None:
+        body = f"#!/bin/sh\nprintf '%s\\n' {shlex.quote(rules)}\n"
+        self._fake("iptables-save", body)
 
     def _run(self, script: str, *args: str):
         return _process.run(
@@ -67,6 +72,61 @@ class FirewallScriptTests(unittest.TestCase):
         result = self._run("apply-agent-firewall.sh", "--config", str(config))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("DRY-RUN", result.stdout)
+
+    def test_iptables_save_single_host_with_32_is_accepted(self) -> None:
+        self._saved_rules(
+            "-A SHM_AGENT_48128_V4 -s 198.51.100.20/32 -d 198.51.100.10/32 "
+            "-p tcp --dport 48128 -m comment --comment smart-homelab-maintenance-48128-allow -j ACCEPT"
+        )
+        result = self._run(
+            "apply-agent-firewall.sh", "--host-ip", "198.51.100.10", "--ha-ip", "198.51.100.20"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_broad_or_invalid_saved_source_is_rejected(self) -> None:
+        for source in ("198.51.100.0/24", "not-an-ip/32"):
+            with self.subTest(source=source):
+                self._saved_rules(
+                    f"-A SHM_AGENT_48128_V4 -s {source} -d 198.51.100.10/32 "
+                    "-p tcp --dport 48128 -m comment --comment smart-homelab-maintenance-48128-allow -j ACCEPT"
+                )
+                result = self._run(
+                    "apply-agent-firewall.sh", "--host-ip", "198.51.100.10", "--ha-ip", "198.51.100.20"
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Abweichende eigene IPv4-Regel", result.stderr)
+
+    def test_duplicate_or_reversed_saved_rules_are_rejected(self) -> None:
+        allow = (
+            "-A SHM_AGENT_48128_V4 -s 198.51.100.20/32 -d 198.51.100.10/32 "
+            "-p tcp --dport 48128 -m comment --comment smart-homelab-maintenance-48128-allow -j ACCEPT"
+        )
+        drop = (
+            "-A SHM_AGENT_48128_V4 -p tcp --dport 48128 -m comment "
+            "--comment smart-homelab-maintenance-48128-drop -j DROP"
+        )
+        for rules in (f"{allow}\n{allow}\n{drop}", f"{drop}\n{allow}"):
+            with self.subTest(rules=rules):
+                self._saved_rules(rules)
+                result = self._run(
+                    "apply-agent-firewall.sh", "--host-ip", "198.51.100.10", "--ha-ip", "198.51.100.20"
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Abweichende eigene IPv4-Regel", result.stderr)
+
+    def test_existing_tailscale_rules_do_not_conflict(self) -> None:
+        self._saved_rules(
+            "-A INPUT -j ts-input\n"
+            "-A ts-input -i tailscale0 -j ACCEPT\n"
+            "-A SHM_AGENT_48128_V4 -s 198.51.100.20/32 -d 198.51.100.10/32 "
+            "-p tcp --dport 48128 -m comment --comment smart-homelab-maintenance-48128-allow -j ACCEPT\n"
+            "-A SHM_AGENT_48128_V4 -p tcp --dport 48128 -m comment "
+            "--comment smart-homelab-maintenance-48128-drop -j DROP"
+        )
+        result = self._run(
+            "apply-agent-firewall.sh", "--host-ip", "198.51.100.10", "--ha-ip", "198.51.100.20"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

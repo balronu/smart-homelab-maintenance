@@ -126,12 +126,76 @@ check_interface_source() {
 check_conflicting_marker() {
     local saved
     saved="$(iptables-save -t filter)"
-    if grep -F -- "--comment $AGENT_FIREWALL_ALLOW_MARK" <<<"$saved" | grep -Fq -- "-s "; then
-        grep -F -- "--comment $AGENT_FIREWALL_ALLOW_MARK" <<<"$saved" | grep -F -- "-s $ha_ip -d $host_ip" >/dev/null || die "Abweichende eigene IPv4-Regel gefunden; manuell prüfen."
-    fi
-    if grep -F -- "--comment $AGENT_FIREWALL_DROP_MARK" <<<"$saved" | grep -Fq -- "-d "; then
-        grep -F -- "--comment $AGENT_FIREWALL_DROP_MARK" <<<"$saved" >/dev/null || die "Abweichende eigene Drop-Regel gefunden; manuell prüfen."
-    fi
+    python3 - "$ha_ip" "$host_ip" "$AGENT_FIREWALL_ALLOW_MARK" "$AGENT_FIREWALL_DROP_MARK" "$saved" <<'PY' || die "Abweichende eigene IPv4-Regel gefunden; manuell prüfen."
+import ipaddress
+import sys
+
+expected_source = ipaddress.ip_address(sys.argv[1])
+expected_destination = ipaddress.ip_address(sys.argv[2])
+allow_marker = sys.argv[3]
+drop_marker = sys.argv[4]
+saved = sys.argv[5]
+
+
+def field(tokens, option):
+    try:
+        return tokens[tokens.index(option) + 1]
+    except (ValueError, IndexError):
+        return None
+
+
+def exact_host(value, expected):
+    try:
+        if "/" in value:
+            interface = ipaddress.ip_interface(value)
+            return interface.version == 4 and interface.network.prefixlen == 32 and interface.ip == expected
+        return ipaddress.ip_address(value) == expected
+    except ValueError:
+        return False
+
+
+allow_indices = []
+drop_indices = []
+for line in saved.splitlines():
+    tokens = line.split()
+    if len(tokens) < 2 or tokens[0] != "-A":
+        continue
+    chain = tokens[1]
+    comment = field(tokens, "--comment")
+    if comment == allow_marker:
+        valid = (
+            chain == "SHM_AGENT_48128_V4"
+            and
+            field(tokens, "-p") == "tcp"
+            and field(tokens, "--dport") == "48128"
+            and field(tokens, "-j") == "ACCEPT"
+            and exact_host(field(tokens, "-s") or "", expected_source)
+            and exact_host(field(tokens, "-d") or "", expected_destination)
+        )
+        if not valid:
+            raise SystemExit(1)
+        allow_indices.append(len(allow_indices) + len(drop_indices))
+    elif comment == drop_marker:
+        valid = (
+            chain == "SHM_AGENT_48128_V4"
+            and
+            field(tokens, "-p") == "tcp"
+            and field(tokens, "--dport") == "48128"
+            and field(tokens, "-j") == "DROP"
+            and field(tokens, "-s") is None
+            and field(tokens, "-d") is None
+        )
+        if not valid:
+            raise SystemExit(1)
+        drop_indices.append(len(allow_indices) + len(drop_indices))
+
+if len(allow_indices) > 1 or len(drop_indices) > 1:
+    raise SystemExit(1)
+if drop_indices and not allow_indices:
+    raise SystemExit(1)
+if allow_indices and drop_indices and allow_indices[0] > drop_indices[0]:
+    raise SystemExit(1)
+PY
 }
 
 check_chain_safety() {
