@@ -47,12 +47,14 @@ jobs:
           import json
           from pathlib import Path
           manifest = json.loads(Path('custom_components/smart_homelab_maintenance/manifest.json').read_text())
-          assert manifest['version'] == '0.1.0-beta.6'
+          assert manifest['version'] == '0.1.0-beta.7'
           init = Path('custom_components/smart_homelab_maintenance/__init__.py').read_text()
           assert 'StaticPathConfig' in init and 'add_extra_js_url' in init
           card = Path('custom_components/smart_homelab_maintenance/frontend/smart-homelab-maintenance-card.js').read_text()
           assert 'type: "smart-homelab-maintenance-card"' in card
           assert 'getConfigElement' in card and 'getStubConfig' in card
+          assert 'export function resolveLanguage' in card
+          assert 'locale?.toLowerCase' not in card
           PY
   api-contract:
     runs-on: ubuntu-latest

@@ -10,7 +10,9 @@ Home-Assistant-Entitydaten (`hass`), niemals Agent-URLs oder Tokens.
 - responsive Grid-Layout nach tatsächlicher Kartenbreite (`auto-fit`), nicht
   nach Bildschirmbreite
 - Light-/Dark-Mode über Home-Assistant-CSS-Variablen
-- deutsche und englische Standardtexte anhand von `hass.locale`
+- deutsche und englische Standardtexte anhand einer typgeprüften Auflösung von
+  `hass.language`, `hass.locale` und `hass.config.language`; unbekannte oder
+  fehlende Angaben fallen auf Englisch zurück
 - automatische Erkennung von Host-, VM- und LXC-Entitäten
 - echte CPU-, RAM-, Speicher- und Laufzeitwerte, sofern vorhanden
 - Fortschrittsbalken nur bei vorhandenen Zählerständen
@@ -18,7 +20,7 @@ Home-Assistant-Entitydaten (`hass`), niemals Agent-URLs oder Tokens.
 - `getConfigElement()`, `getStubConfig()` und idempotente Registrierung in
   `window.customCards`
 
-## Beta-6-Kandidat
+## Beta-7-Kandidat
 
 Die Datei wird ohne Buildschritt bytegleich in den Integrationspfad kopiert und
 über `add_extra_js_url` mit Versionsquery registriert. Der Kandidat führt keine
@@ -32,7 +34,8 @@ node --check frontend/card-state.js
 node --check frontend/smart-homelab-maintenance-card.js
 ```
 
-Beta.6 hält das Editor-DOM bei erneutem `setConfig()` stabil, sodass Fokus und
+Beta.7 behebt den Laufzeitfehler bei einem objektförmigen `hass.locale`. Das
+Editor-DOM bleibt bei erneutem `setConfig()` stabil, sodass Fokus und
 ungespeicherte Eingaben bei mobilen HA-Updates erhalten bleiben. Der
 Playwright-Harness prüft zusätzlich iPhone-/iPad-Emulation, leere und unbekannte
 Entity-Zustände, JavaScript-Fehler, fehlgeschlagene Requests, den Lovelace-
