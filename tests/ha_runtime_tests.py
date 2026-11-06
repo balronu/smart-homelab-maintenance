@@ -30,7 +30,7 @@ async def hass(tmp_path):
     dr.async_setup(instance)
     instance.auth = await auth.auth_manager_from_config(instance, [], [])
     await http.async_setup(instance, {})
-    await frontend.async_setup(instance)
+    await frontend.async_setup(instance, {})
     await dr.async_load(instance)
     await er.async_load(instance)
     await instance.async_start()
