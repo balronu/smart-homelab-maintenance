@@ -8,6 +8,12 @@
 - Keine Update- oder Shell-Ausführung ergänzt; produktiver Listener bleibt
   unimplementiert/ungeinstalliert
 
+## Unreleased – Phase 4.5 Installer-Vorbereitung
+
+- reproduzierbare Installations-, Prüf-, Update- und Deinstallationsskripte
+- exakte Commit-Prüfung, TLS-/DNS-Gates und geschützte systemd-Credentials
+- standardmäßig kein Apply, kein Start und kein automatischer Neustart
+
 ## 0.1.0-beta.2 – Config-Flow-Fix
 
 - Config Flow funktioniert als eigenständiges Home-Assistant-Paket ohne das

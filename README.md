@@ -33,6 +33,10 @@ Eintrag ist daher nicht vorausgesetzt.
 3. Erst danach die Integration über den Config Flow mit einer privaten
    HTTPS-Agent-Adresse und vertrauenswürdiger Zertifikatskette verbinden.
 
+Der spätere Proxmox-Installationsweg ist in
+[`docs/AGENT_INSTALLATION.md`](docs/AGENT_INSTALLATION.md) beschrieben. Die
+Skripte arbeiten standardmäßig nur im Prüfmodus und starten keinen Dienst.
+
 Für eine spätere Veröffentlichung müssen die Marketplace-Struktur, die
 Release-Artefakte und der Installationsweg erneut gegen die Zielversion von
 Home Assistant geprüft werden.
