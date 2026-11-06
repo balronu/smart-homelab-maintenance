@@ -1,7 +1,7 @@
 [Unit]
 Description=Smart Homelab Maintenance agent firewall guard (manual staging)
 After=network-online.target tailscaled.service
-Wants=network-online.target
+Wants=network-online.target tailscaled.service
 ConditionPathExists=/usr/local/sbin/apply-agent-firewall.sh
 ConditionPathExists=/etc/smart-homelab-maintenance/firewall.conf
 
