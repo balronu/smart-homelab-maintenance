@@ -121,9 +121,11 @@ Integrationen: [HTTP-Integration](https://www.home-assistant.io/integrations/htt
 | Produktiver DNS-/TLS-Test | **NOT RUN** – ausdrücklich nicht freigegeben |
 | HAOS-Installation oder CA-Installation | **NOT RUN** – ausdrücklich verboten |
 
-Die vollständige Remote-CI muss nach dem Commit dieses isolierten Changes über
-PR #2 erneut ausgeführt werden; ein CI-Ergebnis wird erst nach dem tatsächlichen
-Lauf berichtet.
+Die vollständige Remote-CI wurde über PR #2 für Commit `fa50b7fbf1441a8273ca2d1f230f0943bd6e165b`
+ausgeführt und bestand in Lauf
+[42232337473](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42232337473).
+Der nachfolgende reine Dokumentationscommit benötigt wegen der Repository-
+CI-Regeln ebenfalls einen eigenen Lauf.
 
 ## 7. Freigaben und Risiken
 
