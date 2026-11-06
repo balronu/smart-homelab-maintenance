@@ -174,5 +174,3 @@ async def test_actions_return_read_only_data_and_diagnostics_are_secret_free(has
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
     assert diagnostics["execution_enabled"] is False
     assert "fixture-token" not in str(diagnostics)
-    monkeypatch.setattr(AgentHttpTransport, "host", fake_host)
-    monkeypatch.setattr(AgentHttpTransport, "virtual_machines", fake_virtual_machines)
