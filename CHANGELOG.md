@@ -105,7 +105,7 @@
 - Updateausführung global deaktiviert
 - Installation der Karte aus derselben Version als lokale HA-Ressource
 - Keine produktive Geräte- oder Infrastrukturaktion
-## 0.1.0-beta.10 – Scroll- und DOM-Stabilität (unveröffentlichter Kandidat)
+## 0.1.0-beta.10 – Scroll- und DOM-Stabilität (Prerelease veröffentlicht)
 
 - Behebt den iPhone-Scrollsprung durch einmaligen Shadow-DOM-Aufbau und
   inkrementelle Updates bestehender Knoten.
