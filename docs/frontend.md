@@ -20,11 +20,12 @@ Home-Assistant-Entitydaten (`hass`), niemals Agent-URLs oder Tokens.
 - `getConfigElement()`, `getStubConfig()` und idempotente Registrierung in
   `window.customCards`
 
-## Beta-8-Kandidat
+## Beta-9-Kandidat
 
 Die Datei wird ohne Buildschritt bytegleich in den Integrationspfad kopiert und
-über `add_extra_js_url` mit Versionsquery registriert. Der Kandidat führt keine
-HA-Installation und keine öffentliche Veröffentlichung durch.
+über `add_extra_js_url` mit Versionsquery registriert. Beta.9 bewahrt den
+geöffneten Hostbereich bei erneuten `hass`-Updates, nutzt Container Queries für
+die tatsächliche Kartenbreite und blendet unbekannte OS-Werte aus.
 
 Lokale Prüfungen:
 
@@ -43,5 +44,4 @@ Playwright-Harness prüft zusätzlich iPhone-/iPad-Emulation, leere und unbekann
 Entity-Zustände, JavaScript-Fehler, fehlgeschlagene Requests, den Lovelace-
 Editor-Lifecycle und Light-/Dark-Mode.
 
-Der Playwright-Harness benötigt eine installierte `playwright`-Abhängigkeit;
-ohne diese Abhängigkeit ist die Browsermatrix nicht ausgeführt.
+Der Playwright-Harness benötigt eine installierte `playwright`-Abhängigkeit.

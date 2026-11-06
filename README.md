@@ -5,7 +5,7 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Beta-8-Kandidat; Veröffentlichung erst nach vollständiger CI.
+Beta-9-Kandidat; Veröffentlichung erst nach vollständiger CI.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
 konfiguriert und geprüft werden.
