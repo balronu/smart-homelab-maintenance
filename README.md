@@ -5,7 +5,8 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Passive Beta `0.1.0-beta.2`. Updateausführung ist deaktiviert. Agent-,
+Passive Beta `0.1.0-beta.3` (lokaler, nicht veröffentlichter Kandidat).
+Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
 konfiguriert und geprüft werden.
 
@@ -30,8 +31,12 @@ Eintrag ist daher nicht vorausgesetzt.
    einbinden und `custom_components/smart_homelab_maintenance/` installieren.
 2. Die Lovelace-Datei `frontend/smart-homelab-maintenance-card.js` aus derselben
    Version als lokale Dashboard-Ressource vom Typ `module` registrieren.
-3. Erst danach die Integration über den Config Flow mit einem abgesicherten
-   Agent-Endpunkt verbinden.
+3. Erst danach die Integration über den Config Flow mit einer privaten
+   HTTPS-Agent-Adresse und vertrauenswürdiger Zertifikatskette verbinden.
+
+Der spätere Proxmox-Installationsweg ist in
+[`docs/AGENT_INSTALLATION.md`](docs/AGENT_INSTALLATION.md) beschrieben. Die
+Skripte arbeiten standardmäßig nur im Prüfmodus und starten keinen Dienst.
 
 Für eine spätere Veröffentlichung müssen die Marketplace-Struktur, die
 Release-Artefakte und der Installationsweg erneut gegen die Zielversion von
@@ -41,10 +46,14 @@ Home Assistant geprüft werden.
 
 - passive Beta; keine Updateausführung
 - keine freien Shell-Kommandos über die API
-- Agent-Kommunikation authentifiziert und größen-/timeoutbegrenzt
+- Agent-Kommunikation nur über private HTTPS-Ziele, authentifiziert und
+  größen-/timeoutbegrenzt
 - unbekannte oder blockierte Anwendungen bleiben lesend
 - Zugangsdaten gehören ausschließlich in die lokale Konfiguration und dürfen
   nicht in Logs, Issues, Screenshots oder Diagnosen erscheinen
+- der Agent-Server erzwingt TLS, bindet nicht an unbeschränkte Adressen und
+  nutzt getrennte systemd-Credentials; das Proxmox-Backend arbeitet nur lesend
+- produktive Installation und Start sind nicht erfolgt
 
 ## Entwicklung und Tests
 

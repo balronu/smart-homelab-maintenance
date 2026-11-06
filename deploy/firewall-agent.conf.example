@@ -1,0 +1,4 @@
+# No secrets. Replace placeholders only in a local, operator-controlled copy.
+HOST_IP=<PROXMOX_AGENT_BIND_IPV4>
+HA_IP=<HOME_ASSISTANT_VM104_IPV4>
+INTERFACE=vmbr0

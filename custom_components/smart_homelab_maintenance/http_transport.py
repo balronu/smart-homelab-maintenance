@@ -8,11 +8,62 @@ depend on the separate agent source tree being installed beside it.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
+import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any
+from urllib.parse import urlsplit
+
+
+PRIVATE_DNS_SUFFIXES = (".home.arpa", ".lan", ".local")
+
+
+def validate_ca_file(value: str | None) -> str | None:
+    """Allow only an explicit CA file in HA's persistent SSL directory."""
+
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if ".." in raw.split("/"):
+        raise ValueError("ca_file must not contain path traversal")
+    path = PurePosixPath(raw)
+    if not path.is_absolute() or path.parts[:2] != ("/", "ssl"):
+        raise ValueError("ca_file must be an absolute path below /ssl")
+    if ".." in path.parts or path.suffix.lower() not in {".pem", ".crt", ".cer"}:
+        raise ValueError("ca_file must be a certificate file below /ssl")
+    return str(path)
+
+
+def validate_agent_url(value: str) -> str:
+    """Return a normalized private HTTPS URL or reject it fail-closed."""
+
+    raw = str(value).strip().rstrip("/")
+    parsed = urlsplit(raw)
+    if parsed.scheme.lower() != "https" or not parsed.hostname:
+        raise ValueError("agent_url must use HTTPS")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("agent_url must not contain credentials or query data")
+    hostname = parsed.hostname.lower()
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        if hostname != "localhost" and not hostname.endswith(PRIVATE_DNS_SUFFIXES):
+            raise ValueError("agent_url must use a private DNS suffix")
+    else:
+        if not (address.is_private or address.is_loopback or address.is_link_local):
+            raise ValueError("agent_url must use a private address")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("agent_url has an invalid port") from exc
+    authority = f"[{hostname}]" if ":" in hostname else hostname
+    if port is not None:
+        authority += f":{port}"
+    return f"https://{authority}"
 
 
 class TransportError(Exception):
@@ -32,10 +83,11 @@ class TransportConfig:
     timeout_seconds: float = 5.0
     max_response_bytes: int = 256_000
     api_version: str = "1"
+    ca_file: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.base_url.startswith(("http://127.0.0.1", "http://localhost")):
-            raise ValueError("offline transport accepts localhost endpoints only")
+        validate_agent_url(self.base_url)
+        validate_ca_file(self.ca_file)
         if not self.token or len(self.token) > 512:
             raise ValueError("token is required and bounded")
         if not 0.1 <= self.timeout_seconds <= 30:
@@ -48,6 +100,12 @@ class AgentHttpTransport:
     def __init__(self, config: TransportConfig) -> None:
         self.config = config
 
+    def _ssl_context(self) -> ssl.SSLContext:
+        context = ssl.create_default_context(cafile=self.config.ca_file)
+        context.check_hostname = True
+        context.verify_mode = ssl.CERT_REQUIRED
+        return context
+
     async def get(self, path: str) -> dict[str, Any]:
         if not path.startswith("/api/v1/"):
             raise TransportError("invalid_path", "only API v1 paths are allowed")
@@ -58,7 +116,11 @@ class AgentHttpTransport:
             )
         except asyncio.TimeoutError as exc:
             raise TransportError("timeout", "agent request timed out") from exc
-        except (ConnectionError, OSError, urllib.error.URLError) as exc:
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, ssl.SSLError):
+                raise TransportError("tls_error", "agent TLS verification failed") from exc
+            raise TransportError("connection", "agent connection failed") from exc
+        except (ConnectionError, OSError) as exc:
             raise TransportError("connection", "agent connection failed") from exc
 
     def _get_sync(self, path: str) -> dict[str, Any]:
@@ -71,10 +133,15 @@ class AgentHttpTransport:
             method="GET",
         )
         try:
-            with urllib.request.urlopen(request, timeout=self.config.timeout_seconds) as response:
+            with urllib.request.urlopen(
+                request,
+                timeout=self.config.timeout_seconds,
+                context=self._ssl_context(),
+            ) as response:
                 raw = response.read(self.config.max_response_bytes + 1)
         except urllib.error.HTTPError as exc:
-            raise TransportError("http_error", "agent returned an HTTP error") from exc
+            code = "authentication" if exc.code in {401, 403} else "http_error"
+            raise TransportError(code, "agent returned an HTTP error") from exc
         if len(raw) > self.config.max_response_bytes:
             raise TransportError("response_too_large", "agent response exceeds limit")
         try:

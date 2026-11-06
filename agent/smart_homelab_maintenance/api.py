@@ -62,6 +62,10 @@ class ApiApplication:
             return {"status": "ok", "mode": "offline"}
         if path == "/api/v1/capabilities":
             return {"execution_enabled": False, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
+        if path == "/api/v1/host":
+            return self.discovery.host()
+        if path == "/api/v1/virtual-machines":
+            return self._page(self.discovery.virtual_machines(), query)
         if path == "/api/v1/containers":
             return self._page([item.as_dict() for item in self.discovery.containers()], query)
         if path == "/api/v1/jobs":

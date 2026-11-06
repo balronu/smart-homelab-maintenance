@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 from .http_transport import AgentHttpTransport, TransportConfig, TransportError
 
-from .const import CONF_AGENT_URL, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL
+from .const import CONF_AGENT_URL, CONF_CA_FILE, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +26,7 @@ class SmartHomelabCoordinator:
         options = options or {}
         interval = int(options.get(CONF_SCAN_INTERVAL, data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)))
         self.update_interval = max(MIN_SCAN_INTERVAL, min(MAX_SCAN_INTERVAL, interval))
-        self.transport = AgentHttpTransport(TransportConfig(str(data[CONF_AGENT_URL]), str(data[CONF_TOKEN])))
+        self.transport = AgentHttpTransport(TransportConfig(str(data[CONF_AGENT_URL]), str(data[CONF_TOKEN]), ca_file=data.get(CONF_CA_FILE)))
         self.data = CoordinatorData(False)
         self.last_error: str | None = None
         self._lock = asyncio.Lock()

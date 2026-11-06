@@ -1,0 +1,216 @@
+"""Small HTTPS server for the read-only agent API.
+
+The server is intentionally dependency-free and injectable.  It exposes only
+the routes implemented by :class:`ApiApplication`; there is no shell or update
+operation endpoint.  A caller must provide certificate/key files and a token
+credential explicitly, so an accidental plaintext listener cannot be created.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import ssl
+import ipaddress
+import argparse
+import json
+import tomllib
+from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, Callable
+
+from .api import ApiApplication
+from .discovery import DiscoveryService
+from .jobs import JobRepository
+from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInventoryBackend
+from .security import redact_secrets
+
+_LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class AgentServerConfig:
+    host: str = "127.0.0.1"
+    port: int = 48128
+    certificate: str | None = None
+    private_key: str | None = None
+    execution_enabled: bool = False
+    max_request_line: int = 4096
+
+    def __post_init__(self) -> None:
+        if not self.host:
+            raise ValueError("agent must not bind an unrestricted address")
+        try:
+            address = ipaddress.ip_address(self.host)
+        except ValueError:
+            address = None
+        if address is not None and address.is_unspecified:
+            raise ValueError("agent must not bind an unrestricted address")
+        if not 1024 <= self.port <= 65535:
+            raise ValueError("agent port must be an unprivileged port")
+        if not self.certificate or not self.private_key:
+            raise ValueError("TLS certificate and private key are required")
+        if self.execution_enabled:
+            raise ValueError("update execution is permanently disabled in this phase")
+
+
+@dataclass(frozen=True, slots=True)
+class AgentRuntimeConfig:
+    server: AgentServerConfig
+    state_directory: str
+    proxmox: ProxmoxClientConfig
+    max_response_bytes: int = 256_000
+
+
+def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
+    """Load non-secret runtime settings from a TOML file."""
+
+    try:
+        with Path(path).open("rb") as handle:
+            raw = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise ValueError("agent configuration could not be loaded") from exc
+    try:
+        server = AgentServerConfig(
+            host=str(raw["listen_host"]), port=int(raw["listen_port"]),
+            certificate=str(raw["certificate"]), private_key=str(raw["private_key"]),
+            execution_enabled=bool(raw.get("execution_enabled", False)),
+        )
+        proxmox = ProxmoxClientConfig(
+            base_url=str(raw["proxmox_url"]), node=str(raw["proxmox_node"]),
+            api_token="configuration-credential-placeholder",
+            ca_file=str(raw["proxmox_ca_file"]) if raw.get("proxmox_ca_file") else None,
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("agent configuration is invalid") from exc
+    state_directory = str(raw.get("state_directory", ""))
+    if not state_directory or not Path(state_directory).is_absolute():
+        raise ValueError("state_directory must be an absolute path")
+    max_bytes = int(raw.get("max_response_bytes", 256_000))
+    if max_bytes < 1024:
+        raise ValueError("max_response_bytes is too small")
+    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes)
+
+
+def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:
+    """Construct the live read-only application from validated settings."""
+
+    if not agent_token or not proxmox_token:
+        raise ValueError("required credentials are missing")
+    proxmox_config = ProxmoxClientConfig(
+        base_url=config.proxmox.base_url, node=config.proxmox.node,
+        api_token=proxmox_token, ca_file=config.proxmox.ca_file,
+        timeout=config.proxmox.timeout, max_bytes=config.proxmox.max_bytes,
+    )
+    repository = JobRepository(str(Path(config.state_directory) / "jobs.sqlite"))
+    backend = ProxmoxInventoryBackend(ProxmoxApiClient(proxmox_config))
+    application = ApiApplication(DiscoveryService(backend), repository,
+                                read_token=agent_token, max_bytes=config.max_response_bytes)
+    return application, repository
+
+
+def load_credential(path: str | os.PathLike[str]) -> str:
+    """Load and validate a systemd-style credential without logging it."""
+
+    value = Path(path).read_text(encoding="utf-8").strip()
+    if not value or len(value) > 512 or any(char.isspace() for char in value):
+        raise ValueError("credential is empty or malformed")
+    return value
+
+
+def credential_from_systemd(name: str = "api_token") -> str:
+    directory = os.environ.get("CREDENTIALS_DIRECTORY")
+    if not directory:
+        raise ValueError("CREDENTIALS_DIRECTORY is not set")
+    return load_credential(Path(directory) / name)
+
+
+def tls_context(config: AgentServerConfig) -> ssl.SSLContext:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.load_cert_chain(config.certificate, config.private_key)
+    return context
+
+
+class AgentRequestHandler(BaseHTTPRequestHandler):
+    server_version = "SmartHomelabMaintenanceAgent/0.1"
+    sys_version = ""
+
+    def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
+        application: ApiApplication = self.server.application  # type: ignore[attr-defined]
+        try:
+            status, payload = application.handle("GET", self.path, headers=self.headers)
+            body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            _LOGGER.debug("client disconnected before response was written")
+        except Exception as exc:  # do not expose internals to clients
+            _LOGGER.warning("agent request failed: %s", redact_secrets(str(exc)))
+            try:
+                self.send_error(500, "internal server error")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+    def do_POST(self) -> None:  # noqa: N802
+        self.send_error(405, "method not allowed")
+
+    def log_message(self, format: str, *args: object) -> None:
+        # Access logs must never contain Authorization headers or query tokens.
+        _LOGGER.info("agent HTTP request: %s", format.split("%", 1)[0].strip())
+
+
+class AgentHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = False
+    daemon_threads = True
+
+    def __init__(self, address: tuple[str, int], application: ApiApplication, context: ssl.SSLContext) -> None:
+        super().__init__(address, AgentRequestHandler)
+        self.application = application
+        self.socket = context.wrap_socket(self.socket, server_side=True)
+
+
+def create_server(application: ApiApplication, config: AgentServerConfig) -> AgentHTTPServer:
+    """Create an HTTPS server; it is not started by this function."""
+
+    return AgentHTTPServer((config.host, config.port), application, tls_context(config))
+
+
+def serve_forever(application: ApiApplication, config: AgentServerConfig, *, server_factory: Callable[..., AgentHTTPServer] = create_server) -> None:
+    """Run a caller-supplied application until interrupted, then close it."""
+
+    server = server_factory(application, config)
+    try:
+        server.serve_forever(poll_interval=0.25)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Smart Homelab Maintenance read-only agent")
+    parser.add_argument("--config", default=os.environ.get("SMART_HOMELAB_AGENT_CONFIG"))
+    args = parser.parse_args(argv)
+    if not args.config:
+        parser.error("--config or SMART_HOMELAB_AGENT_CONFIG is required")
+    try:
+        config = load_runtime_config(args.config)
+        agent_token = credential_from_systemd("api_token")
+        proxmox_token = credential_from_systemd("proxmox_api_token")
+        application, repository = build_application(config, agent_token=agent_token, proxmox_token=proxmox_token)
+        try:
+            serve_forever(application, config.server)
+        finally:
+            repository.close()
+    except (OSError, ValueError) as exc:
+        _LOGGER.error("agent startup failed: %s", redact_secrets(str(exc)))
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
