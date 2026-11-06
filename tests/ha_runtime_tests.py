@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import pytest_asyncio
+import socket
 import sys
 
 from homeassistant import auth, loader
@@ -24,13 +25,16 @@ pytestmark = pytest.mark.asyncio
 @pytest_asyncio.fixture
 async def hass(tmp_path):
     instance = HomeAssistant(str(tmp_path))
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        http_port = probe.getsockname()[1]
     loader.async_setup(instance)
     frame.async_setup(instance)
     instance.config_entries = ConfigEntries(instance, {"components": {}})
     await instance.config_entries.async_initialize()
     dr.async_setup(instance)
     instance.auth = await auth.auth_manager_from_config(instance, [], [])
-    await http.async_setup(instance, {})
+    await http.async_setup(instance, {"server_port": http_port})
     instance.data[DATA_EXTRA_MODULE_URL] = UrlManager(lambda _action, _url: None, [])
     await dr.async_load(instance)
     await er.async_load(instance)
