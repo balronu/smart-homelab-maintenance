@@ -27,7 +27,7 @@ async def hass(tmp_path):
     frame.async_setup(instance)
     instance.config_entries = ConfigEntries(instance, {"components": {}})
     await instance.config_entries.async_initialize()
-    await http.async_setup(instance)
+    await http.async_setup(instance, {})
     await frontend.async_setup(instance)
     dr.async_setup(instance)
     await dr.async_load(instance)

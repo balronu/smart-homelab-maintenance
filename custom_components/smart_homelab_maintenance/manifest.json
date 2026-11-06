@@ -2,6 +2,7 @@
   "domain": "smart_homelab_maintenance",
   "name": "Smart Homelab Maintenance",
   "codeowners": ["@balronu"],
+  "dependencies": ["http"],
   "config_flow": true,
   "documentation": "https://github.com/balronu/smart-homelab-maintenance",
   "iot_class": "local_polling",
