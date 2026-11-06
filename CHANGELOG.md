@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-beta.4 – Lovelace-Dashboard-Kandidat (nicht veröffentlicht)
+## 0.1.0-beta.4 – Lovelace-Dashboard (Prerelease)
 
 - Read-only Lovelace-Karte für Proxmox-Host, VMs, LXC-Container und
   Wartungshinweise ergänzt.
@@ -10,8 +10,8 @@
   Frontend-Ressource registriert und ist über den grafischen Karteneditor
   auswählbar.
 - Responsive Light-/Dark-Mode-Darstellung und deutsche/englische Texte ergänzt.
-- Kandidat ist lokal und unveröffentlicht; produktive Installation und
-  GitHub-Veröffentlichung sind nicht erfolgt.
+- Als GitHub-Prerelease veröffentlicht; eine produktive Installation ist nicht
+  erfolgt.
 
 ## 0.1.0-beta.3 – Private HTTPS-IP-Transport (lokaler Kandidat)
 
