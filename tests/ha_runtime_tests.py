@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 import sys
 
-from homeassistant import loader
+from homeassistant import auth, loader
 from homeassistant.components import frontend, http
 from homeassistant.config_entries import ConfigEntries, SOURCE_USER
 from homeassistant.core import HomeAssistant
@@ -28,6 +28,7 @@ async def hass(tmp_path):
     instance.config_entries = ConfigEntries(instance, {"components": {}})
     await instance.config_entries.async_initialize()
     await http.async_setup(instance, {})
+    instance.auth = await auth.auth_manager_from_config(instance, [], [])
     await frontend.async_setup(instance)
     dr.async_setup(instance)
     await dr.async_load(instance)
