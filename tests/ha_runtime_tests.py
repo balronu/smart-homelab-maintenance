@@ -34,7 +34,7 @@ async def hass(tmp_path):
     await instance.config_entries.async_initialize()
     dr.async_setup(instance)
     instance.auth = await auth.auth_manager_from_config(instance, [], [])
-    await http.async_setup(instance, {"server_port": http_port})
+    await http.async_setup(instance, {"http": {"server_port": http_port}})
     instance.data[DATA_EXTRA_MODULE_URL] = UrlManager(lambda _action, _url: None, [])
     await dr.async_load(instance)
     await er.async_load(instance)
