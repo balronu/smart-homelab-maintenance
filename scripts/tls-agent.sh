@@ -29,6 +29,8 @@ Verwendung:
   tls-agent.sh init-ca --ca-dir DIR [--days N] [--apply --confirm]
   tls-agent.sh issue --ca-dir DIR --output-dir DIR --ip IP [--prefix NAME]
                       [--days N] [--apply --confirm]
+  tls-agent.sh self-signed --output-dir DIR --ip IP [--prefix NAME]
+                            [--days N] [--apply --confirm]
   tls-agent.sh verify --ca-dir DIR --cert FILE --key FILE --ip IP
   tls-agent.sh renew --ca-dir DIR --output-dir DIR --ip IP [--prefix NAME]
                       [--days N] [--apply --confirm]
@@ -147,6 +149,46 @@ issue_certificate() {
     info "Zertifikat erstellt: öffentliches Zertifikat $cert"
 }
 
+issue_self_signed_certificate() {
+    require_apply
+    require_absolute_dir "$output_dir" "Ausgabeverzeichnis"
+    [[ -n "$ip_address" ]] || die "--ip ist erforderlich."
+    validate_ip "$ip_address" || die "IP muss eine private IPv4/IPv6-Adresse sein."
+    mkdir -p "$output_dir"
+    chmod 700 "$output_dir"
+    local key="$output_dir/$prefix.key" cert="$output_dir/$prefix.crt"
+    [[ ! -e "$key" && ! -e "$cert" ]] || die "Zielzertifikat existiert bereits; kein Überschreiben."
+    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "$key" >/dev/null 2>&1
+    chmod 600 "$key"
+    openssl req -x509 -new -sha256 -days "$days" \
+        -key "$key" -out "$cert" \
+        -subj "/CN=Smart Homelab Maintenance Agent" \
+        -addext "subjectAltName=critical,IP:$ip_address" \
+        -addext "basicConstraints=critical,CA:FALSE" \
+        -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+        -addext "extendedKeyUsage=serverAuth" >/dev/null 2>&1
+    chmod 644 "$cert"
+    verify_self_signed "$cert" "$key" "$ip_address"
+    info "Selbstsigniertes Zertifikat erstellt: öffentliches Zertifikat $cert"
+}
+
+verify_self_signed() {
+    local cert="$1" key="$2" expected_ip="$3"
+    [[ -r "$cert" && -f "$cert" ]] || die "Zertifikat fehlt oder ist nicht lesbar."
+    [[ -r "$key" && -f "$key" ]] || die "Privatschlüssel fehlt oder ist nicht lesbar."
+    openssl x509 -in "$cert" -noout -checkend 86400 >/dev/null || die "Zertifikat ist ungültig oder läuft in weniger als 24 Stunden ab."
+    openssl x509 -in "$cert" -noout -checkip "$expected_ip" >/dev/null || die "Zertifikat enthält keinen passenden IP-SAN."
+    openssl verify -CAfile "$cert" "$cert" >/dev/null || die "Selbstsigniertes Zertifikat konnte nicht als expliziter Trust Anchor geprüft werden."
+    openssl x509 -in "$cert" -noout -text | grep -Fq "CA:FALSE" || die "Zertifikat ist keine End-Entity."
+    openssl x509 -in "$cert" -noout -text | grep -Fq "TLS Web Server Authentication" || die "Zertifikat ist nicht für Server-Authentifizierung ausgestellt."
+    local cert_key private_key issuer_subject
+    cert_key="$(openssl x509 -in "$cert" -pubkey -noout | openssl pkey -pubin -outform DER 2>/dev/null | sha256sum | awk '{print $1}')" || die "Zertifikat konnte nicht geprüft werden."
+    private_key="$(openssl pkey -in "$key" -pubout 2>/dev/null | openssl pkey -pubin -outform DER 2>/dev/null | sha256sum | awk '{print $1}')" || die "Zertifikat konnte nicht geprüft werden."
+    [[ "$cert_key" == "$private_key" ]] || die "Zertifikat und Privatschlüssel gehören nicht zusammen."
+    issuer_subject="$(openssl x509 -in "$cert" -noout -issuer -subject | sed 's/^issuer=//; s/^subject=//')"
+    [[ "$(printf '%s\n' "$issuer_subject" | sed -n '1p')" == "$(printf '%s\n' "$issuer_subject" | sed -n '2p')" ]] || die "Zertifikat ist nicht selbstsigniert."
+}
+
 verify_certificate() {
     [[ -n "$ca_dir" && -n "$candidate_cert" && -n "$candidate_key" && -n "$ip_address" ]] || die "verify benötigt CA, Zertifikat, Schlüssel und --ip."
     validate_ip "$ip_address" || die "IP muss eine private IPv4/IPv6-Adresse sein."
@@ -175,6 +217,7 @@ case "$ACTION" in
         [[ "$ACTION" != renew || "$prefix" != agent ]] || prefix="agent-renewed"
         issue_certificate
         ;;
+    self-signed) issue_self_signed_certificate ;;
     verify) verify_certificate ;;
     rotate) rotate_certificate ;;
     *) usage >&2; die "Unbekannte Aktion: $ACTION" ;;

@@ -95,6 +95,42 @@ Selbstsignierte Zertifikate ohne vertrauenswürdige CA, deaktivierte
 Zertifikatsprüfung und Klartext-HTTP sind nicht zulässig. Der Installer prüft
 Ablaufdatum und die Zuordnung von Zertifikat und Schlüssel.
 
+### 3a. Einfacher lokaler Betrieb mit selbstsigniertem Zertifikat
+
+Für einen ausschließlich lokalen Agenten kann statt einer separaten CA ein
+selbstsigniertes Serverzertifikat verwendet werden. Das Zertifikat wird als
+ausdrücklich vertrauenswürdige CA-Datei unter `/ssl/` in Home Assistant
+hinterlegt. Dadurch bleibt die Prüfung aktiv; `verify=False`, eine Abschaltung
+der Hostname-/IP-Prüfung oder ein HTTP-Fallback sind nicht erforderlich.
+
+Die Erstellung bleibt ein separat freizugebender, mutierender Schritt:
+
+```bash
+sudo scripts/tls-agent.sh self-signed \
+  --output-dir /secure/smart-homelab-maintenance-agent-cert \
+  --ip <PRIVATE_AGENT_IP> \
+  --prefix agent \
+  --apply --confirm
+```
+
+Das Werkzeug erzeugt einen privaten Schlüssel mit Modus `0600` und ein
+öffentliches Zertifikat mit Modus `0644`. Das Zertifikat enthält die private
+IP-Adresse als echten IP-SAN, `basicConstraints=CA:FALSE`, `serverAuth` und
+geeignete Key Usage. Nur die öffentliche Zertifikatsdatei wird kontrolliert
+nach Home Assistant `/ssl/` übertragen und im Config Flow als CA-Datei
+angegeben. Der Server-Privatschlüssel bleibt ausschließlich auf Proxmox.
+
+Der Installer akzeptiert diesen Betriebsweg, weil er Zertifikatsablauf,
+passenden Schlüssel und den IP-SAN prüft. Eine Zertifikatskette wird bei diesem
+Modus nicht vorausgesetzt; die Vertrauensentscheidung erfolgt ausschließlich
+durch die explizite CA-Datei im HA-Transport. Für mehrere Agenten oder längere
+Betriebswege ist weiterhin die dedizierte CA-Variante vorzuziehen.
+
+Bei Erneuerung muss ein neuer Dateipräfix verwendet werden. Vor dem Austausch
+sind SAN, Ablauf, Schlüssel-Paar und die explizite Vertrauensprüfung erneut
+isoliert zu prüfen. Ein Zertifikatswechsel, eine HA-Konfigurationsänderung und
+ein Dienstneustart bleiben getrennte, freizugebende Schritte.
+
 ## 4. Vorprüfung
 
 Die Vorprüfung verändert nichts:
