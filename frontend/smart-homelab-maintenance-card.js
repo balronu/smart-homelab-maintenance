@@ -15,7 +15,7 @@ function resourceLines(item, labels) { return [bar(labels.memory, item.memory_us
 const css = `:host{display:block;color:var(--primary-text-color)}.card{background:var(--ha-card-background,var(--card-background-color));border-radius:var(--ha-card-border-radius,12px);padding:16px;box-shadow:var(--ha-card-box-shadow);overflow:hidden}.header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}.header h2{margin:0;font-size:1.25rem}.status{display:inline-flex;align-items:center;gap:6px;font-size:.9em}.dot{width:9px;height:9px;border-radius:50%;background:var(--success-color,#43a047)}.offline .dot{background:var(--error-color,#db4437)}.summary,.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.metric,.item{border:1px solid var(--divider-color,#ddd);border-radius:8px;padding:10px;min-width:0}.metric strong{display:block;font-size:1.2em}.muted{color:var(--secondary-text-color);font-size:.86em}.section{margin-top:14px}.section h3{margin:0 0 8px;font-size:1rem}.item-head{display:flex;justify-content:space-between;gap:8px}.bar-row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin-top:8px}.bar-row progress{width:100%}.pill{border-radius:12px;padding:2px 7px;font-size:.78em;background:var(--secondary-background-color)}.warning{color:var(--error-color,#db4437)}.readonly{color:var(--secondary-text-color);font-size:.82em;margin-top:10px}details{margin-top:8px}summary{cursor:pointer;list-style-position:inside}@media(max-width:420px){.card{padding:12px}.summary,.grid{grid-template-columns:1fr}.header{align-items:flex-start;flex-direction:column}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
   constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; }
-  setConfig(config) { this.config = { ...DEFAULTS, ...(config || {}) }; this.render(); }
+  setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
   set hass(value) { this._hass = value; this.render(); }
   get hass() { return this._hass; }
   render() { const labels = textFor(this._hass?.locale || "de"); const data = model(this._hass, this.config); const host = data.host; const vmCards = data.vms.map((vm) => `<article class="item"><div class="item-head"><strong>VM ${esc(vm.vmid ?? "?")} · ${esc(vm.name)}</strong><span class="pill">${vm.running ? labels.running : labels.stopped}</span></div>${bar(labels.memory, vm.memory_used_bytes, vm.memory_total_bytes)}${bar(labels.storage, vm.disk_used_bytes, vm.disk_total_bytes)}${vm.cpu_percent != null ? `<div class="muted">${labels.cpu}: ${Number(vm.cpu_percent).toFixed(1)}%</div>` : ""}</article>`).join(""); const ctCards = data.containers.map((ct) => `<article class="item"><div class="item-head"><strong>CT ${esc(ct.container_id ?? "?")} · ${esc(ct.name)}</strong><span class="pill">${ct.running ? labels.running : labels.stopped}</span></div>${resourceLines(ct, labels)}<div class="muted">${esc(ct.os_name || labels.unknown)} ${esc(ct.os_version || "")}</div></article>`).join("");
@@ -25,8 +25,26 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   static getStubConfig() { return { title: "Smart Homelab Maintenance", show_vms: true, show_containers: true }; }
 }
 export class SmartHomelabMaintenanceCardEditor extends HTMLElement {
-  setConfig(config) { this.config = { ...DEFAULTS, ...(config || {}) }; this.render(); }
-  render() { this.innerHTML = `<label>Title <input data-field="title" value="${esc(this.config.title)}"></label><label><input data-field="show_vms" type="checkbox" ${this.config.show_vms ? "checked" : ""}> Virtual machines</label><label><input data-field="show_containers" type="checkbox" ${this.config.show_containers ? "checked" : ""}> LXC containers</label><label><input data-field="show_maintenance" type="checkbox" ${this.config.show_maintenance ? "checked" : ""}> Maintenance</label>`; this.querySelectorAll("input").forEach((input) => input.addEventListener("change", () => { const next = { ...this.config, title: this.querySelector('[data-field="title"]').value, show_vms: this.querySelector('[data-field="show_vms"]').checked, show_containers: this.querySelector('[data-field="show_containers"]').checked, show_maintenance: this.querySelector('[data-field="show_maintenance"]').checked }; this.config = next; this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: next }, bubbles: true, composed: true })); })); }
+  constructor() { super(); this.config = { ...DEFAULTS }; this._rendered = false; }
+  setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
+  render() {
+    if (!this._rendered) {
+      this.innerHTML = `<label>Title <input data-field="title"></label><label><input data-field="show_vms" type="checkbox"> Virtual machines</label><label><input data-field="show_containers" type="checkbox"> LXC containers</label><label><input data-field="show_maintenance" type="checkbox"> Maintenance</label>`;
+      this.addEventListener("change", (event) => {
+        if (!(event.target instanceof HTMLInputElement)) return;
+        const next = { ...this.config, title: this.querySelector('[data-field="title"]').value, show_vms: this.querySelector('[data-field="show_vms"]').checked, show_containers: this.querySelector('[data-field="show_containers"]').checked, show_maintenance: this.querySelector('[data-field="show_maintenance"]').checked };
+        this.config = next;
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: next }, bubbles: true, composed: true }));
+      });
+      this._rendered = true;
+    }
+    const title = this.querySelector('[data-field="title"]');
+    if (title && title !== document.activeElement) title.value = this.config.title;
+    for (const field of ["show_vms", "show_containers", "show_maintenance"]) {
+      const input = this.querySelector(`[data-field="${field}"]`);
+      if (input && input !== document.activeElement) input.checked = Boolean(this.config[field]);
+    }
+  }
 }
 if (!customElements.get("smart-homelab-maintenance-card")) customElements.define("smart-homelab-maintenance-card", SmartHomelabMaintenanceCard);
 if (!customElements.get("smart-homelab-maintenance-card-editor")) customElements.define("smart-homelab-maintenance-card-editor", SmartHomelabMaintenanceCardEditor);

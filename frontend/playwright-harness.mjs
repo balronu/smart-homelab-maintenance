@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { chromium, devices } from "playwright";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -17,17 +17,25 @@ const port = server.address().port;
 
 const browser = await chromium.launch({ headless: true });
 try {
-  for (const width of [390, 768, 1024, 1440]) {
-    const page = await browser.newPage({ viewport: { width, height: 900 }, colorScheme: "light" });
+  const contexts = [
+    { name: "iphone-dark", options: { ...devices["iPhone 13"], colorScheme: "dark" } },
+    { name: "ipad-light", options: { ...devices["iPad (gen 7)"], colorScheme: "light" } },
+    ...[768, 1024, 1440].map((width) => ({ name: `desktop-${width}`, options: { viewport: { width, height: 900 }, colorScheme: "light" } })),
+  ];
+  for (const { name, options } of contexts) {
+    const context = await browser.newContext(options);
+    const page = await context.newPage();
+    const browserErrors = [];
+    const failedRequests = [];
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("requestfailed", (request) => failedRequests.push(`${request.url()}: ${request.failure()?.errorText || "failed"}`));
     await page.goto(`http://127.0.0.1:${port}/frontend/browser-harness.html`);
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
     const result = JSON.parse(await page.locator("#result").textContent());
-    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.editorChanged || result.hasHorizontalOverflow) throw new Error(`light ${width}px failed`);
-    await page.screenshot({ path: `/tmp/card-${width}-light.png` });
-    await page.emulateMedia({ colorScheme: "dark" });
-    if (!(await page.locator(".card").count()) || !(await page.locator("#editor").count())) throw new Error(`dark ${width}px failed`);
-    await page.screenshot({ path: `/tmp/card-${width}-dark.png` });
+    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.emptyCardSafe || !result.unknownSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
+    await page.screenshot({ path: `/tmp/card-${name}.png`, fullPage: true });
     await page.close();
+    await context.close();
   }
 } finally {
   await browser.close();

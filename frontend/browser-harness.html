@@ -4,6 +4,12 @@
 <script type="module">
 import "./smart-homelab-maintenance-card.js";
 const card = document.querySelector("#card");
+const errors = [];
+window.addEventListener("error", (event) => errors.push(event.message));
+window.addEventListener("unhandledrejection", (event) => errors.push(String(event.reason)));
+card.setConfig();
+card.hass = { locale: "en", states: {} };
+const emptyCardSafe = card.shadowRoot.textContent.includes("No virtual machines detected");
 card.setConfig({ title: "Harness", show_vms: true, show_containers: true });
 card.hass = { locale: "en", states: {
   "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
@@ -16,8 +22,24 @@ card.hass = { locale: "en", states: {
 } };
 let editorChanged = false;
 document.querySelector("#editor").addEventListener("config-changed", () => { editorChanged = true; });
-document.querySelector("#editor").setConfig({ title: "Harness", show_vms: true, show_containers: true });
-document.querySelector('#editor [data-field="show_vms"]').click();
-window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), editorChanged, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+const editor = document.querySelector("#editor");
+editor.setConfig({ title: "Harness", show_vms: true, show_containers: true });
+const titleInput = editor.querySelector('[data-field="title"]');
+titleInput.focus();
+titleInput.value = "Draft on iPhone";
+editor.setConfig({ title: "Background HA update", show_vms: true, show_containers: true });
+const editorPreservesFocusedDraft = document.activeElement === titleInput && titleInput.value === "Draft on iPhone";
+editor.querySelector('[data-field="show_vms"]').click();
+const unknownSafe = (() => { card.hass = { locale: "en", states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "unknown", attributes: {} } } }; return card.shadowRoot.textContent.includes("No virtual machines detected"); })();
+card.hass = { locale: "en", states: {
+  "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
+  "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
+  "sensor.smart_homelab_maintenance_last_error": { state: "none", attributes: {} },
+  "sensor.smart_homelab_maintenance_running_jobs": { state: "0", attributes: {} },
+  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { cpu_percent: 24.3, memory_used_bytes: 13751140352, memory_total_bytes: 16632160256, storage_used_bytes: 40958152704, storage_total_bytes: 72722055168, release: "pve-manager/9.2.26" } },
+  "sensor.smart_homelab_maintenance_vm_104": { state: "running", attributes: { vmid: 104, name: "haos", memory_used_bytes: 100, memory_total_bytes: 200 } },
+  "sensor.smart_homelab_maintenance_container_101": { state: "running", attributes: { container_id: 101, name: "cloudflared", os_name: "Debian", os_version: "12" } }
+} };
+window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), editorChanged, editorPreservesFocusedDraft, emptyCardSafe, unknownSafe, errors, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
 document.querySelector("#result").textContent = JSON.stringify(window.__HARNESS__);
 </script></body></html>
