@@ -1,0 +1,95 @@
+"""Bounded, authenticated, read-only API surface for offline tests.
+
+The application exposes an in-process handler and an optional localhost-only
+stdlib server.  It has no production listener configuration.
+"""
+
+from __future__ import annotations
+
+import json
+import secrets
+from dataclasses import asdict
+from typing import Any, Mapping
+
+from .api_models import ApiError
+from .discovery import DiscoveryService
+from .errors import MaintenanceError, ValidationError
+from .jobs import JobRepository
+from .security import redact_secrets
+
+
+class ApiApplication:
+    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, read_token: str | None = None, max_bytes: int = 256_000) -> None:
+        self.discovery = discovery
+        self.jobs = jobs
+        self.read_token = read_token
+        self.max_bytes = max_bytes
+
+    def handle(self, method: str, path: str, *, headers: Mapping[str, str] | None = None) -> tuple[int, dict[str, Any]]:
+        request_id = secrets.token_hex(8)
+        headers = {str(k).lower(): str(v) for k, v in (headers or {}).items()}
+        raw_path, separator, raw_query = path.partition("?")
+        query: dict[str, list[str]] = {}
+        if separator:
+            for item in raw_query.split("&"):
+                key, equals, value = item.partition("=")
+                if key:
+                    query.setdefault(key, []).append(value if equals else "")
+        try:
+            if method.upper() != "GET":
+                raise ValidationError("only GET is available")
+            if raw_path != "/api/v1/health" and not self._authorized(headers):
+                return 401, self._error("authentication_required", "authentication required", request_id)
+            payload = self._route(raw_path, query)
+            body = {"schema_version": "1", "data": payload, "request_id": request_id}
+            encoded = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode()
+            if len(encoded) > self.max_bytes:
+                return 413, self._error("response_too_large", "response exceeds configured limit", request_id)
+            return 200, body
+        except KeyError:
+            return 404, self._error("not_found", "resource not found", request_id)
+        except MaintenanceError as exc:
+            return 400, self._error(exc.code, str(exc), request_id)
+        except (TypeError, ValueError) as exc:
+            return 400, self._error("invalid_parameter", str(exc), request_id)
+
+    def _authorized(self, headers: Mapping[str, str]) -> bool:
+        supplied = headers.get("authorization", "")
+        return bool(self.read_token and secrets.compare_digest(supplied, "Bearer " + self.read_token))
+
+    def _route(self, path: str, query: Mapping[str, list[str]]) -> Any:
+        if path == "/api/v1/health":
+            return {"status": "ok", "mode": "offline"}
+        if path == "/api/v1/capabilities":
+            return {"execution_enabled": False, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
+        if path == "/api/v1/containers":
+            return self._page([item.as_dict() for item in self.discovery.containers()], query)
+        if path == "/api/v1/jobs":
+            return self._page(self.jobs.list(offset=self._int(query, "offset", 0), limit=self._int(query, "limit", 50)), query)
+        parts = path.strip("/").split("/")
+        if len(parts) == 4 and parts[:3] == ["api", "v1", "apps"]:
+            return self.discovery.app(parts[3]).as_dict()
+        if len(parts) == 4 and parts[:3] == ["api", "v1", "jobs"]:
+            return self.jobs.get(parts[3])
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "events":
+            return {"events": self.jobs.events(parts[3], after=self._int(query, "after", 0), limit=self._int(query, "limit", min(50, self.jobs.max_log_entries)))}
+        raise KeyError(path)
+
+    @staticmethod
+    def _int(query: Mapping[str, list[str]], name: str, default: int) -> int:
+        value = query.get(name, [str(default)])[0]
+        if not value.isdigit():
+            raise ValidationError(f"{name} must be a non-negative integer")
+        return int(value)
+
+    @staticmethod
+    def _page(items: list[Any], query: Mapping[str, list[str]]) -> dict[str, Any]:
+        offset = ApiApplication._int(query, "offset", 0)
+        limit = ApiApplication._int(query, "limit", 50)
+        if limit < 1 or limit > 100:
+            raise ValidationError("limit must be between 1 and 100")
+        return {"items": items[offset:offset + limit], "offset": offset, "limit": limit, "total": len(items), "has_more": offset + limit < len(items)}
+
+    @staticmethod
+    def _error(code: str, message: str, request_id: str) -> dict[str, Any]:
+        return {"schema_version": "1", "error": asdict(ApiError(code, str(redact_secrets(message)), request_id))}

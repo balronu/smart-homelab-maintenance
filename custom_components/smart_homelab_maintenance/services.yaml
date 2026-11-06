@@ -1,0 +1,46 @@
+check:
+  name: Check
+  description: Read the current agent health and capabilities.
+  fields:
+    entry_id:
+      name: Config entry
+      description: Optional config entry ID.
+      required: false
+      selector:
+        text:
+get_job:
+  name: Get job
+  description: Read one persisted job.
+  fields:
+    entry_id:
+      name: Config entry
+      required: false
+      selector:
+        text:
+    job_id:
+      name: Job ID
+      required: true
+      selector:
+        text:
+get_job_events:
+  name: Get job events
+  description: Read a bounded page of job events.
+  fields:
+    entry_id:
+      name: Config entry
+      required: false
+      selector:
+        text:
+    job_id:
+      name: Job ID
+      required: true
+      selector:
+        text:
+    after:
+      name: Cursor
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          mode: box

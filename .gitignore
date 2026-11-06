@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.sqlite
+*.db
+*.log
+node_modules/
+dist/
+build/
+.coverage
+coverage/
+.pytest_cache/
+.trash-*/
+frontend/*.png
+frontend/*.ppm

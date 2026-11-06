@@ -1,0 +1,1 @@
+{"config": {"step": {"user": {"title": "Connect agent", "data": {"agent_url": "Agent URL", "token": "Token", "scan_interval": "Polling interval"}}}, "error": {"cannot_connect": "Agent is not reachable", "api_version": "Unsupported API version"}}, "options": {"step": {"init": {"data": {"scan_interval": "Polling interval"}}}}}
