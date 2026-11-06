@@ -31,12 +31,19 @@ produktiven Dienste gestartet und keine Proxmox- oder HA-Systeme verändert.
 | Offline-Core-Regression | PASSED – 30 Tests |
 | Shell-Syntax Installer | PASSED |
 | Produktiver Proxmox-Zugriff | NOT RUN – ausdrücklich ausgeschlossen |
-| HA-2026.11-Laufzeit in GitHub Actions | PENDING – nach Push dieses Branches |
-| Hassfest/HACS/Browsermatrix | PENDING – nach Push dieses Branches |
+| HA-2026.11-Laufzeit in GitHub Actions | PASSED |
+| Hassfest/HACS/Browsermatrix | PASSED |
 
 Die Clienttests verwenden ausschließlich Fake-HTTP-Antworten und prüfen
 GET-only, Bearer-Header, Größenbegrenzung, private URL-Gates und strukturierte
 Authentifizierungsfehler.
+
+Der geprüfte PR-Head ist `dfe731483fbf1d85ac666070c0f64e3aa7e4b9d7`.
+Die beiden verifizierten Actions-Läufe sind
+[42222074564](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42222074564)
+und
+[42222086490](https://github.com/balronu/smart-homelab-maintenance/actions/runs/42222086490);
+alle acht Jobs waren erfolgreich.
 
 ## Offene Infrastrukturvoraussetzungen
 
