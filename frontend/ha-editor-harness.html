@@ -4,7 +4,7 @@
 <body><style>body{margin:0;max-width:100vw;overflow-x:hidden;background:#fff;color:#111}@media(prefers-color-scheme:dark){body{background:#111;color:#eee;--primary-text-color:#eee;--secondary-text-color:#aaa;--card-background-color:#1c1c1c;--ha-card-background:#1c1c1c;--secondary-background-color:#292929;--divider-color:#555}}</style><ha-card-editor-dialog id="dialog"></ha-card-editor-dialog><pre id="result"></pre>
 <script type="module">
 import "./smart-homelab-maintenance-card.js";
-const hass = { locale: "de", config: { language: "de" }, states: {
+const hass = { language: "de", locale: { language: "en" }, config: { language: "en" }, states: {
   "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
   "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
   "sensor.smart_homelab_maintenance_running_jobs": { state: "0", attributes: {} },

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-beta.7 – Robuste Lovelace-Spracherkennung (Kandidat)
+
+- Behebt den iPhone-Editorfehler `locale?.toLowerCase is not a function`.
+- Verwendet eine zentrale, typgeprüfte Sprachauflösung mit Priorität für
+  `hass.language`, sicherer Unterstützung von `hass.locale` als String oder
+  Objekt und englischem Fallback.
+- Ergänzt Regressionen für Karte, Vorschau, Editor, fehlendes `hass` sowie
+  deutsche und englische Sprachwerte.
+
 ## 0.1.0-beta.6 – Lovelace editor layout and preview fix (Candidate)
 
 - Add responsive editor layout with localized German/English labels.

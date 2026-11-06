@@ -2,14 +2,18 @@
 <html lang="en"><head><meta charset="utf-8"><title>offline card harness</title></head>
 <body style="margin:0;max-width:100vw;overflow-x:hidden"><style>body{background:#fff;color:#111}pre{white-space:pre-wrap;overflow-wrap:anywhere}@media(prefers-color-scheme:dark){body{background:#111;color:#eee;--primary-text-color:#eee;--secondary-text-color:#aaa;--card-background-color:#1c1c1c;--ha-card-background:#1c1c1c;--secondary-background-color:#292929;--divider-color:#555}}</style><smart-homelab-maintenance-card id="card"></smart-homelab-maintenance-card><smart-homelab-maintenance-card-editor id="editor"></smart-homelab-maintenance-card-editor><pre id="result"></pre>
 <script type="module">
-import "./smart-homelab-maintenance-card.js";
+import { resolveLanguage } from "./smart-homelab-maintenance-card.js";
 const card = document.querySelector("#card");
 const errors = [];
 window.addEventListener("error", (event) => errors.push(event.message));
 window.addEventListener("unhandledrejection", (event) => errors.push(String(event.reason)));
 card.setConfig();
-card.hass = { locale: "en", states: {} };
+card.hass = { language: "en", locale: { language: "de" }, states: {} };
 const emptyCardSafe = card.shadowRoot.textContent.includes("No virtual machines detected");
+const languageEnglish = resolveLanguage({ language: "en", locale: { language: "de" } }) === "en";
+const languageGerman = resolveLanguage({ language: "de", locale: { language: "en" } }) === "de";
+const localeObjectSafe = resolveLanguage({ locale: { language: "de" } }) === "de";
+const missingLanguageFallback = resolveLanguage({ locale: {} }) === "en";
 card.setConfig({ title: "Harness", show_vms: true, show_containers: true });
 card.hass = { locale: "en", states: {
   "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
@@ -32,7 +36,7 @@ titleInput.value = "Draft on iPhone";
 editor.setConfig({ title: "Background HA update", show_vms: true, show_containers: true });
 const editorPreservesFocusedDraft = document.activeElement === titleInput && titleInput.value === "Draft on iPhone";
 editor.querySelector('[data-field="show_vms"]').click();
-const unknownSafe = (() => { card.hass = { locale: "en", states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "unknown", attributes: {} } } }; return card.shadowRoot.textContent.includes("No virtual machines detected"); })();
+const unknownSafe = (() => { card.hass = { language: "en", locale: {}, states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "unknown", attributes: {} } } }; return card.shadowRoot.textContent.includes("No virtual machines detected"); })();
 card.hass = { locale: "en", states: {
   "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
   "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
@@ -47,6 +51,7 @@ editor.setConfig(savedConfig);
 const reopenedEditorSafe = editor.querySelector('[data-field="title"]').value === savedConfig.title && editor.querySelector('[data-field="show_containers"]').checked === savedConfig.show_containers;
 const barRects = [...card.shadowRoot.querySelectorAll(".bar-row span")].map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
 const hasTextOverlap = barRects.some((left, index) => barRects.slice(index + 1).some((right) => Math.abs(left.top - right.top) < 2 && left.left < right.right && right.left < left.right));
-window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), cardHasSize: card.getCardSize() >= 1, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, unknownSafe, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+const initialCardSafe = (() => { const initial = document.createElement("smart-homelab-maintenance-card"); document.body.append(initial); return Boolean(initial.shadowRoot.querySelector(".card")); })();
+window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), cardHasSize: card.getCardSize() >= 1, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, initialCardSafe, unknownSafe, languageEnglish, languageGerman, localeObjectSafe, missingLanguageFallback, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
 document.querySelector("#result").textContent = JSON.stringify(window.__HARNESS__);
 </script></body></html>
