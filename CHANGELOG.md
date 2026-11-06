@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-beta.4 – Lovelace-Dashboard-Kandidat (nicht veröffentlicht)
+
+- Read-only Lovelace-Karte für Proxmox-Host, VMs, LXC-Container und
+  Wartungshinweise ergänzt.
+- Host-, VM- und LXC-Messwerte werden aus den tatsächlich vorhandenen HA-
+  Entitäten erkannt; fehlende Daten werden nicht simuliert.
+- Karte wird beim Laden der Integration automatisch als versionierte
+  Frontend-Ressource registriert und ist über den grafischen Karteneditor
+  auswählbar.
+- Responsive Light-/Dark-Mode-Darstellung und deutsche/englische Texte ergänzt.
+- Kandidat ist lokal und unveröffentlicht; produktive Installation und
+  GitHub-Veröffentlichung sind nicht erfolgt.
+
 ## 0.1.0-beta.3 – Private HTTPS-IP-Transport (lokaler Kandidat)
 
 - Private HTTPS-Ziele einschließlich IP-Adressen mit aktivierter

@@ -56,10 +56,19 @@ try:
             _ProjectedSensor(coordinator, "agent_connection", "Agent connection", lambda d: "connected" if d.connected else "offline", lambda d: {"error": d.error}),
             _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"preflight", "running", "postcheck"}])),
             _ProjectedSensor(coordinator, "agent_last_error", "Last error", lambda d: d.error or "none"),
+            _ProjectedSensor(coordinator, "host", "Host", lambda d: d.host.get("name", "unknown") if d.host else "unknown", lambda d: d.host or {}),
         ]
+        for vm in coordinator.data.virtual_machines:
+            vmid = str(vm.get("vmid"))
+            entities.append(_ProjectedSensor(
+                coordinator, f"vm_{vmid}", str(vm.get("name", vmid)),
+                lambda d, vmid=vmid: next(("running" if item.get("running") else "stopped" for item in d.virtual_machines if str(item.get("vmid")) == vmid), "unknown"),
+                lambda d, vmid=vmid: next((dict(item) for item in d.virtual_machines if str(item.get("vmid")) == vmid), {}),
+                f"vm_{vmid}"
+            ))
         for container in coordinator.data.containers:
             cid = str(container.get("container_id"))
-            entities.append(_ContainerSensor(coordinator, f"container_{cid}_status", str(container.get("name", cid)), lambda d, cid=cid: next(("running" if c.get("running") else "stopped" for c in d.containers if str(c.get("container_id")) == cid), "unknown"), lambda d, cid=cid: next(({"os": c.get("os_name")} for c in d.containers if str(c.get("container_id")) == cid), {}), f"container_{cid}"))
+            entities.append(_ContainerSensor(coordinator, f"container_{cid}_status", str(container.get("name", cid)), lambda d, cid=cid: next(("running" if c.get("running") else "stopped" for c in d.containers if str(c.get("container_id")) == cid), "unknown"), lambda d, cid=cid: next((dict(c) for c in d.containers if str(c.get("container_id")) == cid), {}), f"container_{cid}"))
         async_add_entities(entities)
 except ImportError:
     SensorEntity = object

@@ -5,7 +5,7 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Passive Beta `0.1.0-beta.3` (lokaler, nicht veröffentlichter Kandidat).
+Passiver Beta-4-Kandidat `0.1.0-beta.4` (lokal, nicht veröffentlicht).
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
 konfiguriert und geprüft werden.
@@ -22,15 +22,13 @@ docs/                                         öffentliche technische Doku
 
 ## Installation
 
-Die Integration und die Karte werden aus demselben Quellrepository versioniert,
-aber vom Home-Assistant-Marketplace als unterschiedliche Inhaltstypen behandelt.
-Eine automatische Installation beider Typen aus einem einzigen Marketplace-
-Eintrag ist daher nicht vorausgesetzt.
+Die Karte ist im Integrationspaket enthalten. Beim Laden der Integration wird
+sie als versionierte Frontend-Ressource registriert und im Lovelace-
+Karteneditor angeboten; eine manuelle YAML-Ressource ist dafür nicht nötig.
 
 1. Für die Integration das Repository als Marketplace-/HACS-Integration
    einbinden und `custom_components/smart_homelab_maintenance/` installieren.
-2. Die Lovelace-Datei `frontend/smart-homelab-maintenance-card.js` aus derselben
-   Version als lokale Dashboard-Ressource vom Typ `module` registrieren.
+2. Die Karte im Lovelace-Karteneditor als `Smart Homelab Maintenance` auswählen.
 3. Erst danach die Integration über den Config Flow mit einer privaten
    HTTPS-Agent-Adresse und vertrauenswürdiger Zertifikatskette verbinden.
 

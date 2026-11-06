@@ -161,6 +161,12 @@ class AgentHttpTransport:
     async def containers(self) -> dict[str, Any]:
         return await self.get("/api/v1/containers?limit=100")
 
+    async def host(self) -> dict[str, Any]:
+        return await self.get("/api/v1/host")
+
+    async def virtual_machines(self) -> dict[str, Any]:
+        return await self.get("/api/v1/virtual-machines?limit=100")
+
     async def capabilities(self) -> dict[str, Any]:
         return await self.get("/api/v1/capabilities")
 

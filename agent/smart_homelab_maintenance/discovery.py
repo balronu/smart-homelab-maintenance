@@ -38,6 +38,12 @@ class ContainerObservation:
     memory_available_bytes: int | None
     free_bytes: int | None
     package_manager: str | None
+    cpu_percent: float | None = None
+    memory_used_bytes: int | None = None
+    memory_total_bytes: int | None = None
+    disk_used_bytes: int | None = None
+    disk_total_bytes: int | None = None
+    uptime_seconds: int | None = None
     applications: tuple[ApplicationObservation, ...] = ()
     blocked_reasons: tuple[str, ...] = ()
 
@@ -103,6 +109,9 @@ class DiscoveryService:
                 os_name=str(raw.get("os_name", "unknown")), os_version=str(raw.get("os_version", "unknown")),
                 memory_available_bytes=raw.get("memory_available_bytes"), free_bytes=raw.get("free_bytes"),
                 package_manager=raw.get("package_manager"), applications=apps, blocked_reasons=tuple(sorted(set(reasons))),
+                cpu_percent=raw.get("cpu_percent"), memory_used_bytes=raw.get("memory_used_bytes"),
+                memory_total_bytes=raw.get("memory_total_bytes"), disk_used_bytes=raw.get("disk_used_bytes"),
+                disk_total_bytes=raw.get("disk_total_bytes"), uptime_seconds=raw.get("uptime_seconds"),
             ))
         return result
 

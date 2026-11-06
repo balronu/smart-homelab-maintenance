@@ -7,6 +7,7 @@ import pytest_asyncio
 import sys
 
 from homeassistant import loader
+from homeassistant.components import frontend, http
 from homeassistant.config_entries import ConfigEntries, SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -26,6 +27,8 @@ async def hass(tmp_path):
     frame.async_setup(instance)
     instance.config_entries = ConfigEntries(instance, {"components": {}})
     await instance.config_entries.async_initialize()
+    await http.async_setup(instance)
+    await frontend.async_setup(instance)
     dr.async_setup(instance)
     await dr.async_load(instance)
     await er.async_load(instance)
@@ -43,20 +46,26 @@ def _payloads():
             "update_supported": True, "blocked_reasons": [],
         }],
     }]}}
-    return (containers, {"schema_version": "1", "data": {"items": []}},
+    return ({"schema_version": "1", "data": {"name": "pve-home", "online": True, "cpu_percent": 12.5}},
+            {"schema_version": "1", "data": {"items": [{"vmid": 104, "name": "haos", "status": "running"}]}},
+            containers, {"schema_version": "1", "data": {"items": []}},
             {"schema_version": "1", "data": {"execution_enabled": False}},
             {"schema_version": "1", "data": {"status": "ok"}})
 
 
 @pytest.fixture
 def patched_transport(monkeypatch):
-    containers, jobs, capabilities, health = _payloads()
+    host, virtual_machines, containers, jobs, capabilities, health = _payloads()
 
+    async def fake_host(self): return host
+    async def fake_virtual_machines(self): return virtual_machines
     async def fake_containers(self): return containers
     async def fake_jobs(self): return jobs
     async def fake_capabilities(self): return capabilities
     async def fake_health(self): return health
 
+    monkeypatch.setattr(AgentHttpTransport, "host", fake_host)
+    monkeypatch.setattr(AgentHttpTransport, "virtual_machines", fake_virtual_machines)
     monkeypatch.setattr(AgentHttpTransport, "containers", fake_containers)
     monkeypatch.setattr(AgentHttpTransport, "jobs", fake_jobs)
     monkeypatch.setattr(AgentHttpTransport, "capabilities", fake_capabilities)
@@ -123,13 +132,14 @@ async def test_integration_package_has_no_agent_tree_runtime_dependency(hass, mo
 async def test_setup_registers_entities_devices_services_and_survives_reload(hass, patched_transport):
     from custom_components import smart_homelab_maintenance as integration
     assert await integration.async_setup(hass, {})
+    assert hass.data[DOMAIN]["card_registered"] is True
     result = await _create_entry(hass)
     entry = result["result"]
     await hass.async_block_till_done()
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
     unique_ids = {item.unique_id for item in entities}
-    assert {"agent_connection", "agent_running_jobs", "agent_last_error", "agent_connected", "container_102_status"} <= unique_ids
+    assert {"agent_connection", "agent_running_jobs", "agent_last_error", "host", "vm_104", "container_102_status"} <= unique_ids
     devices = dr.async_get(hass)
     device_entries = dr.async_entries_for_config_entry(devices, entry.entry_id)
     assert any((DOMAIN, "agent") in device.identifiers for device in device_entries)
@@ -157,3 +167,5 @@ async def test_actions_return_read_only_data_and_diagnostics_are_secret_free(has
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
     assert diagnostics["execution_enabled"] is False
     assert "fixture-token" not in str(diagnostics)
+    monkeypatch.setattr(AgentHttpTransport, "host", fake_host)
+    monkeypatch.setattr(AgentHttpTransport, "virtual_machines", fake_virtual_machines)

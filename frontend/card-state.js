@@ -1,64 +1,23 @@
 // DOM-free state helpers for the Lovelace card and its tests.
-export const DEFAULT_CONFIG = {
-  title: "Smart Homelab Maintenance",
-  data_entity: "sensor.smart_homelab_maintenance_status",
-  compact: false,
-  show_resources: true,
-  show_jobs: true,
-  max_containers: 20,
-};
-
+export const DEFAULT_CONFIG = { title: "Smart Homelab Maintenance", data_entity: "sensor.smart_homelab_maintenance_status", compact: false, show_maintenance: true, show_vms: true, show_containers: true };
 export function labels(locale = "de") {
-  return locale.toLowerCase().startsWith("en") ? {
-    connected: "Connected", offline: "Agent unreachable", containers: "Containers", updates: "Updates", blocked: "Blocked", jobs: "Jobs", jobsTitle: "Update jobs", noJobs: "No jobs", noApps: "No applications detected", running: "running", stopped: "stopped", unknownVersion: "Version unknown",
-  } : {
-    connected: "Verbunden", offline: "Agent nicht erreichbar", containers: "Container", updates: "Updates", blocked: "Blockiert", jobs: "Jobs", jobsTitle: "Updatejobs", noJobs: "Keine Jobs", noApps: "Keine Anwendungen erkannt", running: "running", stopped: "stopped", unknownVersion: "Version unbekannt",
-  };
+  return locale.toLowerCase().startsWith("en") ? { connected: "Connected", offline: "Agent unreachable", overview: "Overview", host: "Proxmox host", lastUpdated: "Last updated", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance", running: "running", stopped: "stopped", unknown: "unknown", cpu: "CPU", memory: "RAM", storage: "Storage", version: "Version", kernel: "Kernel", uptime: "Uptime", jobs: "Running jobs", noData: "No data available", noVms: "No virtual machines detected", noContainers: "No containers detected", error: "Error", readOnly: "Read-only mode" } : { connected: "Verbunden", offline: "Agent nicht erreichbar", overview: "Übersicht", host: "Proxmox-Host", lastUpdated: "Letzte Aktualisierung", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung", running: "laufend", stopped: "gestoppt", unknown: "unbekannt", cpu: "CPU", memory: "RAM", storage: "Speicher", version: "Version", kernel: "Kernel", uptime: "Laufzeit", jobs: "Laufende Jobs", noData: "Keine Daten verfügbar", noVms: "Keine VMs erkannt", noContainers: "Keine Container erkannt", error: "Fehler", readOnly: "Nur-Lese-Modus" };
 }
-
-export function normalizeConfig(config = {}) {
-  const result = { ...DEFAULT_CONFIG, ...config };
-  result.max_containers = Math.max(1, Math.min(100, Number(result.max_containers) || 20));
-  return result;
-}
-
+export function normalizeConfig(config = {}) { return { ...DEFAULT_CONFIG, ...(config && typeof config === "object" ? config : {}) }; }
+function numberOrNull(value) { return typeof value === "number" && Number.isFinite(value) ? value : null; }
+function entityEntries(hass, prefix) { return Object.entries(hass.states || {}).filter(([id]) => id.startsWith(prefix)); }
 export function modelFromHass(hass = {}, config = {}) {
-  const effective = normalizeConfig(config);
-  const state = hass.states?.[effective.data_entity] || {};
-  const attrs = state.attributes || {};
-  return {
-    connected: attrs.connected === true || state.state === "connected",
-    agent_version: attrs.agent_version ?? "unknown",
-    last_check: attrs.last_check ?? null,
-    containers: Array.isArray(attrs.containers) ? attrs.containers.slice(0, effective.max_containers) : [],
-    updates: Number(attrs.available_updates || 0),
-    blocked: Number(attrs.blocked_updates || 0),
-    jobs: effective.show_jobs && Array.isArray(attrs.jobs) ? attrs.jobs : [],
-    error: attrs.error || null,
-  };
+  const effective = normalizeConfig(config); const states = hass.states || {}; const connection = states["sensor.smart_homelab_maintenance_agent_connection"]; const reachable = states["binary_sensor.smart_homelab_maintenance_agent_reachable"]; const hostState = states["sensor.smart_homelab_maintenance_host"];
+  const containers = entityEntries(hass, "sensor.smart_homelab_maintenance_container_").map(([entity_id, state]) => ({ entity_id, container_id: state.attributes?.container_id ?? entity_id.split("_").pop(), name: state.attributes?.name || state.attributes?.friendly_name || entity_id, running: state.state === "running", ...state.attributes }));
+  const virtual_machines = entityEntries(hass, "sensor.smart_homelab_maintenance_vm_").map(([entity_id, state]) => ({ entity_id, vmid: state.attributes?.vmid ?? entity_id.split("_").pop(), name: state.attributes?.name || state.attributes?.friendly_name || entity_id, running: state.state === "running", ...state.attributes }));
+  const legacy = states[effective.data_entity]?.attributes || {};
+  return { connected: connection?.state === "connected" || reachable?.state === "on" || states[effective.data_entity]?.state === "connected" || legacy.connected === true, error: connection?.attributes?.error || states["sensor.smart_homelab_maintenance_last_error"]?.state || legacy.error || null, host: hostState ? { name: hostState.state, ...hostState.attributes } : legacy.host || null, last_updated: hostState?.last_updated || connection?.last_updated || null, containers: containers.length ? containers : (Array.isArray(legacy.containers) ? legacy.containers : []), virtual_machines: virtual_machines.length ? virtual_machines : (Array.isArray(legacy.virtual_machines) ? legacy.virtual_machines : []), running_jobs: numberOrNull(states["sensor.smart_homelab_maintenance_running_jobs"]?.state) ?? numberOrNull(legacy.running_jobs), jobs: Array.isArray(legacy.jobs) ? legacy.jobs : null, read_only: true };
 }
-
-export function phaseLabel(job) {
-  return job?.phase || job?.state || "unknown";
-}
-
-export function progressFor(job) {
-  // Never invent percentages: the API may provide a phase only.
-  return Number.isFinite(job?.progress) ? Math.max(0, Math.min(100, job.progress)) : null;
-}
-
-export function updateLabel(app) {
-  if (!app?.update_supported) return "update_unknown";
-  if (app.blocked_reasons?.length) return "update_blocked";
-  if (app.available_version && app.installed_version && app.available_version !== app.installed_version) return "update_available";
-  return "current";
-}
-
-export function preserveSelection(previous, model) {
-  const ids = new Set((model.jobs || []).map((job) => job.job_id));
-  return previous?.selectedJob && ids.has(previous.selectedJob) ? previous.selectedJob : null;
-}
-
-export function editorConfigChanged(previous = {}, next = {}) {
-  return JSON.stringify(normalizeConfig(previous)) !== JSON.stringify(normalizeConfig(next));
-}
+export function formatBytes(value) { if (!Number.isFinite(Number(value))) return null; const units = ["B", "KB", "MB", "GB", "TB"]; let n = Number(value); let i = 0; while (Math.abs(n) >= 1024 && i < units.length - 1) { n /= 1024; i += 1; } return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${units[i]}`; }
+export function percent(used, total) { return Number.isFinite(Number(used)) && Number(total) > 0 ? Math.max(0, Math.min(100, Number(used) / Number(total) * 100)) : null; }
+export function formatUptime(seconds) { if (!Number.isFinite(Number(seconds))) return null; const d = Math.floor(seconds / 86400); const h = Math.floor(seconds % 86400 / 3600); return d ? `${d}d ${h}h` : `${h}h`; }
+export function editorConfigChanged(previous = {}, next = {}) { return JSON.stringify(normalizeConfig(previous)) !== JSON.stringify(normalizeConfig(next)); }
+export function phaseLabel(job) { return job?.phase || job?.state || "unknown"; }
+export function progressFor(job) { return Number.isFinite(job?.progress) ? Math.max(0, Math.min(100, job.progress)) : null; }
+export function updateLabel(app) { if (!app?.update_supported) return "update_unknown"; if (app.blocked_reasons?.length) return "update_blocked"; if (app.available_version && app.installed_version && app.available_version !== app.installed_version) return "update_available"; return "current"; }
+export function preserveSelection(previous, model) { const ids = new Set((model.jobs || []).map((job) => job.job_id)); return previous?.selectedJob && ids.has(previous.selectedJob) ? previous.selectedJob : null; }

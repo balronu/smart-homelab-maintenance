@@ -112,11 +112,22 @@ class ProxmoxApiClient:
 
     def node_status(self) -> Mapping[str, Any]:
         raw = self._get(f"nodes/{self.config.node}/status")
+        memory = raw.get("memory") if isinstance(raw.get("memory"), Mapping) else {}
+        rootfs = raw.get("rootfs") if isinstance(raw.get("rootfs"), Mapping) else {}
         return {
             "name": self.config.node,
             "release": str(raw.get("pveversion", "unknown")),
             "kernel": str(raw.get("kversion", "unknown")),
-            "online": raw.get("status") == "online",
+            "online": True,
+            "cpu_percent": float(raw.get("cpu", 0)) * 100,
+            "cpu_cores": (raw.get("cpuinfo") or {}).get("cores"),
+            "memory_used_bytes": memory.get("used"),
+            "memory_total_bytes": memory.get("total"),
+            "memory_available_bytes": memory.get("available"),
+            "storage_used_bytes": rootfs.get("used"),
+            "storage_total_bytes": rootfs.get("total"),
+            "storage_available_bytes": rootfs.get("avail"),
+            "uptime_seconds": raw.get("uptime"),
         }
 
     def lxc_list(self) -> list[Mapping[str, Any]]:
@@ -132,6 +143,10 @@ class ProxmoxApiClient:
             result.append({
                 "vmid": item["vmid"], "name": item.get("name", f"lxc-{item['vmid']}"),
                 "status": item.get("status", "unknown"),
+                "cpu_percent": float(item.get("cpu", 0)) * 100,
+                "memory_used_bytes": item.get("mem"), "memory_total_bytes": item.get("maxmem"),
+                "disk_used_bytes": item.get("disk"), "disk_total_bytes": item.get("maxdisk"),
+                "uptime_seconds": item.get("uptime"),
                 "memory_available_bytes": maxmem - mem if isinstance(maxmem, int) and isinstance(mem, int) and maxmem >= mem else None,
                 "free_bytes": maxdisk - disk if isinstance(maxdisk, int) and isinstance(disk, int) and maxdisk >= disk else None,
                 "os_name": "unknown", "os_version": "unknown", "package_manager": None,
@@ -144,7 +159,12 @@ class ProxmoxApiClient:
         if not isinstance(raw, list):
             raise ProxmoxResponseError("Proxmox returned invalid VM data")
         return [{"vmid": item["vmid"], "name": item.get("name", f"vm-{item['vmid']}"),
-                 "status": item.get("status", "unknown"), "os_name": "unknown", "os_version": "unknown"}
+                 "status": item.get("status", "unknown"),
+                 "cpu_percent": float(item.get("cpu", 0)) * 100,
+                 "memory_used_bytes": item.get("mem"), "memory_total_bytes": item.get("maxmem"),
+                 "disk_used_bytes": item.get("disk"), "disk_total_bytes": item.get("maxdisk"),
+                 "uptime_seconds": item.get("uptime"),
+                 "os_name": "unknown", "os_version": "unknown"}
                 for item in raw if isinstance(item, Mapping) and isinstance(item.get("vmid"), int)]
 
 

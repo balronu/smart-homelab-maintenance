@@ -6,7 +6,9 @@ only coordinates transport data and never exposes update execution.
 
 from __future__ import annotations
 
-from .const import ACTIONS, DOMAIN
+from pathlib import Path
+
+from .const import ACTIONS, CARD_VERSION, DOMAIN
 
 PLATFORMS = ("sensor", "binary_sensor", "update")
 
@@ -29,6 +31,16 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Register the domain without starting any update execution."""
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN]["actions"] = ACTIONS
+    if vol is not None and hasattr(hass, "http") and not hass.data[DOMAIN].get("card_registered"):
+        from homeassistant.components.frontend import add_extra_js_url
+        from homeassistant.components.http import StaticPathConfig
+
+        card_path = Path(__file__).parent / "frontend" / "smart-homelab-maintenance-card.js"
+        await hass.http.async_register_static_paths([
+            StaticPathConfig("/smart_homelab_maintenance/smart-homelab-maintenance-card.js", str(card_path), cache_headers=True)
+        ])
+        add_extra_js_url(hass, f"/smart_homelab_maintenance/smart-homelab-maintenance-card.js?v={CARD_VERSION}")
+        hass.data[DOMAIN]["card_registered"] = True
     if vol is not None:
         async def handle_action(call):
             entry_id = call.data.get("entry_id")
@@ -65,10 +77,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     coordinator = SmartHomelabCoordinator(hass, entry.data, entry.options)
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    from datetime import timedelta
+    from homeassistant.helpers.event import async_track_time_interval
+    coordinator.set_unsub_interval(async_track_time_interval(
+        hass, lambda _now: hass.async_create_task(coordinator.async_request_refresh()),
+        timedelta(seconds=coordinator.update_interval),
+    ))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator is not None:
+        coordinator.async_stop()
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     return unloaded
