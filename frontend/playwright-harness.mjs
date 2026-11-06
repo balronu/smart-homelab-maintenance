@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
+const cardSource = fs.readFileSync(path.join(root, "frontend/smart-homelab-maintenance-card.js"), "utf8");
+if (/\b(?:scrollIntoView|scrollTo)\s*\(/.test(cardSource)) throw new Error("production card must not programmatically scroll");
 const server = http.createServer((request, response) => {
   const relative = request.url === "/" ? "frontend/browser-harness.html" : request.url.replace(/^\//, "");
   const file = path.resolve(root, relative);
@@ -39,6 +41,11 @@ try {
     const haResult = JSON.parse(await page.locator("#result").textContent());
     if (!haResult.pickerRegistered || !haResult.editorVisible || !haResult.previewVisible || !haResult.savedAndReopened || !haResult.noHorizontalOverflow) throw new Error(`${name} HA editor harness failed: ${JSON.stringify(haResult)}`);
     await page.screenshot({ path: `/tmp/card-${name}-ha-editor.png`, fullPage: true });
+    await page.goto(`http://127.0.0.1:${port}/frontend/scroll-harness.html`);
+    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("cardCount"), null, { timeout: 10000 });
+    const scrollResult = JSON.parse(await page.locator("#result").textContent());
+    if (!scrollResult.stableScroll || !scrollResult.stableDom || !scrollResult.independentDetails || !scrollResult.noHorizontalOverflow || scrollResult.cardCount !== 3) throw new Error(`${name} scroll harness failed: ${JSON.stringify(scrollResult)}`);
+    await page.screenshot({ path: `/tmp/card-${name}-scroll.png`, fullPage: true });
     await page.close();
     await context.close();
   }
