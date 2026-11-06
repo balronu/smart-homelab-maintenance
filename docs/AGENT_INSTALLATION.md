@@ -11,7 +11,8 @@ HA-Laufzeitabnahme und Infrastrukturfreigabe müssen noch erfolgen.
 - Proxmox VE mit systemd, Python 3 und `python3-venv`
 - root-Zugriff für die Installation
 - geprüfter Git-Commit des Projekts; keine unbestätigten Downloads
-- private DNS-Adresse unter `.home.arpa`, `.lan` oder `.local`
+- private DNS-Adresse unter `.home.arpa`, `.lan` oder `.local` **oder** eine
+  private IP-Adresse mit passendem IP-SAN im Agent-Zertifikat
 - Zertifikat einer CA, der Home Assistant und der Agent vertrauen
 - passender privater Schlüssel; Zertifikat und Schlüssel müssen zusammengehören
 - freier interner Port ab 1024; Port 8128 des alten Dienstes wird nicht verwendet
@@ -42,13 +43,22 @@ enthält und keine uncommitteten Änderungen besitzt.
 
 ## 3. TLS und DNS vorbereiten
 
-Der private DNS-Name muss auf den freigegebenen internen TLS-Proxy oder Tunnel
-zeigen. Der Agent selbst bindet lokal; eine externe Erreichbarkeit darf nur über
-einen separat geprüften, authentifizierten TLS-Weg erfolgen.
+Ein zusätzlicher DNS-Eintrag ist nicht erforderlich, wenn der Agent direkt über
+eine private IP-Adresse angesprochen wird. In diesem Fall muss das Zertifikat
+die Adresse als echten IP-SAN enthalten; ein DNS-Name im CN reicht nicht aus.
+Die Home-Assistant-URL lautet dann beispielsweise:
+
+```text
+https://<PRIVATE_AGENT_IP>:48128
+```
+
+Alternativ kann ein bestätigter privater DNS-Name verwendet werden. Öffentliche
+Proxies und Tunnel sind für die Agent-API nicht zulässig.
 
 ```bash
 openssl x509 -in /etc/ssl/private/smart-homelab-agent.crt -noout -subject -issuer -dates
 openssl x509 -in /etc/ssl/private/smart-homelab-agent.crt -noout -checkend 86400
+openssl x509 -in /etc/ssl/private/smart-homelab-agent.crt -noout -checkip <PRIVATE_AGENT_IP>
 ```
 
 Selbstsignierte Zertifikate ohne vertrauenswürdige CA, deaktivierte
@@ -65,16 +75,17 @@ sudo scripts/install-agent.sh \
   --expected-commit <GEPRUEFTER_COMMIT> \
   --cert /etc/ssl/private/smart-homelab-agent.crt \
   --key /etc/ssl/private/smart-homelab-agent.key \
-  --agent-host agent.home.arpa \
+  --agent-host <PRIVATE_AGENT_IP> \
   --port 48128 \
-  --proxmox-url https://pve.home.arpa:8006/api2/json \
+  --proxmox-url https://<PROXMOX_PRIVATE_NAME>:8006/api2/json \
   --proxmox-node pve \
   --proxmox-ca /etc/ssl/certs/proxmox-ca.crt \
   --proxmox-token-file /etc/smart-homelab-maintenance/proxmox-api-token
 ```
 
-Die Prüfung stoppt bei fehlendem Proxmox-/Python-Voraussetzungen, ungültigem
-TLS, öffentlichem Hostnamen, falschem Commit oder unvollständiger Quelle.
+Die Prüfung stoppt bei fehlenden Proxmox-/Python-Voraussetzungen, ungültigem
+TLS, öffentlichem Host/IP-Ziel, fehlendem SAN, falschem Commit oder
+unvollständiger Quelle.
 
 ## 5. Installation
 
@@ -87,9 +98,9 @@ sudo scripts/install-agent.sh \
   --expected-commit <GEPRUEFTER_COMMIT> \
   --cert /etc/ssl/private/smart-homelab-agent.crt \
   --key /etc/ssl/private/smart-homelab-agent.key \
-  --agent-host agent.home.arpa \
+  --agent-host <PRIVATE_AGENT_IP> \
   --port 48128 \
-  --proxmox-url https://pve.home.arpa:8006/api2/json \
+  --proxmox-url https://<PROXMOX_PRIVATE_NAME>:8006/api2/json \
   --proxmox-node pve \
   --proxmox-ca /etc/ssl/certs/proxmox-ca.crt \
   --proxmox-token-file /etc/smart-homelab-maintenance/proxmox-api-token \

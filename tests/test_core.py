@@ -46,6 +46,7 @@ from agent.smart_homelab_maintenance.types import (
 )
 from agent.smart_homelab_maintenance.versions import Version, compare_versions
 from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url
+from custom_components.smart_homelab_maintenance.http_transport import validate_agent_url as validate_integration_agent_url
 from custom_components.smart_homelab_maintenance.http_transport import validate_ca_file
 from custom_components.smart_homelab_maintenance.config_flow import validate_config
 from custom_components.smart_homelab_maintenance.update import update_value
@@ -252,6 +253,16 @@ class CoreTests(unittest.TestCase):
         for value in ("agent-ca.pem", "/config/secrets.yaml", "/ssl/../config/ca.pem", "/ssl/ca.txt"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 validate_ca_file(value)
+
+    def test_ip_based_agent_url_is_private_and_tls_only(self) -> None:
+        self.assertEqual(
+            validate_integration_agent_url("https://192.168.178.199:48128"),
+            "https://192.168.178.199:48128",
+        )
+        with self.assertRaises(ValueError):
+            validate_integration_agent_url("http://192.168.178.199:48128")
+        with self.assertRaises(ValueError):
+            validate_integration_agent_url("https://8.8.8.8:48128")
 
     def test_mock_agent_to_coordinator_to_entity_data_flow(self) -> None:
         class FakeTransport:

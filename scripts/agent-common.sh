@@ -25,8 +25,32 @@ validate_source() {
 
 validate_private_host() {
     local host="$1"
-    [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || die "Ungültiger privater DNS-Name: $host"
-    [[ "$host" == *.home.arpa || "$host" == *.lan || "$host" == *.local ]] || die "Agent-Host muss unter einer privaten DNS-Zone liegen."
+    if python3 - "$host" <<'PY'
+import ipaddress
+import re
+import sys
+
+value = sys.argv[1].strip().rstrip(".")
+try:
+    address = ipaddress.ip_address(value)
+except ValueError:
+    if (
+        not re.fullmatch(r"[A-Za-z0-9.-]+", value)
+        or value.startswith(".")
+        or value.endswith(".")
+        or ".." in value
+        or not value.endswith((".home.arpa", ".lan", ".local"))
+    ):
+        raise SystemExit(1)
+else:
+    if not (address.is_private or address.is_loopback or address.is_link_local):
+        raise SystemExit(1)
+PY
+    then
+        :
+    else
+        die "Agent-Host muss eine private IP-Adresse oder private DNS-Adresse sein."
+    fi
 }
 
 verify_commit() {
@@ -41,11 +65,16 @@ verify_commit() {
 }
 
 check_certificate() {
-    local cert="$1" key="$2"
+    local cert="$1" key="$2" expected_host="$3"
     [[ -r "$cert" && -f "$cert" ]] || die "TLS-Zertifikat fehlt oder ist nicht lesbar."
     [[ -r "$key" && -f "$key" ]] || die "TLS-Privatschlüssel fehlt oder ist nicht lesbar."
     require_command openssl
     openssl x509 -in "$cert" -noout -checkend 86400 >/dev/null || die "TLS-Zertifikat ist ungültig oder läuft in weniger als 24 Stunden ab."
+    if [[ "$expected_host" == *:* || "$expected_host" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+        openssl x509 -in "$cert" -noout -checkip "$expected_host" >/dev/null || die "TLS-Zertifikat enthält keinen passenden IP-SAN."
+    else
+        openssl x509 -in "$cert" -noout -checkhost "$expected_host" >/dev/null || die "TLS-Zertifikat enthält keinen passenden Hostnamen-SAN."
+    fi
     local cert_key private_key
     cert_key="$(openssl x509 -in "$cert" -pubkey -noout | openssl pkey -pubin -outform DER 2>/dev/null | sha256sum | awk '{print $1}')" || die "Zertifikat konnte nicht geprüft werden."
     private_key="$(openssl pkey -in "$key" -pubout 2>/dev/null | openssl pkey -pubin -outform DER 2>/dev/null | sha256sum | awk '{print $1}')" || die "Privatschlüssel konnte nicht geprüft werden."

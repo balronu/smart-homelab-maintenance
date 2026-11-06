@@ -65,7 +65,7 @@ validate_private_host "$agent_host"
 [[ -s "$proxmox_token_file" ]] || die "Proxmox-Credential ist leer."
 validate_source "$source_dir"
 verify_commit "$source_dir" "$expected_commit"
-check_certificate "$cert_file" "$key_file"
+check_certificate "$cert_file" "$key_file" "$agent_host"
 
 if [[ "$apply" -ne 1 ]]; then
     info "Vorprüfung erfolgreich. Kein Installationsschritt ausgeführt."
