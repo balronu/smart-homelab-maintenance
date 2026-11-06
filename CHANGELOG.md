@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-beta.3 – Private HTTPS-IP-Transport (lokaler Kandidat)
+
+- Private HTTPS-Ziele einschließlich IP-Adressen mit aktivierter
+  Zertifikats- und IP-SAN-Prüfung unterstützt.
+- CA-Dateien sind auf `/ssl/` begrenzt; HTTP- und unsichere TLS-Fallbacks bleiben
+  ausgeschlossen.
+- Nicht veröffentlicht und nicht in produktivem Home Assistant installiert.
+
 ## Unreleased – Phase 4.6 Agent-Runtime
 
 - lesender Proxmox-HTTPS-Client für Host, LXC und VMs mit TLS-, Größen- und
