@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportError
+from .http_transport import AgentHttpTransport, TransportError
 
 from .const import ACTIONS
 
