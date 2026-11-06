@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import ssl
+import ipaddress
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -32,7 +33,13 @@ class AgentServerConfig:
     max_request_line: int = 4096
 
     def __post_init__(self) -> None:
-        if not self.host or self.host in {"0.0.0.0", "::"}:
+        if not self.host:
+            raise ValueError("agent must not bind an unrestricted address")
+        try:
+            address = ipaddress.ip_address(self.host)
+        except ValueError:
+            address = None
+        if address is not None and address.is_unspecified:
             raise ValueError("agent must not bind an unrestricted address")
         if not 1024 <= self.port <= 65535:
             raise ValueError("agent port must be an unprivileged port")
