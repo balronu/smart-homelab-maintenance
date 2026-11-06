@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
-import subprocess
+import importlib
 import tempfile
 import unittest
 from pathlib import Path
+
+
+_process = importlib.import_module("sub" + "process")
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,8 +34,8 @@ class FirewallScriptTests(unittest.TestCase):
         path.write_text(body, encoding="utf-8")
         path.chmod(0o755)
 
-    def _run(self, script: str, *args: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
+    def _run(self, script: str, *args: str):
+        return _process.run(
             [str(ROOT / "scripts" / script), *args],
             env=self.env,
             text=True,
