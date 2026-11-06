@@ -1,0 +1,15 @@
+# Non-secret runtime configuration for the read-only agent.
+# Replace only with approved private DNS names and absolute paths.
+listen_host = "agent.example.home.arpa"
+listen_port = 48128
+api_version = "1"
+state_directory = "/var/lib/smart-homelab-maintenance"
+execution_enabled = false
+certificate = "/etc/smart-homelab-maintenance/agent.crt"
+private_key = "/etc/smart-homelab-maintenance/agent.key"
+proxmox_url = "https://proxmox.example.home.arpa:8006/api2/json"
+proxmox_node = "pve-node"
+proxmox_ca_file = "/etc/smart-homelab-maintenance/proxmox-ca.crt"
+
+# Secrets are supplied only through systemd LoadCredential:
+# api_token and proxmox_api_token.
