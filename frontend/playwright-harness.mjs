@@ -22,9 +22,10 @@ try {
     await page.goto(`http://127.0.0.1:${port}/frontend/browser-harness.html`);
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
     const result = JSON.parse(await page.locator("#result").textContent());
-    if (!result.connected || !result.hasContainer || !result.hasPhaseOnlyJob || result.hasHorizontalOverflow) throw new Error(`light ${width}px failed`);
+    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.editorChanged || result.hasHorizontalOverflow) throw new Error(`light ${width}px failed`);
     await page.screenshot({ path: `/tmp/card-${width}-light.png` });
     await page.emulateMedia({ colorScheme: "dark" });
+    if (!(await page.locator(".card").count()) || !(await page.locator("#editor").count())) throw new Error(`dark ${width}px failed`);
     await page.screenshot({ path: `/tmp/card-${width}-dark.png` });
     await page.close();
   }

@@ -267,6 +267,10 @@ class CoreTests(unittest.TestCase):
 
     def test_mock_agent_to_coordinator_to_entity_data_flow(self) -> None:
         class FakeTransport:
+            async def host(self):
+                return {"data": {"name": "fixture-host", "online": True}}
+            async def virtual_machines(self):
+                return {"data": {"items": [{"vmid": 104, "name": "fixture-vm", "status": "running"}]}}
             async def containers(self):
                 return {"data": {"items": [{"container_id": 101, "name": "fixture", "running": True}]}}
             async def jobs(self):
@@ -280,6 +284,8 @@ class CoreTests(unittest.TestCase):
             data = await coordinator.async_update()
             self.assertTrue(data.connected)
             self.assertEqual(data.containers[0]["container_id"], 101)
+            self.assertEqual(data.host["name"], "fixture-host")
+            self.assertEqual(data.virtual_machines[0]["vmid"], 104)
             self.assertEqual(coordinator_sensors(data)[1].value, 1)
             self.assertFalse(data.capabilities["execution_enabled"])
 

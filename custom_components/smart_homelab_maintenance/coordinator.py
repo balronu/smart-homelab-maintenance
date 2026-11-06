@@ -14,6 +14,8 @@ from .const import CONF_AGENT_URL, CONF_CA_FILE, CONF_SCAN_INTERVAL, CONF_TOKEN,
 @dataclass(frozen=True, slots=True)
 class CoordinatorData:
     connected: bool
+    host: Mapping[str, Any] | None = None
+    virtual_machines: tuple[Mapping[str, Any], ...] = ()
     containers: tuple[Mapping[str, Any], ...] = ()
     jobs: tuple[Mapping[str, Any], ...] = ()
     capabilities: Mapping[str, Any] | None = None
@@ -31,6 +33,7 @@ class SmartHomelabCoordinator:
         self.last_error: str | None = None
         self._lock = asyncio.Lock()
         self._failure_count = 0
+        self._unsub_interval = None
 
     async def async_config_entry_first_refresh(self) -> None:
         await self.async_update()
@@ -40,10 +43,18 @@ class SmartHomelabCoordinator:
             return self.data
         async with self._lock:
             try:
-                containers, jobs, capabilities = await asyncio.gather(self.transport.containers(), self.transport.jobs(), self.transport.capabilities())
+                host, virtual_machines, containers, jobs, capabilities = await asyncio.gather(
+                    self.transport.host(), self.transport.virtual_machines(), self.transport.containers(),
+                    self.transport.jobs(), self.transport.capabilities()
+                )
+                host_data = host.get("data", {})
+                vm_data = virtual_machines.get("data", {})
                 cdata = containers.get("data", {})
                 jdata = jobs.get("data", {})
-                self.data = CoordinatorData(True, tuple(cdata.get("items", [])), tuple(jdata.get("items", [])), capabilities.get("data"), None)
+                self.data = CoordinatorData(
+                    True, host_data, tuple(vm_data.get("items", [])), tuple(cdata.get("items", [])),
+                    tuple(jdata.get("items", [])), capabilities.get("data"), None
+                )
                 self.last_error = None
                 self._failure_count = 0
             except TransportError as exc:
@@ -63,6 +74,15 @@ class SmartHomelabCoordinator:
         self._listeners = getattr(self, "_listeners", [])
         self._listeners.append(update_callback)
         return lambda: self._listeners.remove(update_callback) if update_callback in self._listeners else None
+
+    def set_unsub_interval(self, unsubscribe) -> None:
+        self._unsub_interval = unsubscribe
+
+    def async_stop(self) -> None:
+        if self._unsub_interval is not None:
+            self._unsub_interval()
+            self._unsub_interval = None
+
     @property
     def backoff_seconds(self) -> int:
         return min(self.update_interval * (2 ** min(self._failure_count, 5)), 3600)
