@@ -55,6 +55,36 @@ https://<PRIVATE_AGENT_IP>:48128
 Alternativ kann ein bestätigter privater DNS-Name verwendet werden. Öffentliche
 Proxies und Tunnel sind für die Agent-API nicht zulässig.
 
+Die vorbereiteten Werkzeuge liegen unter `scripts/tls-agent.sh`. Mutierende
+Aktionen benötigen immer sowohl `--apply` als auch `--confirm` und starten
+keinen Dienst:
+
+```bash
+# Nur nach gesonderter Freigabe ausführen; der CA-Schlüssel bleibt auf dem
+# administrativen, geschützten System und wird niemals nach HA übertragen.
+sudo scripts/tls-agent.sh init-ca \
+  --ca-dir /secure/smart-homelab-maintenance-ca \
+  --apply --confirm
+
+sudo scripts/tls-agent.sh issue \
+  --ca-dir /secure/smart-homelab-maintenance-ca \
+  --output-dir /secure/smart-homelab-maintenance-agent-cert \
+  --ip <PRIVATE_AGENT_IP> \
+  --apply --confirm
+
+sudo scripts/tls-agent.sh verify \
+  --ca-dir /secure/smart-homelab-maintenance-ca \
+  --cert /secure/smart-homelab-maintenance-agent-cert/agent.crt \
+  --key /secure/smart-homelab-maintenance-agent-cert/agent.key \
+  --ip <PRIVATE_AGENT_IP>
+```
+
+Das öffentliche CA-Zertifikat wird später kontrolliert als `/ssl/<name>.pem`
+in Home Assistant bereitgestellt und im Config Flow als CA-Pfad angegeben. Nur
+das öffentliche CA-Zertifikat wird übertragen; CA- und Agent-Privatschlüssel
+bleiben außerhalb von HA. Die Integration prüft weiterhin Zertifikatskette,
+IP-SAN und Ablaufdatum und akzeptiert keinen HTTP-Fallback.
+
 ```bash
 openssl x509 -in /etc/ssl/private/smart-homelab-agent.crt -noout -subject -issuer -dates
 openssl x509 -in /etc/ssl/private/smart-homelab-agent.crt -noout -checkend 86400
@@ -86,6 +116,32 @@ sudo scripts/install-agent.sh \
 Die Prüfung stoppt bei fehlenden Proxmox-/Python-Voraussetzungen, ungültigem
 TLS, öffentlichem Host/IP-Ziel, fehlendem SAN, falschem Commit oder
 unvollständiger Quelle.
+
+## 4a. Erneuerung und Zertifikatswechsel
+
+Erneuerungen werden zunächst in ein separates Verzeichnis ausgestellt und
+geprüft. Die vorbereitete Rotation ersetzt anschließend nur die beiden eigenen
+Agent-Dateien atomar; sie startet keinen Dienst und ändert keine CA:
+
+```bash
+sudo scripts/tls-agent.sh renew \
+  --ca-dir /secure/smart-homelab-maintenance-ca \
+  --output-dir /secure/smart-homelab-maintenance-renewal \
+  --ip <PRIVATE_AGENT_IP> \
+  --apply --confirm
+
+sudo scripts/tls-agent.sh rotate \
+  --ca-dir /secure/smart-homelab-maintenance-ca \
+  --cert /secure/smart-homelab-maintenance-renewal/agent-renewed.crt \
+  --key /secure/smart-homelab-maintenance-renewal/agent-renewed.key \
+  --ip <PRIVATE_AGENT_IP> \
+  --target-dir /etc/smart-homelab-maintenance \
+  --apply --confirm
+```
+
+Vor jedem Wechsel sind Ablauf, CA-Kette, IP-SAN und Schlüssel-Paar zu prüfen.
+Ein Dienstneustart und die Aktualisierung der HA-Konfiguration sind separate,
+explizit freizugebende Schritte.
 
 ## 5. Installation
 
