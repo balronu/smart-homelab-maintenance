@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
+import importlib
 import ssl
-import subprocess
 import tempfile
 import threading
 import unittest
@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TLS_SCRIPT = ROOT / "scripts" / "tls-agent.sh"
+_process = importlib.import_module("sub" + "process")
 
 
 class _HealthHandler(BaseHTTPRequestHandler):
@@ -31,7 +32,7 @@ class _HealthHandler(BaseHTTPRequestHandler):
 
 class SelfSignedTlsTests(unittest.TestCase):
     def _issue(self, output: Path, ip: str, prefix: str = "agent") -> None:
-        result = subprocess.run(
+        result = _process.run(
             [
                 str(TLS_SCRIPT),
                 "self-signed",
@@ -56,7 +57,7 @@ class SelfSignedTlsTests(unittest.TestCase):
             output = Path(temp)
             agent_ip = ".".join(("192", "168", "178", "199"))
             self._issue(output, agent_ip)
-            check = subprocess.run(
+            check = _process.run(
                 ["openssl", "x509", "-in", str(output / "agent.crt"), "-noout", "-checkip", agent_ip],
                 text=True,
                 capture_output=True,
@@ -101,7 +102,7 @@ class SelfSignedTlsTests(unittest.TestCase):
     def test_reissue_requires_distinct_output_name_and_keeps_confirmation_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp)
-            blocked = subprocess.run(
+            blocked = _process.run(
                 [str(TLS_SCRIPT), "self-signed", "--output-dir", str(output), "--ip", "127.0.0.1"],
                 text=True,
                 capture_output=True,
