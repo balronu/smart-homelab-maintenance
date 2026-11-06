@@ -7,7 +7,8 @@ import pytest_asyncio
 import sys
 
 from homeassistant import auth, loader
-from homeassistant.components import frontend, http
+from homeassistant.components import http
+from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, UrlManager
 from homeassistant.config_entries import ConfigEntries, SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -30,7 +31,7 @@ async def hass(tmp_path):
     dr.async_setup(instance)
     instance.auth = await auth.auth_manager_from_config(instance, [], [])
     await http.async_setup(instance, {})
-    await frontend.async_setup(instance, {})
+    instance.data[DATA_EXTRA_MODULE_URL] = UrlManager(lambda _action, _url: None, [])
     await dr.async_load(instance)
     await er.async_load(instance)
     await instance.async_start()
@@ -134,6 +135,7 @@ async def test_setup_registers_entities_devices_services_and_survives_reload(has
     from custom_components import smart_homelab_maintenance as integration
     assert await integration.async_setup(hass, {})
     assert hass.data[DOMAIN]["card_registered"] is True
+    assert "/smart_homelab_maintenance/smart-homelab-maintenance-card.js?v=0.1.0-beta.4" in hass.data[DATA_EXTRA_MODULE_URL].urls
     result = await _create_entry(hass)
     entry = result["result"]
     await hass.async_block_till_done()
