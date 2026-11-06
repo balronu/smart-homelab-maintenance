@@ -14,8 +14,11 @@ from agent.smart_homelab_maintenance.adapters import default_registry
 from agent.smart_homelab_maintenance.api import ApiApplication
 from agent.smart_homelab_maintenance.api_models import JobCreatePayload
 from agent.smart_homelab_maintenance.discovery import DiscoveryService, FixtureProxmoxBackend, phase1_fixture
-from agent.smart_homelab_maintenance.proxmox_backend import FixtureProxmoxClient, ProxmoxInventoryBackend
-from agent.smart_homelab_maintenance.server import AgentServerConfig, load_credential
+from agent.smart_homelab_maintenance.proxmox_backend import (
+    FixtureProxmoxClient, ProxmoxApiClient, ProxmoxAuthenticationError,
+    ProxmoxClientConfig, ProxmoxInventoryBackend,
+)
+from agent.smart_homelab_maintenance.server import AgentServerConfig, load_credential, load_runtime_config
 from agent.smart_homelab_maintenance.errors import (
     ConcurrentJobError,
     DuplicateJobError,
@@ -335,6 +338,66 @@ class CoreTests(unittest.TestCase):
         credential.write_text("fixture token\n", encoding="utf-8")
         with self.assertRaises(ValueError):
             load_credential(credential)
+
+    def test_real_proxmox_client_is_bounded_read_only_and_normalizes_inventory(self) -> None:
+        class Response:
+            def __init__(self, payload):
+                self.status = 200
+                self.payload = json.dumps({"data": payload}).encode()
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self, limit):
+                self.limit = limit
+                return self.payload
+
+        responses = {
+            "status": {"pveversion": "pve-manager/8.4", "kversion": "6.8", "status": "online"},
+            "lxc": [{"vmid": 101, "name": "fixture", "status": "running", "maxmem": 100, "mem": 40, "maxdisk": 1000, "disk": 250}],
+            "qemu": [{"vmid": 104, "name": "ha", "status": "stopped"}],
+        }
+        calls = []
+        def opener(request, **kwargs):
+            calls.append((request, kwargs))
+            return Response(responses[request.full_url.rsplit("/", 1)[-1] if request.full_url.endswith(("status", "lxc", "qemu")) else ""])
+
+        config = ProxmoxClientConfig("https://pve.home.arpa/api2/json", "pve", "fixture-token")
+        client = ProxmoxApiClient(config, opener=opener)
+        self.assertEqual(client.node_status()["release"], "pve-manager/8.4")
+        self.assertEqual(client.lxc_list()[0]["memory_available_bytes"], 60)
+        self.assertEqual(client.vm_list()[0]["vmid"], 104)
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(call[0].get_method() == "GET" for call in calls))
+        self.assertTrue(all(call[0].get_header("Authorization") == "PVEAPIToken fixture-token" for call in calls))
+
+    def test_proxmox_client_rejects_public_urls_and_auth_errors_are_structured(self) -> None:
+        with self.assertRaises(ValueError):
+            ProxmoxClientConfig("https://public.example/api2/json", "pve", "fixture-token")
+        with self.assertRaises(ValueError):
+            ProxmoxClientConfig("http://pve.home.arpa/api2/json", "pve", "fixture-token")
+
+        class ErrorResponse:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self, limit): return b"{}"
+        def opener(request, **kwargs):
+            raise urllib.error.HTTPError(request.full_url, 401, "unauthorized", {}, None)
+        client = ProxmoxApiClient(ProxmoxClientConfig("https://pve.home.arpa/api2/json", "pve", "fixture-token"), opener=opener)
+        with self.assertRaises(ProxmoxAuthenticationError):
+            client.node_status()
+
+    def test_runtime_config_is_non_secret_and_enforces_disabled_execution(self) -> None:
+        config_path = Path(self.tempdir.name) / "agent.toml"
+        config_path.write_text(
+            'listen_host = "agent.home.arpa"\nlisten_port = 48128\n'
+            f'state_directory = "{self.tempdir.name}"\n'
+            'certificate = "/tmp/agent.crt"\nprivate_key = "/tmp/agent.key"\n'
+            'proxmox_url = "https://pve.home.arpa/api2/json"\nproxmox_node = "pve"\n'
+            'execution_enabled = false\n', encoding="utf-8")
+        config = load_runtime_config(config_path)
+        self.assertFalse(config.server.execution_enabled)
+        self.assertEqual(config.proxmox.node, "pve")
 
 
 if __name__ == "__main__":

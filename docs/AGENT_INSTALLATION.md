@@ -2,9 +2,9 @@
 
 Dieses Dokument beschreibt den späteren, kontrollierten Installationsweg des
 Smart-Homelab-Maintenance-Agenten auf Proxmox. Der Agent ist in der aktuellen
-Phase noch nicht für einen produktiven Start freigegeben: Das echte
-Proxmox-Lese-Backend, die TLS-Terminierung und die isolierte HA-
-Laufzeitabnahme müssen vorher abgeschlossen werden.
+Phase noch nicht für einen produktiven Start freigegeben. Die lesende
+Proxmox-API-Anbindung und TLS-Server-Runtime sind implementiert; die isolierte
+HA-Laufzeitabnahme und Infrastrukturfreigabe müssen noch erfolgen.
 
 ## 1. Voraussetzungen
 
@@ -16,6 +16,8 @@ Laufzeitabnahme müssen vorher abgeschlossen werden.
 - passender privater Schlüssel; Zertifikat und Schlüssel müssen zusammengehören
 - freier interner Port ab 1024; Port 8128 des alten Dienstes wird nicht verwendet
 - bestätigte Netzwerk-Allowlist; der Installer öffnet keine Firewallports
+- private Proxmox-API-URL, Knotename und Proxmox-Credential mit Modus 600
+- CA-Datei, die das Proxmox-Zertifikat validiert
 
 Der Agent benötigt einen eigenen Servicebenutzer und verwendet ausschließlich
 sein eigenes Installations-, Konfigurations- und Zustandsverzeichnis. Dateien
@@ -64,7 +66,11 @@ sudo scripts/install-agent.sh \
   --cert /etc/ssl/private/smart-homelab-agent.crt \
   --key /etc/ssl/private/smart-homelab-agent.key \
   --agent-host agent.home.arpa \
-  --port 48128
+  --port 48128 \
+  --proxmox-url https://pve.home.arpa:8006/api2/json \
+  --proxmox-node pve \
+  --proxmox-ca /etc/ssl/certs/proxmox-ca.crt \
+  --proxmox-token-file /etc/smart-homelab-maintenance/proxmox-api-token
 ```
 
 Die Prüfung stoppt bei fehlendem Proxmox-/Python-Voraussetzungen, ungültigem
@@ -83,17 +89,23 @@ sudo scripts/install-agent.sh \
   --key /etc/ssl/private/smart-homelab-agent.key \
   --agent-host agent.home.arpa \
   --port 48128 \
+  --proxmox-url https://pve.home.arpa:8006/api2/json \
+  --proxmox-node pve \
+  --proxmox-ca /etc/ssl/certs/proxmox-ca.crt \
+  --proxmox-token-file /etc/smart-homelab-maintenance/proxmox-api-token \
   --apply
 ```
 
 Dabei werden ausschließlich eigene Pfade unter `/opt/smart-homelab-maintenance`,
 `/etc/smart-homelab-maintenance` und `/var/lib/smart-homelab-maintenance`
-angelegt. Ein zufälliges Token wird geschützt erzeugt, falls noch keines
-existiert. Tokenwerte werden niemals ausgegeben.
+angelegt. Ein Agent-API-Credential wird geschützt erzeugt, falls noch keines
+existiert. Das Proxmox-Credential muss bereitgestellt werden und wird nur
+geschützt kopiert. Tokenwerte werden niemals ausgegeben.
 
 Der Installer führt kein `enable` und kein `start` aus. Die Unit wird nur
-abgelegt und systemd neu eingelesen. In der aktuellen Phase bleibt die
-Runtime wegen des fehlenden Live-Proxmox-Backends absichtlich nicht startbereit.
+abgelegt und systemd neu eingelesen. Für einen späteren Start werden beide
+systemd-Credentials geladen; die Runtime bietet ausschließlich lesende
+Endpunkte.
 
 ## 6. Verbindung mit Home Assistant
 
@@ -178,6 +190,6 @@ sudo scripts/uninstall-agent.sh \
 ## Aktueller Freigabestatus
 
 Der dokumentierte Weg ist technisch vorbereitet, aber für eine kontrollierte
-Installation derzeit **NO-GO**. Erforderlich sind noch das echte
-Proxmox-Backend, eine geprüfte Server-Runtime, private TLS-/DNS-/Proxy-
-Infrastruktur und die isolierte HA-2026.11-Abnahme.
+Installation derzeit **NO-GO**. Erforderlich sind die isolierte HA-2026.11-
+Abnahme, private TLS-/DNS-/Netzwerkstrecke und eine gesonderte Freigabe für
+Installations- und Starttest.

@@ -12,12 +12,18 @@ import logging
 import os
 import ssl
 import ipaddress
+import argparse
+import json
+import tomllib
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from .api import ApiApplication
+from .discovery import DiscoveryService
+from .jobs import JobRepository
+from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInventoryBackend
 from .security import redact_secrets
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,6 +53,61 @@ class AgentServerConfig:
             raise ValueError("TLS certificate and private key are required")
         if self.execution_enabled:
             raise ValueError("update execution is permanently disabled in this phase")
+
+
+@dataclass(frozen=True, slots=True)
+class AgentRuntimeConfig:
+    server: AgentServerConfig
+    state_directory: str
+    proxmox: ProxmoxClientConfig
+    max_response_bytes: int = 256_000
+
+
+def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
+    """Load non-secret runtime settings from a TOML file."""
+
+    try:
+        with Path(path).open("rb") as handle:
+            raw = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise ValueError("agent configuration could not be loaded") from exc
+    try:
+        server = AgentServerConfig(
+            host=str(raw["listen_host"]), port=int(raw["listen_port"]),
+            certificate=str(raw["certificate"]), private_key=str(raw["private_key"]),
+            execution_enabled=bool(raw.get("execution_enabled", False)),
+        )
+        proxmox = ProxmoxClientConfig(
+            base_url=str(raw["proxmox_url"]), node=str(raw["proxmox_node"]),
+            api_token="configuration-credential-placeholder",
+            ca_file=str(raw["proxmox_ca_file"]) if raw.get("proxmox_ca_file") else None,
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("agent configuration is invalid") from exc
+    state_directory = str(raw.get("state_directory", ""))
+    if not state_directory or not Path(state_directory).is_absolute():
+        raise ValueError("state_directory must be an absolute path")
+    max_bytes = int(raw.get("max_response_bytes", 256_000))
+    if max_bytes < 1024:
+        raise ValueError("max_response_bytes is too small")
+    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes)
+
+
+def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:
+    """Construct the live read-only application from validated settings."""
+
+    if not agent_token or not proxmox_token:
+        raise ValueError("required credentials are missing")
+    proxmox_config = ProxmoxClientConfig(
+        base_url=config.proxmox.base_url, node=config.proxmox.node,
+        api_token=proxmox_token, ca_file=config.proxmox.ca_file,
+        timeout=config.proxmox.timeout, max_bytes=config.proxmox.max_bytes,
+    )
+    repository = JobRepository(str(Path(config.state_directory) / "jobs.sqlite"))
+    backend = ProxmoxInventoryBackend(ProxmoxApiClient(proxmox_config))
+    application = ApiApplication(DiscoveryService(backend), repository,
+                                read_token=agent_token, max_bytes=config.max_response_bytes)
+    return application, repository
 
 
 def load_credential(path: str | os.PathLike[str]) -> str:
@@ -80,7 +141,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
         application: ApiApplication = self.server.application  # type: ignore[attr-defined]
         try:
             status, payload = application.handle("GET", self.path, headers=self.headers)
-            body = __import__("json").dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+            body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -128,3 +189,28 @@ def serve_forever(application: ApiApplication, config: AgentServerConfig, *, ser
     finally:
         server.shutdown()
         server.server_close()
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Smart Homelab Maintenance read-only agent")
+    parser.add_argument("--config", default=os.environ.get("SMART_HOMELAB_AGENT_CONFIG"))
+    args = parser.parse_args(argv)
+    if not args.config:
+        parser.error("--config or SMART_HOMELAB_AGENT_CONFIG is required")
+    try:
+        config = load_runtime_config(args.config)
+        agent_token = credential_from_systemd("api_token")
+        proxmox_token = credential_from_systemd("proxmox_api_token")
+        application, repository = build_application(config, agent_token=agent_token, proxmox_token=proxmox_token)
+        try:
+            serve_forever(application, config.server)
+        finally:
+            repository.close()
+    except (OSError, ValueError) as exc:
+        _LOGGER.error("agent startup failed: %s", redact_secrets(str(exc)))
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

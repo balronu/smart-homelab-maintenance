@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased – Phase 4.6 Agent-Runtime
+
+- lesender Proxmox-HTTPS-Client für Host, LXC und VMs mit TLS-, Größen- und
+  Authentifizierungsprüfung
+- TOML-basierter Agent-Startpunkt mit getrennten systemd-Credentials und
+  read-only Runtime-Verdrahtung
+- Installer um Proxmox-URL, CA, Knoten und geschütztes API-Credential ergänzt
+- Update- und Shell-Ausführung bleibt deaktiviert
+
 ## Unreleased – Phase 4.4 Vorbereitung
 
 - Read-only Proxmox-Inventory-Backend mit injizierbarem Client für LXC und VMs

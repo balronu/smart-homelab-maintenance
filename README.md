@@ -50,9 +50,9 @@ Home Assistant geprüft werden.
 - unbekannte oder blockierte Anwendungen bleiben lesend
 - Zugangsdaten gehören ausschließlich in die lokale Konfiguration und dürfen
   nicht in Logs, Issues, Screenshots oder Diagnosen erscheinen
-- der vorbereitete Agent-Server erzwingt TLS, bindet nicht an unbeschränkte
-  Adressen und nutzt systemd-Credentials; Server und Proxmox-Live-Backend sind
-  noch nicht produktiv installiert
+- der Agent-Server erzwingt TLS, bindet nicht an unbeschränkte Adressen und
+  nutzt getrennte systemd-Credentials; das Proxmox-Backend arbeitet nur lesend
+- produktive Installation und Start sind nicht erfolgt
 
 ## Entwicklung und Tests
 

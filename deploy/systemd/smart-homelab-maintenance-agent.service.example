@@ -1,5 +1,5 @@
 [Unit]
-Description=Smart Homelab Maintenance Agent (template, not installed)
+Description=Smart Homelab Maintenance Agent (read-only)
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=/opt/smart-homelab-maintenance/venv/bin/python
@@ -14,7 +14,7 @@ Environment=PYTHONUNBUFFERED=1
 Environment=SMART_HOMELAB_AGENT_CONFIG=/etc/smart-homelab-maintenance/agent.toml
 Environment=PYTHONPATH=/opt/smart-homelab-maintenance/agent
 LoadCredential=api_token:/etc/smart-homelab-maintenance/api-token
-# The server module and live Proxmox backend are not part of this phase.
+LoadCredential=proxmox_api_token:/etc/smart-homelab-maintenance/proxmox-api-token
 ExecStart=/opt/smart-homelab-maintenance/venv/bin/python -m smart_homelab_maintenance.server
 Restart=on-failure
 RestartSec=5
