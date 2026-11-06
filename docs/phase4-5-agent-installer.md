@@ -61,10 +61,12 @@ wurde nicht durch Änderungen am Produktivhost ersetzt.
 
 ## 4. CI und PR
 
-Die Änderungen sind für PR #2 vorgesehen. Remote-CI wird erst nach dem Push
-dieses Feature-Branches erneut ausgeführt. Bis dahin ist der Remote-Status für
-diesen Phase-4.5-Kandidaten **NOT RUN**; frühere CI-Läufe gehören zum
-Phase-4.4-Stand und werden nicht übernommen.
+Die Änderungen wurden in den bestehenden [PR #2](https://github.com/balronu/smart-homelab-maintenance/pull/2)
+aufgenommen. Der Installer-Commit `9a19f85` wurde in den terminalen
+Pull-Request- und Push-Läufen vollständig geprüft. Bestanden sind Python-
+Regression, API-Vertrag, HA-Runtime, HA-Runtime-Tests, Hassfest, HACS,
+Browser und Security. Frühere fehlgeschlagene Läufe auf älteren Phase-4.4-
+Zwischenständen gehören nicht zum Installer-Kandidaten.
 
 ## 5. Noch erforderliche Infrastrukturvoraussetzungen
 
