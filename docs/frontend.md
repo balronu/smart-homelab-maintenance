@@ -18,7 +18,7 @@ Home-Assistant-Entitydaten (`hass`), niemals Agent-URLs oder Tokens.
 - `getConfigElement()`, `getStubConfig()` und idempotente Registrierung in
   `window.customCards`
 
-## Beta-5-Kandidat
+## Beta-6-Kandidat
 
 Die Datei wird ohne Buildschritt bytegleich in den Integrationspfad kopiert und
 über `add_extra_js_url` mit Versionsquery registriert. Der Kandidat führt keine
@@ -32,11 +32,11 @@ node --check frontend/card-state.js
 node --check frontend/smart-homelab-maintenance-card.js
 ```
 
-Beta.5 hält das Editor-DOM bei erneutem `setConfig()` stabil, sodass Fokus und
+Beta.6 hält das Editor-DOM bei erneutem `setConfig()` stabil, sodass Fokus und
 ungespeicherte Eingaben bei mobilen HA-Updates erhalten bleiben. Der
 Playwright-Harness prüft zusätzlich iPhone-/iPad-Emulation, leere und unbekannte
-Entity-Zustände, JavaScript-Fehler, fehlgeschlagene Requests und Editor-
-Interaktion.
+Entity-Zustände, JavaScript-Fehler, fehlgeschlagene Requests, den Lovelace-
+Editor-Lifecycle und Light-/Dark-Mode.
 
 Der Playwright-Harness benötigt eine installierte `playwright`-Abhängigkeit;
 ohne diese Abhängigkeit ist die Browsermatrix nicht ausgeführt.

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>offline card harness</title></head>
-<body style="margin:0;max-width:100vw;overflow-x:hidden"><style>pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><smart-homelab-maintenance-card id="card"></smart-homelab-maintenance-card><smart-homelab-maintenance-card-editor id="editor"></smart-homelab-maintenance-card-editor><pre id="result"></pre>
+<body style="margin:0;max-width:100vw;overflow-x:hidden"><style>body{background:#fff;color:#111}pre{white-space:pre-wrap;overflow-wrap:anywhere}@media(prefers-color-scheme:dark){body{background:#111;color:#eee;--primary-text-color:#eee;--secondary-text-color:#aaa;--card-background-color:#1c1c1c;--ha-card-background:#1c1c1c;--secondary-background-color:#292929;--divider-color:#555}}</style><smart-homelab-maintenance-card id="card"></smart-homelab-maintenance-card><smart-homelab-maintenance-card-editor id="editor"></smart-homelab-maintenance-card-editor><pre id="result"></pre>
 <script type="module">
 import "./smart-homelab-maintenance-card.js";
 const card = document.querySelector("#card");
@@ -23,7 +23,9 @@ card.hass = { locale: "en", states: {
 let editorChanged = false;
 document.querySelector("#editor").addEventListener("config-changed", () => { editorChanged = true; });
 const editor = document.querySelector("#editor");
+editor.hass = { locale: "de" };
 editor.setConfig({ title: "Harness", show_vms: true, show_containers: true });
+const localizedEditor = editor.textContent.includes("Titel") && editor.textContent.includes("Virtuelle Maschinen") && !editor.textContent.includes("Virtual machines");
 const titleInput = editor.querySelector('[data-field="title"]');
 titleInput.focus();
 titleInput.value = "Draft on iPhone";
@@ -40,6 +42,11 @@ card.hass = { locale: "en", states: {
   "sensor.smart_homelab_maintenance_vm_104": { state: "running", attributes: { vmid: 104, name: "haos", memory_used_bytes: 100, memory_total_bytes: 200 } },
   "sensor.smart_homelab_maintenance_container_101": { state: "running", attributes: { container_id: 101, name: "cloudflared", os_name: "Debian", os_version: "12" } }
 } };
-window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), editorChanged, editorPreservesFocusedDraft, emptyCardSafe, unknownSafe, errors, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+const savedConfig = { ...editor.config };
+editor.setConfig(savedConfig);
+const reopenedEditorSafe = editor.querySelector('[data-field="title"]').value === savedConfig.title && editor.querySelector('[data-field="show_containers"]').checked === savedConfig.show_containers;
+const barRects = [...card.shadowRoot.querySelectorAll(".bar-row span")].map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
+const hasTextOverlap = barRects.some((left, index) => barRects.slice(index + 1).some((right) => Math.abs(left.top - right.top) < 2 && left.left < right.right && right.left < left.right));
+window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), cardHasSize: card.getCardSize() >= 1, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, unknownSafe, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
 document.querySelector("#result").textContent = JSON.stringify(window.__HARNESS__);
 </script></body></html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HA Lovelace editor contract harness</title></head>
+<body><style>body{margin:0;max-width:100vw;overflow-x:hidden;background:#fff;color:#111}@media(prefers-color-scheme:dark){body{background:#111;color:#eee;--primary-text-color:#eee;--secondary-text-color:#aaa;--card-background-color:#1c1c1c;--ha-card-background:#1c1c1c;--secondary-background-color:#292929;--divider-color:#555}}</style><ha-card-editor-dialog id="dialog"></ha-card-editor-dialog><pre id="result"></pre>
+<script type="module">
+import "./smart-homelab-maintenance-card.js";
+const hass = { locale: "de", config: { language: "de" }, states: {
+  "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
+  "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
+  "sensor.smart_homelab_maintenance_running_jobs": { state: "0", attributes: {} },
+  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { cpu_percent: 20, memory_used_bytes: 100, memory_total_bytes: 200 } },
+  "sensor.smart_homelab_maintenance_vm_104": { state: "running", attributes: { vmid: 104, name: "haos" } }
+} };
+class HaCardEditorDialog extends HTMLElement {
+  connectedCallback() {
+    this.innerHTML = `<main class="dialog"><nav>Konfiguration · Sichtbarkeit · Layout</nav><section class="editor-slot"></section><section class="preview-slot"></section><button data-action="save">Speichern</button></main>`;
+    this.editor = document.createElement("smart-homelab-maintenance-card-editor");
+    this.card = document.createElement("smart-homelab-maintenance-card");
+    this.querySelector(".editor-slot").append(this.editor); this.querySelector(".preview-slot").append(this.card);
+    this.querySelector('[data-action="save"]').addEventListener("click", () => { this.saved = { ...this.editor.config }; this.setConfig(this.saved); });
+  }
+  set hass(value) { this._hass = value; if (this.editor) { this.editor.hass = value; this.card.hass = value; } }
+  setConfig(config) { this.config = { ...config }; this.editor.setConfig(this.config); this.card.setConfig(this.config); }
+  reopen() { this.setConfig(this.saved); }
+}
+customElements.define("ha-card-editor-dialog", HaCardEditorDialog);
+const dialog = document.querySelector("#dialog");
+dialog.hass = hass;
+dialog.setConfig({ title: "Smart Homelab Maintenance", show_vms: true, show_containers: true, show_maintenance: true });
+dialog.querySelector('[data-action="save"]').click();
+dialog.reopen();
+window.__HA_HARNESS__ = { pickerRegistered: window.customCards.some((entry) => entry.type === "smart-homelab-maintenance-card"), editorVisible: dialog.editor.textContent.includes("Titel"), previewVisible: dialog.card.shadowRoot.querySelector(".card")?.textContent.includes("pve-home"), savedAndReopened: dialog.editor.querySelector('[data-field="title"]').value === "Smart Homelab Maintenance", noHorizontalOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth };
+document.querySelector("#result").textContent = JSON.stringify(window.__HA_HARNESS__);
+</script></body></html>

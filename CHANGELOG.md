@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-beta.6 – Lovelace editor layout and preview fix (Candidate)
+
+- Add responsive editor layout with localized German/English labels.
+- Preserve card preview sizing and render an explicit offline/empty state.
+- Add a Home Assistant editor-contract harness for picker, preview, save, and
+  reopen lifecycle coverage.
+
 ## 0.1.0-beta.5 – Lovelace mobile editor fix (Candidate)
 
 - Keep the editor DOM stable during `setConfig()` updates so mobile focus and
