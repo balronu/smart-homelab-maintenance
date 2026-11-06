@@ -105,3 +105,13 @@
 - Updateausführung global deaktiviert
 - Installation der Karte aus derselben Version als lokale HA-Ressource
 - Keine produktive Geräte- oder Infrastrukturaktion
+## 0.1.0-beta.10 – Scroll- und DOM-Stabilität (unveröffentlichter Kandidat)
+
+- Behebt den iPhone-Scrollsprung durch einmaligen Shadow-DOM-Aufbau und
+  inkrementelle Updates bestehender Knoten.
+- Bewahrt aufgeklappte Hostbereiche sowie die DOM-Identität von VM- und
+  Containerkarten während wiederholter `hass`-Aktualisierungen.
+- Ergänzt eine reproduzierbare Scroll-Regression mit drei unabhängigen
+  Karteninstanzen sowie iPhone-, iPad- und Desktop-Browser-Matrix.
+- Keine automatische Installation, kein HA-Neustart und keine Änderungen an
+  Proxmox oder Agent.
