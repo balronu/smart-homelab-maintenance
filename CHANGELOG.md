@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.0-beta.14 – Sections-Resize- und Ressourcen-Kandidat
+
+### Deutsch
+
+- Meldet Änderungen der tatsächlichen Kartenhöhe über `ResizeObserver` als
+  `card-updated`, damit Home Assistants Sections-Wrapper nach dem Öffnen von
+  Detailbereichen neu layouten können.
+- Ergänzt eine Sections-Fixture, die einen veralteten Wrapper-Höhenwert und
+  das abgeschnittene Kartenende reproduziert; CT112 muss im reparierten Pfad
+  erreichbar bleiben.
+- Reicht CPU-, RAM-, Speicher- und Laufzeitfelder des read-only Proxmox-
+  Backends bis zu den HA-Entitätsattributen durch.
+- Die iPhone-Praxisbehebung bleibt unbestätigt; diese Version ist nur ein
+  Kandidat und wurde nicht veröffentlicht oder produktiv installiert.
+
+### English
+
+- Reports actual card-size changes through `ResizeObserver` as `card-updated`,
+  allowing Home Assistant Sections wrappers to re-layout after details open.
+- Adds a Sections fixture reproducing stale wrapper height and clipped card
+  endings; CT112 must remain reachable in the fixed path.
+- Preserves CPU, RAM, storage, and uptime fields from the read-only Proxmox
+  backend through to Home Assistant entity attributes.
+- The iPhone fix remains unverified; this is a candidate only and was neither
+  published nor installed in production.
+
 ## 0.1.0-beta.13 – Next Generation Dashboard (Kandidat)
 
 - Modernisiert die read-only Lovelace-Karte mit klarer Statusübersicht,

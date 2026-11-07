@@ -24,6 +24,15 @@ Home-Assistant-Entitydaten (`hass`), niemals Agent-URLs oder Tokens.
 - Sections-Grid-Vertrag: `columns: "full"` und `rows: "auto"`; es wird keine
   feste Kartenhöhe oder verschachtelte Haupt-Scrollfläche erzeugt.
 
+## Beta.14-Kandidat
+
+Die Karte beobachtet ihre tatsächliche Hostgröße mit `ResizeObserver` und
+meldet Änderungen als `card-updated` mit Bubbling über die Shadow-DOM-Grenze.
+Das entspricht dem von Home Assistant verwendeten Sections-Aktualisierungspfad
+für Karten. Die neue Fixture prüft einen absichtlich veralteten Wrapper-
+Höhenwert und verlangt, dass der letzte Container sowie ein nachfolgendes
+Dashboard-Element erreichbar bleiben. Das ist kein echter iPhone-Test.
+
 ## Beta-9-Kandidat
 
 Die Datei wird ohne Buildschritt bytegleich in den Integrationspfad kopiert und
@@ -49,7 +58,7 @@ Entity-Zustände, JavaScript-Fehler, fehlgeschlagene Requests, den Lovelace-
 Editor-Lifecycle und Light-/Dark-Mode.
 
 Der Playwright-Harness benötigt eine installierte `playwright`-Abhängigkeit.
-Beta.13 prüft zusätzlich 0, 1, 10, 20 und 50 Container sowie das Erreichen
+Beta.14 prüft zusätzlich 0, 1, 10, 20 und 50 Container sowie das Erreichen
 des Kartenendes in simulierten Sections-/Masonry-Layouts. Diese Fixtures sind
 kein Beweis für ein echtes iOS-Home-Assistant-Rendering; der Praxistest bleibt
 vor einer Veröffentlichung erforderlich.

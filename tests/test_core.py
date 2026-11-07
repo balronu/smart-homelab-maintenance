@@ -337,12 +337,15 @@ class CoreTests(unittest.TestCase):
 
     def test_proxmox_backend_is_read_only_dynamic_and_includes_vms(self) -> None:
         backend = ProxmoxInventoryBackend(FixtureProxmoxClient(
-            {"name": "fixture-node", "release": "9.x", "online": True},
-            lxcs=({"vmid": 101, "name": "fixture-lxc", "status": "stopped", "applications": []},),
+            {"name": "fixture-node", "release": "9.x", "online": True, "memory_used_bytes": 40, "memory_total_bytes": 100},
+            lxcs=({"vmid": 101, "name": "fixture-lxc", "status": "stopped", "memory_used_bytes": 20, "memory_total_bytes": 50, "disk_used_bytes": 30, "disk_total_bytes": 100, "applications": []},),
             vms=({"vmid": 104, "name": "fixture-vm", "status": "running"},),
         ))
         self.assertEqual(backend.host()["name"], "fixture-node")
+        self.assertEqual(backend.host()["memory_total_bytes"], 100)
         self.assertFalse(backend.containers()[0]["running"])
+        self.assertEqual(backend.containers()[0]["memory_used_bytes"], 20)
+        self.assertEqual(backend.containers()[0]["disk_total_bytes"], 100)
         self.assertEqual(backend.virtual_machines()[0]["vmid"], 104)
 
     def test_api_exposes_host_and_virtual_machines_without_update_routes(self) -> None:

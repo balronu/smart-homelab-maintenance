@@ -33,13 +33,26 @@ const css = `:host{display:block;color:var(--primary-text-color);box-sizing:bord
 const editorCss = `:host{display:block;box-sizing:border-box;color:var(--primary-text-color)}.editor{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:4px 0;box-sizing:border-box;max-width:100%}.field{display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr);align-items:center;gap:12px;min-width:0;line-height:1.35}.field.checkbox{grid-template-columns:auto minmax(0,1fr);justify-content:start;gap:10px;cursor:pointer}.field span{overflow-wrap:anywhere}.field input[type=text]{box-sizing:border-box;min-width:0;width:100%;max-width:100%;padding:8px 10px;border:1px solid var(--divider-color,#777);border-radius:6px;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);font:inherit}.field input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:var(--primary-color,#03a9f4)}@media(max-width:600px){.editor{gap:10px}.field,.field.checkbox{grid-template-columns:minmax(0,1fr);gap:6px}.field.checkbox{grid-template-columns:auto minmax(0,1fr);align-items:start}.field input[type=text]{font-size:16px;min-height:40px}}`;
 const premiumCss = `.card{background:linear-gradient(145deg,var(--ha-card-background,var(--card-background-color)),color-mix(in srgb,var(--ha-card-background,var(--card-background-color)) 86%,var(--primary-color,#03a9f4)));border:1px solid color-mix(in srgb,var(--divider-color,#ddd) 70%,transparent);}.header{padding-bottom:4px}.status{padding:5px 9px;border-radius:999px;background:var(--secondary-background-color);}.status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--success-color,#43a047) 18%,transparent)}.offline .status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--error-color,#db4437) 18%,transparent)}.section{border-top:1px solid color-mix(in srgb,var(--divider-color,#ddd) 55%,transparent);padding-top:14px}.item{background:color-mix(in srgb,var(--card-background-color,#fff) 76%,transparent);transition:border-color .18s ease,background .18s ease}.item[open]{border-color:color-mix(in srgb,var(--primary-color,#03a9f4) 55%,var(--divider-color,#ddd));background:color-mix(in srgb,var(--primary-color,#03a9f4) 5%,var(--card-background-color,#fff))}.item>summary{list-style:none}.item>summary::-webkit-details-marker{display:none}.item-head{cursor:pointer;padding:0}.item-head::after{content:"+";color:var(--secondary-text-color);font-weight:700}.item[open]>.item-head::after{content:"−"}.item-body{padding-top:10px}.metric strong{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){.item{transition:none}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
-  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; }
-  connectedCallback() { this._ensureShell(); this.render(); }
+  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._lastSize = null; this._resizeObserver = null; }
+  connectedCallback() { this._ensureShell(); this.render(); this._observeSize(); }
+  disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; }
   setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
   set hass(value) { this._hass = value; this.render(); }
   get hass() { return this._hass; }
   getCardSize() { return 8; }
   getGridOptions() { return { columns: "full", rows: "auto" }; }
+  _observeSize() {
+    if (this._resizeObserver || typeof ResizeObserver === "undefined") return;
+    this._resizeObserver = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      const size = `${Math.round(width)}x${Math.round(height)}`;
+      if (this._lastSize === null) { this._lastSize = size; return; }
+      if (this._lastSize === size) return;
+      this._lastSize = size;
+      this.dispatchEvent(new CustomEvent("card-updated", { bubbles: true, composed: true }));
+    });
+    this._resizeObserver.observe(this);
+  }
   _metric() { const node = document.createElement("div"); node.className = "metric"; node.innerHTML = '<span class="muted"></span><strong></strong><span class="muted"></span>'; return { node, label: node.children[0], value: node.children[1], sub: node.children[2] }; }
   _bar() { const node = document.createElement("div"); node.className = "bar-row"; node.innerHTML = '<span></span><progress max="100"></progress><span class="muted"></span>'; return { node, label: node.children[0], progress: node.children[1], value: node.children[2] }; }
   _section(titleKey, className = "section") { const section = document.createElement("div"); section.className = className; const heading = document.createElement("h3"); section.append(heading); const grid = document.createElement("div"); grid.className = "grid"; section.append(grid); return { section, heading, grid, titleKey }; }
