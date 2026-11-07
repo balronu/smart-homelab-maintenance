@@ -98,16 +98,35 @@ PY
 }
 
 wait_for_health() {
-    local expected_version="$1"
+    local expected_version="$1" baseline_restarts="${2:-}"
     local deadline=$((SECONDS + READINESS_TIMEOUT_SECONDS))
     local payload=""
     local last_error="Dienst nicht bereit"
     while (( SECONDS < deadline )); do
+        if [[ -n "$baseline_restarts" ]]; then
+            local current_restarts
+            current_restarts="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
+            if [[ "$current_restarts" =~ ^[0-9]+$ && "$baseline_restarts" =~ ^[0-9]+$ ]] \
+                && (( current_restarts > baseline_restarts )); then
+                printf 'ERROR: systemd hat den Agent während der Readiness neu gestartet (NRestarts %s -> %s).\n' \
+                    "$baseline_restarts" "$current_restarts" >&2
+                return "$READINESS_FAILURE_EXIT"
+            fi
+        fi
         if systemctl is-active --quiet "$SERVICE_NAME"; then
             if payload="$(curl --fail --silent --show-error \
                 --connect-timeout 2 --max-time 5 --cacert "$ca_file" \
                 "$health_url/health" 2>/dev/null)"; then
                 if validate_health_payload "$payload" "$expected_version" 2>/dev/null; then
+                    if [[ -n "$baseline_restarts" ]]; then
+                        current_restarts="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
+                        if [[ "$current_restarts" =~ ^[0-9]+$ && "$baseline_restarts" =~ ^[0-9]+$ ]] \
+                            && (( current_restarts > baseline_restarts )); then
+                            printf 'ERROR: systemd hat den Agent unmittelbar nach dem Healthcheck neu gestartet (NRestarts %s -> %s).\n' \
+                                "$baseline_restarts" "$current_restarts" >&2
+                            return "$READINESS_FAILURE_EXIT"
+                        fi
+                    fi
                     return 0
                 fi
                 last_error="Healthcheck-Antwort ist inkompatibel"
@@ -259,6 +278,8 @@ systemctl is-active --quiet "$SERVICE_NAME" && was_active=1 || true
 [[ "$was_active" -eq 1 ]] || die "Agent-Dienst ist nicht aktiv; kein automatischer Start im Updatepfad."
 previous_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"
 expected_agent_version="$(read_agent_version "$source_dir/agent")"
+restart_count_before="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
+[[ "$restart_count_before" =~ ^[0-9]+$ ]] || die "systemd-Restartzähler ist nicht lesbar; kein Update ausgeführt."
 update_started=1
 trap finish EXIT
 
@@ -286,7 +307,7 @@ if ! wait_for_port_free; then
 fi
 systemctl start "$SERVICE_NAME"
 port_forensics "nach-start"
-wait_for_health "$expected_agent_version" || exit "$READINESS_FAILURE_EXIT"
+wait_for_health "$expected_agent_version" "$restart_count_before" || exit "$READINESS_FAILURE_EXIT"
 
 trap - EXIT
 info "Agent aktualisiert, Readiness/TLS-Healthcheck erfolgreich, Dienst läuft. Rollback-Staging bleibt erhalten: $rollback_dir"

@@ -534,3 +534,22 @@ system was changed by this release.
   duplicate start, and `TIME-WAIT`. The Beta.24 plan comparison and Beta.25
   lifecycle fix remain included; rollback protection and locked production
   update paths are unchanged.
+
+## Nächster Beta-Kandidat – Readiness erkennt Restart-Races
+
+### Deutsch
+
+- Der Updater merkt sich den systemd-Restartzähler vor dem Agent-Austausch.
+- Jeder automatische `Restart=on-failure`-Versuch während der neuen
+  Readiness wird als fehlgeschlagener Upgrade-Start behandelt, selbst wenn
+  ein späterer Versuch noch gesund wird.
+- Der bestehende Rollback bewahrt den vorherigen Code und die Diagnose; die
+  Schutzprüfung wird nicht durch längere Wartezeiten ersetzt.
+
+### English
+
+- The updater records the systemd restart counter before exchanging the agent.
+- Any automatic `Restart=on-failure` attempt during readiness is treated as a
+  failed upgrade start, even if a later attempt becomes healthy.
+- Existing rollback preserves the previous code and diagnostics; the safety
+  gate is not replaced by a longer timeout.

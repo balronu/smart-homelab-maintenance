@@ -40,6 +40,16 @@ def test_upgrade_recovers_from_explicit_exit_and_bounds_restart_race():
     assert "trap recovery ERR" not in script
 
 
+def test_readiness_rejects_systemd_restart_during_upgrade():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert 'systemctl show --property=NRestarts --value "$SERVICE_NAME"' in script
+    assert 'restart_count_before=' in script
+    assert 'wait_for_health "$expected_agent_version" "$restart_count_before"' in script
+    assert "systemd hat den Agent während der Readiness neu gestartet" in script
+    assert "systemd hat den Agent unmittelbar nach dem Healthcheck neu gestartet" in script
+    assert script.count('systemctl show --property=NRestarts --value "$SERVICE_NAME"') >= 2
+
+
 def test_upgrade_does_not_delete_existing_rollback_staging():
     script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
     assert '"$AGENT_ROOT"/agent.previous.*.staging' in script
