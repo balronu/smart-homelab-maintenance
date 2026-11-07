@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased – Agent-Updater Readiness und Rollback
+
+### Deutsch
+
+- Der Agent-Updater wartet nach dem Dienststart innerhalb eines begrenzten
+  Zeitfensters auf einen TLS-validierten Healthcheck mit passender Version und
+  API 1.1.
+- Fehlerpfade verwenden einen EXIT-sicheren Rollback; der fehlerhafte Code
+  bleibt zur Diagnose erhalten und vorhandenes Rollback-Staging wird nicht
+  automatisch gelöscht.
+
+### English
+
+- The agent updater now waits within a bounded window for a TLS-validated
+  health response with the expected version and API 1.1.
+- Failure paths use EXIT-safe rollback; failed code remains available for
+  diagnosis and existing rollback staging is never deleted automatically.
+
 ## 0.1.0-beta.19 – Dry-Run-Serviceantwort und Update-Erkennung (Prerelease)
 
 ### Deutsch

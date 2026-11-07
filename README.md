@@ -13,6 +13,13 @@ außerdem die eindeutigen Zustände aktuell, Updates verfügbar, noch nicht
 geprüft, nicht unterstützt, nicht autorisiert, fehlgeschlagen, veraltet und
 unbekannt. Echte Updates bleiben deaktiviert.
 
+Der separate Agent-Updater wird in diesem Entwicklungsstand gegen einen
+Restart-/Readiness-Race gehärtet: Der TLS-Healthcheck wird innerhalb eines
+begrenzten Zeitfensters wiederholt, ein Fehler führt über einen EXIT-sicheren
+Rollbackpfad zurück zum vorherigen Agent-Code, und Rollback-Staging wird nicht
+automatisch gelöscht. Diese Korrektur ist zunächst ein PR-Kandidat und noch
+kein neuer Release.
+
 ## Beta.18: gemeinsamer Versions- und Updatevertrag
 
 Integration, Karte und Agent tragen dieselbe Beta-Version. Der Agent meldet
