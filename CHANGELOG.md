@@ -507,3 +507,30 @@ system was changed by this release.
   port causes a safe abort.
 - `TimeoutStopSec=30` bounds the systemd stop; historical and failed rollback
   staging directories remain preserved.
+## 0.1.0-beta.26 – Port-Gate-Forensik und sichere Upgrade-Rennen (Prerelease)
+
+### Deutsch
+
+- Der Updater blockiert aktive TCP-Zustände und eine noch aktive systemd-Unit
+  auf Port 48128; ausschließlich der terminale, kernelverwaltete `TIME-WAIT`
+  Zustand wird bei `SO_REUSEADDR` ausgenommen.
+- Eine zweite Port-/Unit-Prüfung unmittelbar vor `systemctl start` schließt das
+  Stop-/Swap-/Start-Rennen. PID-, ControlPID-, Cgroup- und Socket-Diagnose wird
+  nicht-sensitiv an den relevanten Übergängen protokolliert.
+- Die isolierten Regressionen decken freien Port, Listener, verzögerten
+  Shutdown, Doppelstart und `TIME-WAIT` ab. Beta.24-Planvergleich und Beta.25-
+  Lifecycle-Fix bleiben enthalten; Rollback-Schutz und gesperrte produktive
+  Updatepfade bleiben unverändert.
+
+### English
+
+- The updater blocks active TCP states and an active systemd unit on port 48128;
+  only terminal kernel-owned `TIME-WAIT` is exempted for the server's
+  `SO_REUSEADDR` bind.
+- A second port/unit check immediately before `systemctl start` closes the
+  stop/swap/start race. PID, ControlPID, cgroup, and socket diagnostics remain
+  non-sensitive at the relevant transitions.
+- Isolated regressions cover a free port, active listener, delayed shutdown,
+  duplicate start, and `TIME-WAIT`. The Beta.24 plan comparison and Beta.25
+  lifecycle fix remain included; rollback protection and locked production
+  update paths are unchanged.

@@ -1,5 +1,23 @@
 # Smart Homelab Maintenance
 
+## Beta.26: Port-Gate-Forensik und sichere Upgrade-Rennen
+
+Beta.26 erweitert die Beta.25-Lifecycle-Korrektur um eine forensische
+Portprüfung: aktive TCP-Zustände und eine aktive systemd-Unit blockieren den
+Start, während ausschließlich der terminale, kernelverwaltete `TIME-WAIT`
+Zustand ausgenommen wird. Eine zweite Prüfung unmittelbar vor dem Start
+schließt das Stop-/Swap-/Start-Rennen. PID-, Cgroup- und Socket-Diagnose bleibt
+nicht-sensitiv; Rollback-Stagings werden nicht gelöscht.
+
+Beta.26 extends the Beta.25 lifecycle fix with forensic port gating: active
+TCP states and an active systemd unit block startup, while only terminal,
+kernel-owned `TIME-WAIT` is exempted. A second check immediately before start
+closes the stop/swap/start race. PID, cgroup, and socket diagnostics remain
+non-sensitive; rollback staging is never deleted.
+
+Die zweisprachigen Release Notes liegen unter
+[`docs/releases/v0.1.0-beta.26.md`](docs/releases/v0.1.0-beta.26.md).
+
 ## Beta.25: Agent-Lifecycle und Port-Bind-Race
 
 Der externe Agent beendet seinen HTTPS-Server bei Stop-Signalen kontrolliert
