@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Long card scroll fixture — simulated layouts, not HA runtime</title>
+<style>
+html,body{margin:0;min-height:100%;font-family:system-ui;background:#eee}
+#dashboard{padding:12px;min-width:0}
+#dashboard.sections{display:grid;grid-template-columns:minmax(0,1fr);align-items:start}
+#dashboard.masonry{display:block}
+smart-homelab-maintenance-card{min-width:0}
+#after{height:140px;background:#ddd;margin-top:12px;padding:12px}
+</style>
+<div style="height:120px">Before card</div>
+<main id="dashboard"><smart-homelab-maintenance-card></smart-homelab-maintenance-card><div id="after">AFTER_CARD_SENTINEL</div></main>
+<script type="module">
+import "./smart-homelab-maintenance-card.js";
+const card=document.querySelector("smart-homelab-maintenance-card");
+card.setConfig({title:"Long container test",show_containers:true,show_vms:true});
+const states={
+ "sensor.smart_homelab_maintenance_agent_connection":{state:"connected",attributes:{}},
+ "binary_sensor.smart_homelab_maintenance_agent_reachable":{state:"on",attributes:{}},
+ "sensor.smart_homelab_maintenance_host":{state:"pve-test",attributes:{online:true}},
+ "sensor.smart_homelab_maintenance_running_jobs":{state:"0",attributes:{}},
+};
+for(let id=100;id<=115;id++) states[`sensor.smart_homelab_maintenance_container_${id}`]={state:"running",attributes:{container_id:id,name:`Container ${id}`,running:true,memory_used_bytes:512*1024*1024,memory_total_bytes:1024*1024*1024,disk_used_bytes:1024*1024*1024,disk_total_bytes:2048*1024*1024,os_name:"Debian"}};
+card.hass={language:"de",states};
+window.__FIXTURE_READY__=true;
+</script></html>

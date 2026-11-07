@@ -51,6 +51,32 @@ try {
     const scrollResult = JSON.parse(await page.locator("#result").textContent());
     if (!scrollResult.stableScroll || !scrollResult.stableDom || !scrollResult.stableOrder || scrollResult.gridMutations !== 0 || scrollResult.dashboardMutations !== 0 || !scrollResult.focusStable || !scrollResult.hostCardsStable || !scrollResult.independentDetails || !scrollResult.noHorizontalOverflow || scrollResult.cardCount !== 3) throw new Error(`${name} scroll harness failed: ${JSON.stringify(scrollResult)}`);
     await page.screenshot({ path: `/tmp/card-${name}-scroll.png`, fullPage: true });
+    // Reachability test with a long container list. Layouts here are simulated,
+    // not Home Assistant's real Sections/Masonry layout implementation.
+    for (const layout of ["sections", "masonry"]) {
+      await page.goto(`http://127.0.0.1:${port}/frontend/long-card-scroll-harness.html`);
+      await page.waitForFunction(() => window.__FIXTURE_READY__ === true);
+      const reachability = await page.evaluate((layout) => {
+        document.querySelector("#dashboard").className = layout;
+        const card = document.querySelector("smart-homelab-maintenance-card");
+        const last = [...card.shadowRoot.querySelectorAll(".container-grid .item")].at(-1);
+        const sentinel = document.querySelector("#after");
+        const fullHeight = document.documentElement.scrollHeight;
+        window.scrollTo(0, fullHeight);
+        return { count: card.shadowRoot.querySelectorAll(".container-grid .item").length,
+          lastText: last?.textContent || "", lastBottom: last?.getBoundingClientRect().bottom,
+          sentinelBottom: sentinel.getBoundingClientRect().bottom,
+          viewportHeight: innerHeight, scrollY: window.scrollY,
+          fullHeight, maxScroll: fullHeight - innerHeight };
+      }, layout);
+      if (reachability.count !== 16 || !reachability.lastText.includes("115") ||
+          reachability.lastBottom > reachability.viewportHeight + 2 ||
+          reachability.sentinelBottom > reachability.viewportHeight + 2 ||
+          reachability.scrollY < reachability.maxScroll - 2) {
+        throw new Error(`${name} ${layout} long-card scroll reachability failed: ${JSON.stringify(reachability)}`);
+      }
+      await page.screenshot({ path: `/tmp/card-${name}-long-${layout}.png`, fullPage: true });
+    }
     await page.close();
     await context.close();
   }
