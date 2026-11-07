@@ -118,6 +118,15 @@ wait_for_health() {
                 --connect-timeout 2 --max-time 5 --cacert "$ca_file" \
                 "$health_url/health" 2>/dev/null)"; then
                 if validate_health_payload "$payload" "$expected_version" 2>/dev/null; then
+                    if [[ -n "$baseline_restarts" ]]; then
+                        current_restarts="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
+                        if [[ "$current_restarts" =~ ^[0-9]+$ && "$baseline_restarts" =~ ^[0-9]+$ ]] \
+                            && (( current_restarts > baseline_restarts )); then
+                            printf 'ERROR: systemd hat den Agent unmittelbar nach dem Healthcheck neu gestartet (NRestarts %s -> %s).\n' \
+                                "$baseline_restarts" "$current_restarts" >&2
+                            return "$READINESS_FAILURE_EXIT"
+                        fi
+                    fi
                     return 0
                 fi
                 last_error="Healthcheck-Antwort ist inkompatibel"
