@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>scroll regression harness</title></head>
-<body style="margin:0;background:#eee;color:#111"><div style="height:900px;padding:24px;box-sizing:border-box;background:#d9e8f5"><h1>Dashboard cards above</h1><p>Scroll context before the maintenance cards.</p></div><main id="dashboard" style="display:grid;gap:24px;padding:24px"><p>Dashboard content before cards</p><smart-homelab-maintenance-card data-index="0"></smart-homelab-maintenance-card><smart-homelab-maintenance-card data-index="1"></smart-homelab-maintenance-card><smart-homelab-maintenance-card data-index="2"></smart-homelab-maintenance-card><p>Dashboard content between and after cards.</p></main><div style="height:1100px;padding:24px;box-sizing:border-box;background:#d9e8f5"><h2>Dashboard cards below</h2></div><pre id="result"></pre>
+<body style="margin:0;background:#eee;color:#111"><div style="height:900px;padding:24px;box-sizing:border-box;background:#d9e8f5"><h1>Dashboard cards above</h1><p>Scroll context before the maintenance cards.</p><button id="focus-sentinel" type="button">Focus sentinel</button></div><main id="dashboard" style="display:grid;gap:24px;padding:24px"><p>Dashboard content before cards</p><smart-homelab-maintenance-card data-index="0"></smart-homelab-maintenance-card><smart-homelab-maintenance-card data-index="1"></smart-homelab-maintenance-card><smart-homelab-maintenance-card data-index="2"></smart-homelab-maintenance-card><p>Dashboard content between and after cards.</p></main><div style="height:1100px;padding:24px;box-sizing:border-box;background:#d9e8f5"><h2>Dashboard cards below</h2></div><pre id="result"></pre>
 <script type="module">
 import "./smart-homelab-maintenance-card.js";
 const cards = [...document.querySelectorAll("smart-homelab-maintenance-card")];
@@ -9,12 +9,32 @@ const makeHass = (index, tick) => ({ language: "en", states: {
   "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
   "sensor.smart_homelab_maintenance_running_jobs": { state: String(tick), attributes: {} },
   "sensor.smart_homelab_maintenance_host": { state: `pve-${index}`, attributes: { online: true, cpu_percent: 10 + tick, memory_used_bytes: 1000 + tick, memory_total_bytes: 2000, storage_used_bytes: 3000 + tick, storage_total_bytes: 6000, release: "pve-manager" } },
-  [`sensor.smart_homelab_maintenance_vm_${100 + index}`]: { state: "running", attributes: { vmid: 100 + index, name: `haos-${index}` } },
-  [`sensor.smart_homelab_maintenance_container_${200 + index}`]: { state: "running", attributes: { container_id: 200 + index, name: `container-${index}`, os_name: "unknown", os_version: "unknown" } }
+  ...Object.fromEntries([...Array(3)].map((_, item) => {
+    const id = (tick % 2 === 0 ? item : 2 - item) + index * 10;
+    return [`sensor.smart_homelab_maintenance_vm_${100 + id}`, { state: "running", attributes: { vmid: 100 + id, name: `haos-${id}` } }];
+  })),
+  ...Object.fromEntries([...Array(3)].map((_, item) => {
+    const id = (tick % 2 === 0 ? item : 2 - item) + index * 10;
+    return [`sensor.smart_homelab_maintenance_container_${200 + id}`, { state: "running", attributes: { container_id: 200 + id, name: `container-${id}`, os_name: "unknown", os_version: "unknown" } }];
+  }))
 } });
 cards.forEach((card, index) => { card.setConfig({ title: `Maintenance ${index}`, show_vms: true, show_containers: true }); card.hass = makeHass(index, 0); });
 const identities = cards.map((card) => ({ card: card.shadowRoot.querySelector(".card"), host: card.shadowRoot.querySelector("details[data-section=host]"), vm: card.shadowRoot.querySelector(".vm-grid .item"), container: card.shadowRoot.querySelector(".container-grid .item") }));
 identities[1].host.open = true;
+const focusSentinel = document.querySelector("#focus-sentinel");
+focusSentinel.focus();
+const dashboardMutations = [];
+const dashboardObserver = new MutationObserver((records) => dashboardMutations.push(...records.filter((record) => record.type === "childList")));
+dashboardObserver.observe(document.querySelector("#dashboard"), { childList: true });
+const gridMutations = [];
+cards.forEach((card) => {
+  for (const selector of [".vm-grid", ".container-grid"]) {
+    const grid = card.shadowRoot.querySelector(selector);
+    const observer = new MutationObserver((records) => gridMutations.push(...records.filter((record) => record.type === "childList")));
+    observer.observe(grid, { childList: true });
+  }
+});
+const initialOrder = cards.map((card) => [...card.shadowRoot.querySelectorAll(".vm-grid .item")].map((node) => node.textContent));
 const target = cards[1]; target.scrollIntoView({ block: "center" });
 await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 const before = window.scrollY;
@@ -23,8 +43,11 @@ for (let tick = 1; tick <= 20; tick += 1) { cards.forEach((card, index) => { car
 const after = window.scrollY;
 const stableScroll = Math.max(...scrollSamples.map((value) => Math.abs(value - before))) <= 1 && Math.abs(after - before) <= 1;
 const stableDom = cards.every((card, index) => card.shadowRoot.querySelector(".card") === identities[index].card && card.shadowRoot.querySelector("details[data-section=host]") === identities[index].host && card.shadowRoot.querySelector(".vm-grid .item") === identities[index].vm && card.shadowRoot.querySelector(".container-grid .item") === identities[index].container);
+const stableOrder = cards.every((card, index) => JSON.stringify([...card.shadowRoot.querySelectorAll(".vm-grid .item")].map((node) => node.textContent)) === JSON.stringify(initialOrder[index]));
 const independentDetails = cards[1].shadowRoot.querySelector("details[data-section=host]")?.open === true && cards[0].shadowRoot.querySelector("details[data-section=host]")?.open === false && cards[2].shadowRoot.querySelector("details[data-section=host]")?.open === false;
 const noHorizontalOverflow = document.documentElement.scrollWidth <= document.documentElement.clientWidth;
-window.__SCROLL_HARNESS__ = { stableScroll, stableDom, independentDetails, noHorizontalOverflow, before, after, scrollSamples, cardCount: cards.length };
+const focusStable = document.activeElement === focusSentinel;
+const hostCardsStable = cards.every((card) => card.isConnected && card.parentElement?.id === "dashboard");
+window.__SCROLL_HARNESS__ = { stableScroll, stableDom, stableOrder, independentDetails, noHorizontalOverflow, gridMutations: gridMutations.length, dashboardMutations: dashboardMutations.length, focusStable, hostCardsStable, before, after, scrollSamples, cardCount: cards.length };
 document.querySelector("#result").textContent = JSON.stringify(window.__SCROLL_HARNESS__);
 </script></body></html>

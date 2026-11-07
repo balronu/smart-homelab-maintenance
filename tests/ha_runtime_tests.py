@@ -17,7 +17,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import frame
 
 from custom_components.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportError
-from custom_components.smart_homelab_maintenance.const import DOMAIN
+from custom_components.smart_homelab_maintenance.const import CARD_VERSION, DOMAIN
 
 pytestmark = pytest.mark.asyncio
 
@@ -139,7 +139,7 @@ async def test_setup_registers_entities_devices_services_and_survives_reload(has
     from custom_components import smart_homelab_maintenance as integration
     assert await integration.async_setup(hass, {})
     assert hass.data[DOMAIN]["card_registered"] is True
-    assert "/smart_homelab_maintenance/smart-homelab-maintenance-card.js?v=0.1.0-beta.10" in hass.data[DATA_EXTRA_MODULE_URL].urls
+    assert f"/smart_homelab_maintenance/smart-homelab-maintenance-card.js?v={CARD_VERSION}" in hass.data[DATA_EXTRA_MODULE_URL].urls
     result = await _create_entry(hass)
     entry = result["result"]
     await hass.async_block_till_done()

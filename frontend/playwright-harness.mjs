@@ -44,7 +44,7 @@ try {
     await page.goto(`http://127.0.0.1:${port}/frontend/scroll-harness.html`);
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("cardCount"), null, { timeout: 10000 });
     const scrollResult = JSON.parse(await page.locator("#result").textContent());
-    if (!scrollResult.stableScroll || !scrollResult.stableDom || !scrollResult.independentDetails || !scrollResult.noHorizontalOverflow || scrollResult.cardCount !== 3) throw new Error(`${name} scroll harness failed: ${JSON.stringify(scrollResult)}`);
+    if (!scrollResult.stableScroll || !scrollResult.stableDom || !scrollResult.stableOrder || scrollResult.gridMutations !== 0 || scrollResult.dashboardMutations !== 0 || !scrollResult.focusStable || !scrollResult.hostCardsStable || !scrollResult.independentDetails || !scrollResult.noHorizontalOverflow || scrollResult.cardCount !== 3) throw new Error(`${name} scroll harness failed: ${JSON.stringify(scrollResult)}`);
     await page.screenshot({ path: `/tmp/card-${name}-scroll.png`, fullPage: true });
     await page.close();
     await context.close();
