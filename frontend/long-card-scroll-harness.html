@@ -21,7 +21,8 @@ const states={
  "sensor.smart_homelab_maintenance_host":{state:"pve-test",attributes:{online:true}},
  "sensor.smart_homelab_maintenance_running_jobs":{state:"0",attributes:{}},
 };
-for(let id=100;id<=115;id++) states[`sensor.smart_homelab_maintenance_container_${id}`]={state:"running",attributes:{container_id:id,name:`Container ${id}`,running:true,memory_used_bytes:512*1024*1024,memory_total_bytes:1024*1024*1024,disk_used_bytes:1024*1024*1024,disk_total_bytes:2048*1024*1024,os_name:"Debian"}};
+const count=Math.max(0,Math.min(50,Number(new URLSearchParams(location.search).get("count") ?? 16)||0));
+for(let offset=0;offset<count;offset++){const id=100+offset; states[`sensor.smart_homelab_maintenance_container_${id}`]={state:offset%3===0?"stopped":"running",attributes:{container_id:id,name:`Container ${id} with a deliberately long name`,running:offset%3!==0,memory_used_bytes:512*1024*1024,memory_total_bytes:1024*1024*1024,disk_used_bytes:1024*1024*1024,disk_total_bytes:2048*1024*1024,os_name:"Debian",os_version:"12"}};}
 card.hass={language:"de",states};
 window.__FIXTURE_READY__=true;
 </script></html>

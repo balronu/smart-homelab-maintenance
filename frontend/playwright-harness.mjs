@@ -7,7 +7,8 @@ const root = process.cwd();
 const cardSource = fs.readFileSync(path.join(root, "frontend/smart-homelab-maintenance-card.js"), "utf8");
 if (/\b(?:scrollIntoView|scrollTo)\s*\(/.test(cardSource)) throw new Error("production card must not programmatically scroll");
 const server = http.createServer((request, response) => {
-  const relative = request.url === "/" ? "frontend/browser-harness.html" : request.url.replace(/^\//, "");
+  const requestPath = new URL(request.url, "http://127.0.0.1").pathname;
+  const relative = requestPath === "/" ? "frontend/browser-harness.html" : requestPath.replace(/^\//, "");
   const file = path.resolve(root, relative);
   if (!file.startsWith(path.resolve(root) + path.sep) || !fs.existsSync(file)) { response.writeHead(404); response.end(); return; }
   const type = file.endsWith(".js") || file.endsWith(".mjs") ? "text/javascript" : "text/html";
@@ -36,7 +37,7 @@ try {
       const card = document.createElement("smart-homelab-maintenance-card");
       return typeof card.getGridOptions === "function" ? card.getGridOptions() : null;
     });
-    if (sectionsSizing?.rows !== "auto" || sectionsSizing?.min_rows !== 6 || sectionsSizing?.columns !== "full") throw new Error(`${name} Sections sizing failed: ${JSON.stringify(sectionsSizing)}`);
+    if (sectionsSizing?.rows !== "auto" || Object.hasOwn(sectionsSizing, "min_rows") || sectionsSizing?.columns !== "full") throw new Error(`${name} Sections sizing failed: ${JSON.stringify(sectionsSizing)}`);
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
     const result = JSON.parse(await page.locator("#result").textContent());
     if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.hasAvailableResources || !result.cardHasSize || !result.localizedEditor || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.reopenedEditorSafe || !result.emptyCardSafe || !result.initialCardSafe || !result.unknownSafe || !result.unknownContainerSafe || !result.hostDetailsPreservedAfterUpdates || !result.languageEnglish || !result.languageGerman || !result.localeObjectSafe || !result.missingLanguageFallback || !result.hostOfflineWithoutAgentContradiction || !result.statusStatesSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasTextOverlap || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
@@ -53,8 +54,8 @@ try {
     await page.screenshot({ path: `/tmp/card-${name}-scroll.png`, fullPage: true });
     // Reachability test with a long container list. Layouts here are simulated,
     // not Home Assistant's real Sections/Masonry layout implementation.
-    for (const layout of ["sections", "masonry"]) {
-      await page.goto(`http://127.0.0.1:${port}/frontend/long-card-scroll-harness.html`);
+    for (const count of [0, 1, 10, 20, 50]) for (const layout of ["sections", "masonry"]) {
+      await page.goto(`http://127.0.0.1:${port}/frontend/long-card-scroll-harness.html?count=${count}`);
       await page.waitForFunction(() => window.__FIXTURE_READY__ === true);
       const reachability = await page.evaluate((layout) => {
         document.querySelector("#dashboard").className = layout;
@@ -63,13 +64,13 @@ try {
         const sentinel = document.querySelector("#after");
         const fullHeight = document.documentElement.scrollHeight;
         window.scrollTo(0, fullHeight);
-        return { count: card.shadowRoot.querySelectorAll(".container-grid .item").length,
+        return { expectedCount: Number(new URLSearchParams(location.search).get("count")), count: card.shadowRoot.querySelectorAll(".container-grid .item").length,
           lastText: last?.textContent || "", lastBottom: last?.getBoundingClientRect().bottom,
           sentinelBottom: sentinel.getBoundingClientRect().bottom,
           viewportHeight: innerHeight, scrollY: window.scrollY,
           fullHeight, maxScroll: fullHeight - innerHeight };
       }, layout);
-      if (reachability.count !== 16 || !reachability.lastText.includes("115") ||
+      if (reachability.count !== reachability.expectedCount || (reachability.expectedCount > 0 && !reachability.lastText.includes(String(99 + reachability.expectedCount))) ||
           reachability.lastBottom > reachability.viewportHeight + 2 ||
           reachability.sentinelBottom > reachability.viewportHeight + 2 ||
           reachability.scrollY < reachability.maxScroll - 2) {
@@ -83,7 +84,7 @@ try {
     await page.waitForFunction(() => window.__FIXTURE_READY__ === true);
     const clipping = await page.evaluate(() => {
       const dashboard = document.querySelector("#dashboard");
-      dashboard.style.height = "900px";
+      dashboard.style.height = "400px";
       dashboard.style.overflow = "hidden";
       const card = document.querySelector("smart-homelab-maintenance-card");
       const last = [...card.shadowRoot.querySelectorAll(".container-grid .item")].at(-1);

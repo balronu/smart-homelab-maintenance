@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-beta.13 – Next Generation Dashboard (Kandidat)
+
+- Modernisiert die read-only Lovelace-Karte mit klarer Statusübersicht,
+  responsiven Kartenbreiten und aufklappbaren VM-/LXC-Details.
+- Entfernt die wirkungslose `min_rows`-Angabe neben `rows: "auto"`; die Karte
+  meldet weiterhin volle Sections-Breite und folgt ausschließlich ihrem Inhalt.
+- Bewahrt DOM-Identität, offene Details, Fokus und Scrollposition bei HA-Updates.
+- Erweitert die Browser-Regressionen um 0, 1, 10, 20 und 50 Container sowie
+  erreichbare Kartenenden in simulierten Sections-/Masonry-Layouts.
+- Kein produktiver Home-Assistant-/Proxmox-Zugriff und keine Veröffentlichung.
+
 ## 0.1.0-beta.11 – Lovelace-Scrollstabilität (Prerelease-Kandidat)
 
 - Verhindert unnötiges Entfernen und Wiedereinfügen bestehender VM-/LXC-Karten

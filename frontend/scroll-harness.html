@@ -21,6 +21,7 @@ const makeHass = (index, tick) => ({ language: "en", states: {
 cards.forEach((card, index) => { card.setConfig({ title: `Maintenance ${index}`, show_vms: true, show_containers: true }); card.hass = makeHass(index, 0); });
 const identities = cards.map((card) => ({ card: card.shadowRoot.querySelector(".card"), host: card.shadowRoot.querySelector("details[data-section=host]"), vm: card.shadowRoot.querySelector(".vm-grid .item"), container: card.shadowRoot.querySelector(".container-grid .item") }));
 identities[1].host.open = true;
+identities[1].container.open = true;
 const focusSentinel = document.querySelector("#focus-sentinel");
 focusSentinel.focus();
 const dashboardMutations = [];
@@ -44,7 +45,7 @@ const after = window.scrollY;
 const stableScroll = Math.max(...scrollSamples.map((value) => Math.abs(value - before))) <= 1 && Math.abs(after - before) <= 1;
 const stableDom = cards.every((card, index) => card.shadowRoot.querySelector(".card") === identities[index].card && card.shadowRoot.querySelector("details[data-section=host]") === identities[index].host && card.shadowRoot.querySelector(".vm-grid .item") === identities[index].vm && card.shadowRoot.querySelector(".container-grid .item") === identities[index].container);
 const stableOrder = cards.every((card, index) => JSON.stringify([...card.shadowRoot.querySelectorAll(".vm-grid .item")].map((node) => node.textContent)) === JSON.stringify(initialOrder[index]));
-const independentDetails = cards[1].shadowRoot.querySelector("details[data-section=host]")?.open === true && cards[0].shadowRoot.querySelector("details[data-section=host]")?.open === false && cards[2].shadowRoot.querySelector("details[data-section=host]")?.open === false;
+const independentDetails = cards[1].shadowRoot.querySelector("details[data-section=host]")?.open === true && cards[0].shadowRoot.querySelector("details[data-section=host]")?.open === false && cards[2].shadowRoot.querySelector("details[data-section=host]")?.open === false && cards[1].shadowRoot.querySelector(".container-grid .item")?.open === true;
 const noHorizontalOverflow = document.documentElement.scrollWidth <= document.documentElement.clientWidth;
 const focusStable = document.activeElement === focusSentinel;
 const hostCardsStable = cards.every((card) => card.isConnected && card.parentElement?.id === "dashboard");
