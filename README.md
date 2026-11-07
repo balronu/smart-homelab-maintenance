@@ -1,5 +1,25 @@
 # Smart Homelab Maintenance
 
+## Beta.27: Restart-Race-Erkennung und sichere Rollbacks
+
+Beta.27 erkennt systemd-Restarts während des Agent-Upgrades auch dann, wenn
+ein späterer Versuch noch erfolgreich antwortet. Der Updater prüft den
+Restart-Zähler vor dem Austausch und unmittelbar nach dem Healthcheck; jeder
+Anstieg führt zum bestehenden sicheren Rollback. Damit kann ein Upgrade nach
+wiederholten `Address already in use`-Fehlern nicht mehr fälschlich mit Exit 0
+enden. Die Beta.22→Beta.26-`TIME-WAIT`-/`SO_REUSEADDR`-Ursache ist isoliert
+reproduziert und dokumentiert.
+
+Beta.27 detects systemd restarts during an agent upgrade even when a later
+attempt responds successfully. The updater records the restart counter before
+the swap and immediately after the healthcheck; any increase triggers the
+existing safe rollback. An upgrade can therefore no longer report exit 0 after
+repeated `Address already in use` failures. The Beta.22→Beta.26
+`TIME-WAIT`/`SO_REUSEADDR` cause is reproduced and documented.
+
+Die zweisprachigen Release Notes liegen unter
+[`docs/releases/v0.1.0-beta.27.md`](docs/releases/v0.1.0-beta.27.md).
+
 ## Beta.26: Port-Gate-Forensik und sichere Upgrade-Rennen
 
 Beta.26 erweitert die Beta.25-Lifecycle-Korrektur um eine forensische
