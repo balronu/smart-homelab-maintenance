@@ -15,6 +15,8 @@ def test_upgrade_process_requires_explicit_confirmation_and_healthcheck():
     assert "--max-time 5" in script
     assert "READINESS_TIMEOUT_SECONDS=30" in script
     assert "READINESS_FAILURE_EXIT=72" in script
+    assert "wait_for_port_free" in script
+    assert 'ss -Hln "sport = :$AGENT_PORT"' in script
 
 
 def test_update_transaction_has_interrupted_swap_recovery():
@@ -59,6 +61,22 @@ def test_readiness_requires_tls_contract_and_expected_version():
     assert 'data.get("agent_version") != expected_version' in script
     assert 'data.get("api_contract") != "1.1"' in script
     assert 'data.get("status") != "ok"' in script
+
+
+def test_upgrade_checks_port_before_swapping_agent_tree():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    stop = script.index('systemctl stop "$SERVICE_NAME"')
+    swap = script.index('bash "$SCRIPT_DIR/update-agent.sh"')
+    assert stop < script.index("wait_for_port_free", stop) < swap
+    assert 'systemctl start "$SERVICE_NAME" || true' in script
+
+
+def test_unit_bounds_stop_and_keeps_single_restart_owner():
+    unit = (ROOT / "deploy/systemd/smart-homelab-maintenance-agent.service.example").read_text(encoding="utf-8")
+    assert "TimeoutStopSec=30" in unit
+    assert "Restart=on-failure" in unit
+    assert "ExecStart=" in unit
+    assert unit.count("ExecStart=") == 1
 
 
 def test_upgrade_help_is_non_mutating():

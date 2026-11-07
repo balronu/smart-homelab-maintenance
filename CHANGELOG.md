@@ -463,3 +463,24 @@ system was changed by this release.
   classification remains unknown when the source cannot prove it.
 - The visible “Install updates” button is permanently disabled and has no
   server-side execution route.
+## Unreleased – Agent-Port-Bind-Race
+
+### Deutsch
+
+- Der externe Agent beendet seinen HTTPS-Server bei `SIGTERM`/`SIGINT` jetzt
+  kontrolliert und schließt den Listen-Socket garantiert.
+- Der Updater prüft nach dem Dienststopp die tatsächliche Freigabe von Port
+  48128, bevor der Agent-Baum ausgetauscht oder ein neuer Prozess gestartet
+  wird. Ein belegter Port bricht sicher ab.
+- `TimeoutStopSec=30` begrenzt den systemd-Stopp; historische und fehlgeschlagene
+  Rollback-Stagings bleiben erhalten.
+
+### English
+
+- The external agent now shuts down its HTTPS server explicitly on
+  `SIGTERM`/`SIGINT` and always closes the listening socket.
+- After stopping the service, the updater verifies that port 48128 is really
+  free before swapping the agent tree or starting a new process. A still-busy
+  port causes a safe abort.
+- `TimeoutStopSec=30` bounds the systemd stop; historical and failed rollback
+  staging directories remain preserved.
