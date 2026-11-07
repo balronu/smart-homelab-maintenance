@@ -22,6 +22,7 @@ class CoordinatorData:
     updates: tuple[Mapping[str, Any], ...] = ()
     dry_runs: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     error: str | None = None
+    update_error: str | None = None
 
 
 class SmartHomelabCoordinator:
@@ -46,10 +47,19 @@ class SmartHomelabCoordinator:
             return self.data
         async with self._lock:
             try:
-                host, virtual_machines, containers, jobs, capabilities, updates = await asyncio.gather(
+                # Inventory is the primary contract.  Update discovery is an
+                # optional Beta.15 extension and must not make valid
+                # host/VM/LXC data disappear when its endpoint fails.
+                host, virtual_machines, containers, jobs, capabilities = await asyncio.gather(
                     self.transport.host(), self.transport.virtual_machines(), self.transport.containers(),
-                    self.transport.jobs(), self.transport.capabilities(), self.transport.updates()
+                    self.transport.jobs(), self.transport.capabilities()
                 )
+                update_error = None
+                try:
+                    updates = await self.transport.updates()
+                except TransportError as exc:
+                    updates = {"data": {"items": []}}
+                    update_error = exc.code
                 host_data = host.get("data", {})
                 vm_data = virtual_machines.get("data", {})
                 cdata = containers.get("data", {})
@@ -65,7 +75,8 @@ class SmartHomelabCoordinator:
                 vm_items = [dict(item, update=dict(item.get("update") or {}, dry_run=dry_runs.get(f"vm:{item.get('vmid')}")) if item.get("update") else None) for item in vm_items]
                 self.data = CoordinatorData(
                     True, host_data, tuple(vm_items), tuple(container_items),
-                    tuple(jdata.get("items", [])), capabilities.get("data"), update_items, dry_runs, None
+                    tuple(jdata.get("items", [])), capabilities.get("data"), update_items, dry_runs, None,
+                    update_error
                 )
                 self.last_error = None
                 self._failure_count = 0

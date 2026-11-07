@@ -47,7 +47,7 @@ from agent.smart_homelab_maintenance.types import (
 from agent.smart_homelab_maintenance.versions import Version, compare_versions
 from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url
 from custom_components.smart_homelab_maintenance.http_transport import validate_agent_url as validate_integration_agent_url
-from custom_components.smart_homelab_maintenance.http_transport import validate_ca_file
+from custom_components.smart_homelab_maintenance.http_transport import validate_ca_file, TransportError as IntegrationTransportError
 from custom_components.smart_homelab_maintenance.config_flow import validate_config
 from custom_components.smart_homelab_maintenance.update import update_value
 from custom_components.smart_homelab_maintenance.coordinator import SmartHomelabCoordinator
@@ -290,6 +290,36 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(data.virtual_machines[0]["vmid"], 104)
             self.assertEqual(coordinator_sensors(data)[1].value, 1)
             self.assertFalse(data.capabilities["execution_enabled"])
+
+        asyncio.run(scenario())
+
+    def test_update_http_error_does_not_hide_inventory(self) -> None:
+        """The optional Beta.15 update endpoint must not blank core data."""
+        class FakeTransport:
+            async def host(self):
+                return {"data": {"name": "fixture-host", "online": True}}
+            async def virtual_machines(self):
+                return {"data": {"items": [{"vmid": 104, "name": "fixture-vm", "status": "running"}]}}
+            async def containers(self):
+                return {"data": {"items": [{"container_id": 112, "name": "fixture-lxc", "running": True}]}}
+            async def jobs(self):
+                return {"data": {"items": []}}
+            async def capabilities(self):
+                return {"data": {"execution_enabled": False}}
+            async def updates(self):
+                raise IntegrationTransportError("http_error", "fixture update endpoint returned HTTP 500")
+
+        async def scenario() -> None:
+            coordinator = SmartHomelabCoordinator(None, {"agent_url": "https://agent.home.arpa:1", "token": "fixture"})
+            coordinator.transport = FakeTransport()
+            data = await coordinator.async_update()
+            self.assertTrue(data.connected)
+            self.assertEqual(data.update_error, "http_error")
+            self.assertEqual(data.host["name"], "fixture-host")
+            self.assertEqual(data.virtual_machines[0]["vmid"], 104)
+            self.assertEqual(data.containers[0]["container_id"], 112)
+            self.assertEqual(data.updates, ())
+            self.assertIsNone(data.error)
 
         asyncio.run(scenario())
 
