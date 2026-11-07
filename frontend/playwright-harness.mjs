@@ -32,6 +32,11 @@ try {
     page.on("pageerror", (error) => browserErrors.push(error.message));
     page.on("requestfailed", (request) => failedRequests.push(`${request.url()}: ${request.failure()?.errorText || "failed"}`));
     await page.goto(`http://127.0.0.1:${port}/frontend/browser-harness.html`);
+    const sectionsSizing = await page.evaluate(() => {
+      const card = document.createElement("smart-homelab-maintenance-card");
+      return typeof card.getGridOptions === "function" ? card.getGridOptions() : null;
+    });
+    if (sectionsSizing?.rows !== "auto" || sectionsSizing?.min_rows !== 6 || sectionsSizing?.columns !== "full") throw new Error(`${name} Sections sizing failed: ${JSON.stringify(sectionsSizing)}`);
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
     const result = JSON.parse(await page.locator("#result").textContent());
     if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.hasAvailableResources || !result.cardHasSize || !result.localizedEditor || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.reopenedEditorSafe || !result.emptyCardSafe || !result.initialCardSafe || !result.unknownSafe || !result.unknownContainerSafe || !result.hostDetailsPreservedAfterUpdates || !result.languageEnglish || !result.languageGerman || !result.localeObjectSafe || !result.missingLanguageFallback || !result.hostOfflineWithoutAgentContradiction || !result.statusStatesSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasTextOverlap || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);

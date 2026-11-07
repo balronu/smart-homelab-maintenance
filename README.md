@@ -5,7 +5,7 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Beta-11-Prerelease veröffentlicht: [v0.1.0-beta.11](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.11).
+Beta.12-Kandidat: Sections-Kartenhöhe auf `rows: "auto"` umgestellt. Veröffentlichung und HACS-Erkennung stehen noch aus.\nLetzter veröffentlichter Release: [v0.1.0-beta.11](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.11).
 Der abschließende Praxistest in der Home-Assistant-iOS-App steht noch aus.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat

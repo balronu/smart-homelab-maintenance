@@ -38,7 +38,7 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   set hass(value) { this._hass = value; this.render(); }
   get hass() { return this._hass; }
   getCardSize() { return 8; }
-  getGridOptions() { return { columns: "full", min_rows: 6 }; }
+  getGridOptions() { return { columns: "full", min_rows: 6, rows: "auto" }; }
   _metric() { const node = document.createElement("div"); node.className = "metric"; node.innerHTML = '<span class="muted"></span><strong></strong><span class="muted"></span>'; return { node, label: node.children[0], value: node.children[1], sub: node.children[2] }; }
   _bar() { const node = document.createElement("div"); node.className = "bar-row"; node.innerHTML = '<span></span><progress max="100"></progress><span class="muted"></span>'; return { node, label: node.children[0], progress: node.children[1], value: node.children[2] }; }
   _section(titleKey, className = "section") { const section = document.createElement("div"); section.className = className; const heading = document.createElement("h3"); section.append(heading); const grid = document.createElement("div"); grid.className = "grid"; section.append(grid); return { section, heading, grid, titleKey }; }
