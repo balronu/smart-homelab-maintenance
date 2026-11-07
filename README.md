@@ -17,14 +17,15 @@ Die zweisprachigen Release Notes liegen unter
 [`docs/releases/v0.1.0-beta.20.md`](docs/releases/v0.1.0-beta.20.md). Beta.20
 ist als Prerelease veröffentlicht; der Agent wird weiterhin separat aktualisiert.
 
-## Beta.21-Kandidat: sicherer LXC-Gastzugriff
+## Beta.21: sicherer LXC-Gastzugriff
 
 Der Beta.21-Kandidat ergänzt einen optionalen, root-seitigen Unix-Socket-Helper
 für ausdrücklich allowlistete LXC-Ziele. Der Helper akzeptiert ausschließlich
 die festen Operationen `read` und `simulate`, prüft die CT-Allowlist bei jeder
 Anfrage und lehnt alle anderen Befehle, Pfade und Ziele ab. Der Agent bleibt
 standardmäßig deaktiviert (`lxc_helper_enabled = false`); eine bloße HACS-
-oder Agent-Aktualisierung aktiviert den Gastzugriff nicht. Details und die
+oder Agent-Aktualisierung aktiviert den Gastzugriff nicht. Beta.21 ist als
+GitHub-Prerelease veröffentlicht. Details und die
 separaten Freigabegates stehen in
 [`docs/lxc-apt-helper.md`](docs/lxc-apt-helper.md) und
 [`docs/security.md`](docs/security.md).
@@ -61,6 +62,12 @@ Rollback-Stand vor und stellt ihn bei einem fehlgeschlagenen Healthcheck
 wieder her. Er verändert weder Proxmox, VMs noch LXCs.
 
 ## Status
+
+Beta.21-Prerelease: Der optionale root-seitige LXC-Helper prüft Peer-UID,
+Allowlist, feste Operationen, Laufstatus, Timeout und Ausgabelimit pro Anfrage.
+Der Helper ist nicht installiert oder aktiviert; echte Paketupdates bleiben
+serverseitig gesperrt. Die zweisprachigen Release Notes stehen in
+[`docs/releases/v0.1.0-beta.21.md`](docs/releases/v0.1.0-beta.21.md).
 
 Beta.19-Prerelease: Dry-Run-Serviceantworten und passive Update-Erkennung
 sind veröffentlicht. Der Dry-Run-Button verarbeitet den verpflichtenden
