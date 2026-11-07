@@ -8,7 +8,7 @@ import pytest
 from agent.smart_homelab_maintenance.api import ApiApplication
 from agent.smart_homelab_maintenance.discovery import DiscoveryService, FixtureProxmoxBackend, phase1_fixture
 from agent.smart_homelab_maintenance.jobs import JobRepository
-from agent.smart_homelab_maintenance.updates import AptCommandRunner, ProbeTarget, UpdateService, _parse_apt
+from agent.smart_homelab_maintenance.updates import AptCommandRunner, ProbeTarget, UpdateService, _parse_apt, make_targets
 
 
 def target(os_name="Debian"):
@@ -46,6 +46,32 @@ def test_update_check_reports_current_and_unsupported_without_faking_values():
     assert result.status == "current" and result.available_count == 0
     unsupported = service(Runner(), (target("Alpine"),)).check("container:107")
     assert unsupported.status == "unsupported" and unsupported.available_count is None
+
+
+def test_update_check_distinguishes_unauthorized_target_and_explicit_guest_allowlist():
+    denied = service(Runner(), (ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", False),)).check("container:107")
+    assert denied.status == "unauthorized" and denied.supported is False
+    targets = make_targets({"name": "pve"}, [{"container_id": 107, "name": "fixture", "os_name": "unknown"}], {
+        "container:107": {"authorized": True, "os_name": "Debian", "os_version": "12", "package_manager": "apt"},
+    })
+    assert targets[1].authorized is True and targets[1].os_name == "Debian" and targets[1].package_manager == "apt"
+    vm = make_targets({"name": "pve"}, [], virtual_machines=[{"vmid": 104, "name": "haos"}])[1]
+    assert service(Runner(), (vm,)).check("vm:104").status == "not_checked"
+
+
+def test_update_api_preserves_explicit_statuses_instead_of_unknown_fallbacks():
+    unsupported = service(Runner(), (target("Alpine"),)).check("container:107").as_dict()
+    unauthorized = service(Runner(), (ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", False),)).check("container:107").as_dict()
+    assert unsupported["status"] == "unsupported"
+    assert unauthorized["status"] == "unauthorized"
+    assert unsupported["available_count"] is None and unauthorized["available_count"] is None
+
+
+def test_update_result_marks_old_successful_result_stale():
+    result = service(Runner("0 upgraded, 0 newly installed, 0 to remove.")).check("container:107")
+    old = result.__class__(result.target, result.name, result.reachable, result.supported, result.os_name, result.os_version, result.package_manager, result.status, result.available_count, result.security_count, result.packages, result.held_packages, result.conflicts, result.removals, "2000-01-01T00:00:00+00:00", result.error, result.stale_after_seconds, result.plan_digest, result.dry_run_supported)
+    data = old.as_dict()
+    assert data["status"] == "stale" and data["fresh"] is False
 
 
 def test_update_check_reports_errors_and_permission_as_unknown():

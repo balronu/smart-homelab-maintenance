@@ -19,8 +19,14 @@ Alle übrigen Endpunkte verlangen `Authorization: Bearer <read-token>`.
 | GET | `/api/v1/jobs/{job_id}` | Jobstatus ohne große Historie |
 | GET | `/api/v1/jobs/{job_id}/events?after=&limit=` | Cursor-basierte Ereignisse |
 | GET | `/api/v1/updates` | Passive Updateprüfung aller autorisierten Ziele |
-| GET | `/api/v1/updates/{target}` | Ergebnis für `host` oder `container:{vmid}` |
+| GET | `/api/v1/updates/{target}` | Ergebnis für `host`, `container:{vmid}` oder `vm:{vmid}` |
 | POST | `/api/v1/updates/{target}/dry-run` | Bestätigte, feste Paketmanager-Simulation |
+
+Update results preserve the explicit status values `updates_available`,
+`current`, `not_checked`, `unsupported`, `unauthorized`, `error`, `stale`, and
+`unknown`; clients must not collapse these into a generic up-to-date result.
+See [passive update detection](update-detection.md) for the target-authorization
+boundary and the safe allowlist format.
 
 Der lokale Transport prüft private HTTPS-URLs, Zertifikatskette, Timeout,
 Antwortgröße und Bearer-Authentifizierung

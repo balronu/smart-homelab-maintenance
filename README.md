@@ -26,6 +26,18 @@ Host-/VM-/LXC-Details und ein Größenänderungssignal für das Home-Assistant-
 Sections-Layout. Eine echte iOS-Home-Assistant-Praxisprüfung steht noch aus;
 der Scrollfehler ist nicht als behoben bestätigt.
 Letzter veröffentlichter Release: [v0.1.0-beta.18](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.18).
+
+Beta.19-Kandidat: Die passive Update-Erkennung unterscheidet jetzt explizit
+aktuell, Updates verfügbar, noch nicht geprüft, nicht unterstützt, nicht
+autorisiert, fehlgeschlagen, veraltet und unbekannt. Die ausführliche
+deutsch/englische Beschreibung steht in
+[docs/update-detection.md](docs/update-detection.md). Die Änderung ist noch
+nicht veröffentlicht.
+
+Beta.19 candidate: passive update detection now preserves explicit current,
+updates-available, not-checked, unsupported, unauthorized, failed, stale, and
+unknown states. See [docs/update-detection.md](docs/update-detection.md). This
+candidate has not been released.
 Der abschließende Praxistest in der Home-Assistant-iOS-App steht noch aus.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat

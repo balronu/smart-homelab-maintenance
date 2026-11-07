@@ -484,6 +484,18 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(config.server.execution_enabled)
         self.assertEqual(config.proxmox.node, "pve")
 
+    def test_runtime_config_accepts_only_explicit_update_target_metadata(self) -> None:
+        config_path = Path(self.tempdir.name) / "agent-updates.toml"
+        config_path.write_text(
+            'listen_host = "agent.home.arpa"\nlisten_port = 48128\n'
+            f'state_directory = "{self.tempdir.name}"\n'
+            'certificate = "/tmp/agent.crt"\nprivate_key = "/tmp/agent.key"\n'
+            'proxmox_url = "https://pve.home.arpa/api2/json"\nproxmox_node = "pve"\n'
+            '[update_targets."container:107"]\n'
+            'authorized = true\nos_name = "Debian"\nos_version = "12"\npackage_manager = "apt"\n', encoding="utf-8")
+        config = load_runtime_config(config_path)
+        self.assertEqual(config.update_targets["container:107"]["package_manager"], "apt")
+
 
 if __name__ == "__main__":
     unittest.main()
