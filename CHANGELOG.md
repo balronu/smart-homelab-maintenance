@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-beta.17 – Ressourcen- und Agent-Vertrag (Fix-Kandidat)
+## 0.1.0-beta.17 – Ressourcen- und Agent-Vertrag (Prerelease)
 
 ### Deutsch
 
@@ -16,7 +16,7 @@
   RAM-/Speicherwerte stehen direkt am jeweiligen Balken; fehlende Daten blenden
   den Balken aus.
 - Keine echte Updateausführung, keine Paketinstallation und kein produktiver
-  Zugriff. Beta.17 ist ein Fix-Kandidat; ein echter iPhone-Praxistest bleibt
+  Zugriff. Beta.17 bleibt read-only; ein echter iPhone-Praxistest bleibt
   erforderlich.
 - Für die neuen Ressourcenwerte müssen Integration und separat laufender Agent
   gemeinsam auf Beta.17 stehen; ein reines HACS-Update aktualisiert den Agenten
@@ -34,7 +34,7 @@
 - Makes the card more compact with labelled CPU, RAM, and storage bars. Free
   RAM/storage values appear beside the relevant bar; missing data hides the bar.
 - No real update execution, package installation, or productive access. Beta.17
-  is a fix candidate; a real iPhone field test is still required.
+  remains read-only; a real iPhone field test is still required.
 - The integration and separately running agent must both be on Beta.17 for the
   new resource fields; a HACS update alone does not update the agent.
 

@@ -5,12 +5,12 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Beta.17-Fix-Kandidat: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
+Beta.17-Prerelease: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
 aufklappbaren Host-/VM-/LXC-Details und einem Größenänderungssignal für das
 Home-Assistant-Sections-Layout. Eine echte iOS-Home-Assistant-Praxisprüfung
 bleibt vor Veröffentlichung erforderlich; der Scrollfehler ist nicht als
 behoben bestätigt.
-Letzter veröffentlichter Release: [v0.1.0-beta.16](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.16). Beta.17 ist noch nicht veröffentlicht.
+Letzter veröffentlichter Release: [v0.1.0-beta.17](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.17).
 Der abschließende Praxistest in der Home-Assistant-iOS-App steht noch aus.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
