@@ -59,13 +59,6 @@ validate_source "$source_dir"
 verify_commit "$source_dir" "$expected_commit"
 [[ -d "$AGENT_ROOT" ]] || die "Agent ist nicht installiert."
 systemctl cat "$SERVICE_NAME" >/dev/null 2>&1 || die "Agent-Dienst ist nicht installiert."
-compgen -G "$AGENT_ROOT/agent.previous.*.staging" >/dev/null && die "Altes Rollback-Staging ist vorhanden. Manuelle Prüfung erforderlich."
-
-if [[ "$apply" -ne 1 ]]; then
-    info "Vorprüfung erfolgreich. Quelle, Commit, Dienst, Health-URL und CA sind plausibel. Kein Update ausgeführt."
-    exit 0
-fi
-[[ "$confirm" -eq 1 ]] || die "--apply benötigt die ausdrückliche Bestätigung --confirm."
 
 read_agent_version() {
     local package_root="$1"
@@ -128,6 +121,54 @@ wait_for_health() {
     return "$READINESS_FAILURE_EXIT"
 }
 
+version_is_older() {
+    python3 - "$1" "$2" <<'PY'
+import re
+import sys
+
+pattern = re.compile(r"^0\.1\.0-beta\.(\d+)$")
+candidate = pattern.fullmatch(sys.argv[1])
+current = pattern.fullmatch(sys.argv[2])
+if not candidate or not current:
+    raise SystemExit(1)
+raise SystemExit(0 if int(candidate.group(1)) < int(current.group(1)) else 1)
+PY
+}
+
+check_historical_staging() {
+    local dirs=() dir staged_version
+    for dir in "$AGENT_ROOT"/agent.previous.*.staging; do
+        [[ -d "$dir" ]] || continue
+        dirs+=("$dir")
+    done
+    ((${#dirs[@]} == 0)) && return 0
+    systemctl is-active --quiet "$SERVICE_NAME" || die "Rollback-Staging vorhanden, aber Agent-Dienst ist nicht aktiv. Manuelle Prüfung erforderlich."
+    local current_version
+    if ! current_version="$(read_agent_version "$AGENT_ROOT/agent")"; then
+        die "Aktive Agent-Version ist bei vorhandenem Rollback-Staging nicht lesbar. Manuelle Prüfung erforderlich."
+    fi
+    for dir in "${dirs[@]}"; do
+        if ! staged_version="$(read_agent_version "$dir")"; then
+            die "Rollback-Staging enthält keine gültige Agent-Version. Manuelle Prüfung erforderlich."
+        fi
+        if ! version_is_older "$staged_version" "$current_version"; then
+            die "Rollback-Staging ist nicht eindeutig historisch ($staged_version vs. $current_version). Manuelle Prüfung erforderlich."
+        fi
+        info "Historisches Rollback-Staging bleibt erhalten: $dir ($staged_version)"
+    done
+    if ! wait_for_health "$current_version"; then
+        die "Aktiver Agent konnte bei vorhandenem Rollback-Staging nicht TLS-validiert bestätigt werden."
+    fi
+}
+
+check_historical_staging
+
+if [[ "$apply" -ne 1 ]]; then
+    info "Vorprüfung erfolgreich. Quelle, Commit, Dienst, Health-URL, CA und historisches Rollback-Staging sind plausibel. Kein Update ausgeführt."
+    exit 0
+fi
+[[ "$confirm" -eq 1 ]] || die "--apply benötigt die ausdrückliche Bestätigung --confirm."
+
 recover() {
     local reason="$1"
     if (( recovery_running )); then
@@ -186,7 +227,13 @@ trap finish EXIT
 
 systemctl stop "$SERVICE_NAME"
 bash "$SCRIPT_DIR/update-agent.sh" --source-dir "$source_dir" --expected-commit "$expected_commit" --apply --keep-rollback
-rollback_dir="$(find "$AGENT_ROOT" -maxdepth 1 -type d -name 'agent.previous.*.staging' -print -quit)"
+for candidate_dir in "$AGENT_ROOT"/agent.previous.*.staging; do
+    [[ -d "$candidate_dir" ]] || continue
+    if [[ "$(read_agent_version "$candidate_dir")" == "$previous_agent_version" ]]; then
+        [[ -z "$rollback_dir" ]] || die "Mehrere Rollback-Stände passen zur vorherigen Agent-Version. Manuelle Prüfung erforderlich."
+        rollback_dir="$candidate_dir"
+    fi
+done
 [[ -n "$rollback_dir" ]] || die "Rollback-Staging wurde nicht erzeugt."
 systemctl start "$SERVICE_NAME"
 wait_for_health "$expected_agent_version" || exit "$READINESS_FAILURE_EXIT"

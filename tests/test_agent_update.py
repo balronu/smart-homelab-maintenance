@@ -37,10 +37,20 @@ def test_upgrade_recovers_from_explicit_exit_and_bounds_restart_race():
 
 def test_upgrade_does_not_delete_existing_rollback_staging():
     script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
-    assert 'compgen -G "$AGENT_ROOT/agent.previous.*.staging"' in script
+    assert '"$AGENT_ROOT"/agent.previous.*.staging' in script
+    assert "version_is_older" in script
+    assert "check_historical_staging" in script
     assert "Manuelle Prüfung erforderlich" in script
     assert 'rm -rf -- "$rollback_dir"' not in script
     assert "Rollback-Staging bleibt erhalten" in script
+
+
+def test_historical_staging_requires_active_health_and_keeps_ambiguous_state_blocked():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert 'systemctl is-active --quiet "$SERVICE_NAME"' in script
+    assert 'wait_for_health "$current_version"' in script
+    assert "nicht eindeutig historisch" in script
+    assert "Mehrere Rollback-Stände passen" in script
 
 
 def test_readiness_requires_tls_contract_and_expected_version():
