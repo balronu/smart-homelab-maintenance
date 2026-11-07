@@ -25,7 +25,7 @@ from .api import ApiApplication
 from .discovery import DiscoveryService
 from .jobs import JobRepository
 from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInventoryBackend
-from .updates import AptUpdateReader, UpdateService, make_targets
+from .updates import AptCommandRunner, AptUpdateReader, RootHelperTransport, UpdateService, make_targets
 from .security import redact_secrets
 
 _LOGGER = logging.getLogger(__name__)
@@ -64,6 +64,7 @@ class AgentRuntimeConfig:
     proxmox: ProxmoxClientConfig
     max_response_bytes: int = 256_000
     update_targets: dict[str, dict[str, Any]] = field(default_factory=dict)
+    lxc_helper_enabled: bool = False
 
 
 def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
@@ -110,7 +111,7 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
         if any(key in values and not isinstance(values[key], str) for key in {"os_name", "os_version", "package_manager"}):
             raise ValueError("update target metadata must be strings")
         update_targets[target] = dict(values)
-    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets)
+    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets, bool(raw.get("lxc_helper_enabled", False)))
 
 
 def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:
@@ -126,9 +127,11 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
     repository = JobRepository(str(Path(config.state_directory) / "jobs.sqlite"))
     backend = ProxmoxInventoryBackend(ProxmoxApiClient(proxmox_config))
     discovery = DiscoveryService(backend)
+    guest_transport = RootHelperTransport() if config.lxc_helper_enabled else None
     updates = UpdateService(
         lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()], config.update_targets, discovery.virtual_machines()),
-        reader=AptUpdateReader(),
+        runner=AptCommandRunner(guest_transport=guest_transport),
+        reader=AptUpdateReader(guest_transport=guest_transport),
     )
     application = ApiApplication(discovery, repository, updates=updates,
                                 read_token=agent_token, max_bytes=config.max_response_bytes)

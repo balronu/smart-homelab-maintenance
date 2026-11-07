@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased – Beta.21 LXC-Gastzugriff
+
+### Deutsch
+
+- Root-seitiger Helper-Kandidat für strikt allowlistete, passive LXC-APT-Lese-
+  und Dry-Run-Operationen dokumentiert und mit Sicherheitsregressionen
+  abgesichert.
+- Keine produktive Installation, sudoers-Änderung oder Allowlist-Aktivierung;
+  echte Updateausführung bleibt deaktiviert.
+
+### English
+
+- Added a root-side helper candidate for tightly allowlisted, passive LXC APT
+  reads and simulations, with security regression coverage.
+- No production installation, sudoers change, or allowlist activation; real
+  update execution remains disabled.
+
 ## Unreleased – Agent-Updater Readiness und Rollback
 
 ### Deutsch

@@ -1,0 +1,32 @@
+[Unit]
+Description=Smart Homelab Maintenance LXC APT helper (opt-in)
+After=local-fs.target
+ConditionPathExists=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper
+ConditionPathExists=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml
+
+[Service]
+Type=simple
+User=root
+Group=smart-homelab-maintenance
+ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve
+RuntimeDirectory=smart-homelab-maintenance
+RuntimeDirectoryMode=0750
+UMask=0007
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
