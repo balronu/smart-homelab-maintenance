@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import threading
 import asyncio
+import time
 import json
 import ssl
 import urllib.error
@@ -47,7 +48,12 @@ from agent.smart_homelab_maintenance.types import (
 from agent.smart_homelab_maintenance.versions import Version, compare_versions
 from agent.smart_homelab_maintenance.http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url
 from custom_components.smart_homelab_maintenance.http_transport import validate_agent_url as validate_integration_agent_url
-from custom_components.smart_homelab_maintenance.http_transport import validate_ca_file, TransportError as IntegrationTransportError
+from custom_components.smart_homelab_maintenance.http_transport import (
+    AgentHttpTransport as IntegrationAgentHttpTransport,
+    TransportConfig as IntegrationTransportConfig,
+    validate_ca_file,
+    TransportError as IntegrationTransportError,
+)
 from custom_components.smart_homelab_maintenance.config_flow import validate_config
 from custom_components.smart_homelab_maintenance.update import update_value
 from custom_components.smart_homelab_maintenance.coordinator import SmartHomelabCoordinator
@@ -248,6 +254,53 @@ class CoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_agent_url("https://public.example")
 
+    def test_integration_dry_run_transport_handles_success_error_timeout_and_tls(self) -> None:
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, limit):
+                self.limit = limit
+                return json.dumps({"schema_version": "1", "data": {"status": "simulated"}}).encode()
+
+        config = IntegrationTransportConfig("https://agent.home.arpa:443", "fixture", timeout_seconds=1)
+        client = IntegrationAgentHttpTransport(config)
+        with patch(
+            "custom_components.smart_homelab_maintenance.http_transport.urllib.request.urlopen",
+            return_value=Response(),
+        ):
+            result = asyncio.run(client.dry_run("host"))
+        self.assertEqual(result["data"]["status"], "simulated")
+
+        with patch(
+            "custom_components.smart_homelab_maintenance.http_transport.urllib.request.urlopen",
+            side_effect=urllib.error.HTTPError("https://agent.home.arpa", 503, "fixture", {}, None),
+        ):
+            with self.assertRaises(IntegrationTransportError) as raised:
+                asyncio.run(client.dry_run("host"))
+        self.assertEqual(raised.exception.code, "http_error")
+
+        with patch.object(IntegrationAgentHttpTransport, "_post_json_sync", side_effect=lambda *args: time.sleep(0.2)):
+            short = IntegrationTransportConfig("https://agent.home.arpa:443", "fixture", timeout_seconds=0.1)
+            with self.assertRaises(IntegrationTransportError) as raised:
+                asyncio.run(IntegrationAgentHttpTransport(short).dry_run("host"))
+        self.assertEqual(raised.exception.code, "timeout")
+
+        with patch(
+            "custom_components.smart_homelab_maintenance.http_transport.urllib.request.urlopen",
+            side_effect=urllib.error.URLError(ssl.SSLCertVerificationError("fixture certificate")),
+        ):
+            with self.assertRaises(IntegrationTransportError) as raised:
+                asyncio.run(client.dry_run("host"))
+        self.assertEqual(raised.exception.code, "tls_error")
+
+        with self.assertRaises(IntegrationTransportError) as raised:
+            asyncio.run(client.dry_run("container:0"))
+        self.assertEqual(raised.exception.code, "invalid_target")
+
     def test_private_ca_path_is_bounded_to_ha_ssl_directory(self) -> None:
         self.assertEqual(validate_ca_file("/ssl/agent-ca.pem"), "/ssl/agent-ca.pem")
         self.assertEqual(validate_ca_file(""), None)
@@ -279,7 +332,7 @@ class CoreTests(unittest.TestCase):
             async def capabilities(self):
                 return {"data": {"execution_enabled": False}}
             async def health(self):
-                return {"data": {"agent_version": "0.1.0-beta.22", "api_contract": "1.1"}}
+                return {"data": {"agent_version": "0.1.0-beta.23", "api_contract": "1.1"}}
             async def updates(self):
                 return {"data": {"items": []}}
 
@@ -311,7 +364,7 @@ class CoreTests(unittest.TestCase):
             async def capabilities(self):
                 return {"data": {"execution_enabled": False}}
             async def health(self):
-                return {"data": {"agent_version": "0.1.0-beta.22", "api_contract": "1.1"}}
+                return {"data": {"agent_version": "0.1.0-beta.23", "api_contract": "1.1"}}
             async def updates(self):
                 raise IntegrationTransportError("http_error", "fixture update endpoint returned HTTP 500")
 
@@ -342,9 +395,9 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(service.app("paperless").update_supported)
 
     def test_agent_compatibility_is_conservative(self) -> None:
-        self.assertEqual(evaluate_agent("0.1.0-beta.22", "1.1").status, "current")
+        self.assertEqual(evaluate_agent("0.1.0-beta.23", "1.1").status, "current")
         self.assertEqual(evaluate_agent("0.1.0-beta.17", "1.1").status, "outdated")
-        self.assertEqual(evaluate_agent("0.1.0-beta.22", "1.0").status, "incompatible")
+        self.assertEqual(evaluate_agent("0.1.0-beta.23", "1.0").status, "incompatible")
         self.assertEqual(evaluate_agent(None, "1.1").status, "unknown")
 
     def test_discovery_capabilities_are_explicit_and_execution_off(self) -> None:
@@ -356,7 +409,7 @@ class CoreTests(unittest.TestCase):
         api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), self.repo, read_token="test-token")
         status, body = api.handle("GET", "/api/v1/health")
         self.assertEqual(status, 200)
-        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.22")
+        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.23")
         self.assertEqual(body["data"]["api_contract"], "1.1")
         self.assertEqual(api.handle("GET", "/api/v1/containers")[0], 401)
         status, body = api.handle("GET", "/api/v1/containers?limit=2", headers={"Authorization": "Bearer test-token"})

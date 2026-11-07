@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.0-beta.23 – Dry-Run-Serviceauswahl (Kandidat)
+
+### Deutsch
+
+- Behebt den Fehler, bei dem `dry_run` ohne `entry_id` ein internes
+  Setup-Flag als Coordinator verwendete und dadurch mit
+  `bool has no attribute transport` abbrach.
+- Ergänzt Regressionen für erfolgreiche Antworten, HTTP-/TLS-Fehler,
+  Zeitüberschreitungen und ungültige Ziele.
+- Zeigt die Simulationsaktion für Host, VMs und LXCs immer an; nicht
+  autorisierte oder nicht unterstützte Ziele bleiben sichtbar und deaktiviert.
+- Zeigt die dauerhaft deaktivierte Installationsaktion einheitlich und
+  responsiv neben beziehungsweise unter der Simulation an und übersetzt
+  Autorisierungsfehler ins Deutsche.
+- Der Service bleibt `SupportsResponse.ONLY`; echte Updates bleiben
+  serverseitig deaktiviert.
+
+### English
+
+- Fixes `dry_run` without `entry_id` selecting an internal setup flag as the
+  coordinator, which caused `bool has no attribute transport`.
+- Adds regressions for successful responses, HTTP/TLS errors, timeouts, and
+  invalid targets.
+- Keeps the simulation action visible for hosts, VMs, and LXCs while disabling
+  unauthorized or unsupported targets with a clear reason.
+- Keeps the permanently disabled install action in a consistent responsive
+  layout and localizes authorization errors in German.
+- The service remains `SupportsResponse.ONLY`; real updates remain disabled
+  server-side.
+
 ## 0.1.0-beta.22 – sicherer Agent-Preflight (Prerelease)
 
 ### Deutsch

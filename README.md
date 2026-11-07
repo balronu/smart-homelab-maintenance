@@ -3,6 +3,24 @@
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
+## Beta.23: Dry-Run-Servicefehler behoben (Kandidat)
+
+Der `smart_homelab_maintenance.dry_run`-Service wählt seinen Coordinator nun
+robust aus, auch wenn der Lovelace-Aufruf keine `entry_id` mitsendet. Interne
+Setup-Metadaten wie `card_registered` werden nicht mehr als Transportobjekt
+verwendet. Damit verschwindet der Fehler `bool has no attribute transport`.
+
+Der Service fordert weiterhin eine explizite Read-only-Bestätigung und die
+Home-Assistant-Serviceantwort an. Erfolgsantworten, HTTP-/TLS-Fehler,
+Zeitüberschreitungen und ungültige Ziele werden strukturiert behandelt. Echte
+Paketupdates bleiben serverseitig deaktiviert; der Button **Updates
+installieren** bleibt ohne ausführbaren Pfad. **Update simulieren** bleibt bei
+Host, VMs und LXCs sichtbar; bei nicht autorisierten, nicht unterstützten,
+ungeprüften oder veralteten Zielen ist die Aktion ausgegraut und begründet.
+Die beiden Aktionen sind responsiv angeordnet und verändern keine bestehenden
+Aufklapp- oder Scrollzustände. Details stehen in
+[`docs/releases/v0.1.0-beta.23.md`](docs/releases/v0.1.0-beta.23.md).
+
 ## Beta.20: vollständige Updateverwaltung ohne Ausführung
 
 Dieser Entwicklungsstand trennt die passive APT-Cache-Auswertung vom bewusst
