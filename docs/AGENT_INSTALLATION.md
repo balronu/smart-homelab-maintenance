@@ -24,6 +24,22 @@ Der Agent benötigt einen eigenen Servicebenutzer und verwendet ausschließlich
 sein eigenes Installations-, Konfigurations- und Zustandsverzeichnis. Dateien
 des bestehenden `homelab-wartung`-Systems werden nicht gelesen.
 
+## 1a. Beta-Updates des Agenten getrennt von HACS
+
+HACS aktualisiert ausschließlich die Home-Assistant-Integration und die
+mitgelieferte Lovelace-Karte. Der separat laufende Agent auf Proxmox muss aus
+dem gleichen geprüften Git-Commit separat aktualisiert werden. Vor einer
+Freigabe ist der öffentliche Healthcheck lesend auf die erwartete
+`agent_version` zu prüfen; Zugangsdaten werden dabei nicht ausgegeben.
+
+Der sichere Ablauf ist: geprüften Commit bereitstellen, `install-agent.sh`
+zunächst ohne `--apply` als Vorprüfung ausführen, die Quell- und
+Versionsprüfung dokumentieren und erst nach einer getrennten Infrastruktur-
+freigabe mit `--apply` die eigenen Agent-Dateien atomar aktualisieren. Der
+Installer startet oder aktiviert den Dienst nicht. Dienstneustart und
+Änderung der HA-Konfiguration bleiben getrennte, ausdrücklich freizugebende
+Schritte. Ein HACS-Update allein darf nicht als Agent-Update betrachtet werden.
+
 ## 2. Quelle und Integrität
 
 Der Installer lädt nichts aus dem Internet. Die Quelle wird von einem

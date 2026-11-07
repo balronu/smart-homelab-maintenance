@@ -35,6 +35,26 @@ class ProxmoxResponseError(ProxmoxClientError):
     code = "proxmox_invalid_response"
 
 
+def _number(value: Any) -> int | float | None:
+    """Return finite API numbers without turning missing data into zero."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value
+
+
+def _cpu_percent(value: Any) -> float | None:
+    cpu = _number(value)
+    return None if cpu is None else cpu * 100
+
+
+def _remaining(total: Any, used: Any) -> int | float | None:
+    total_value, used_value = _number(total), _number(used)
+    if total_value is None or used_value is None or total_value < used_value:
+        return None
+    return total_value - used_value
+
+
 @dataclass(frozen=True, slots=True)
 class ProxmoxClientConfig:
     base_url: str
@@ -112,6 +132,7 @@ class ProxmoxApiClient:
 
     def node_status(self) -> Mapping[str, Any]:
         raw = self._get(f"nodes/{self.config.node}/status")
+        cpuinfo = raw.get("cpuinfo") if isinstance(raw.get("cpuinfo"), Mapping) else {}
         memory = raw.get("memory") if isinstance(raw.get("memory"), Mapping) else {}
         rootfs = raw.get("rootfs") if isinstance(raw.get("rootfs"), Mapping) else {}
         return {
@@ -119,8 +140,8 @@ class ProxmoxApiClient:
             "release": str(raw.get("pveversion", "unknown")),
             "kernel": str(raw.get("kversion", "unknown")),
             "online": True,
-            "cpu_percent": float(raw.get("cpu", 0)) * 100,
-            "cpu_cores": (raw.get("cpuinfo") or {}).get("cores"),
+            "cpu_percent": _cpu_percent(raw.get("cpu")),
+            "cpu_cores": cpuinfo.get("cores"),
             "memory_used_bytes": memory.get("used"),
             "memory_total_bytes": memory.get("total"),
             "memory_available_bytes": memory.get("available"),
@@ -143,12 +164,12 @@ class ProxmoxApiClient:
             result.append({
                 "vmid": item["vmid"], "name": item.get("name", f"lxc-{item['vmid']}"),
                 "status": item.get("status", "unknown"),
-                "cpu_percent": float(item.get("cpu", 0)) * 100,
+                "cpu_percent": _cpu_percent(item.get("cpu")),
                 "memory_used_bytes": item.get("mem"), "memory_total_bytes": item.get("maxmem"),
                 "disk_used_bytes": item.get("disk"), "disk_total_bytes": item.get("maxdisk"),
                 "uptime_seconds": item.get("uptime"),
-                "memory_available_bytes": maxmem - mem if isinstance(maxmem, int) and isinstance(mem, int) and maxmem >= mem else None,
-                "free_bytes": maxdisk - disk if isinstance(maxdisk, int) and isinstance(disk, int) and maxdisk >= disk else None,
+                "memory_available_bytes": _remaining(maxmem, mem),
+                "free_bytes": _remaining(maxdisk, disk),
                 "os_name": "unknown", "os_version": "unknown", "package_manager": None,
                 "applications": [],
             })
@@ -160,7 +181,7 @@ class ProxmoxApiClient:
             raise ProxmoxResponseError("Proxmox returned invalid VM data")
         return [{"vmid": item["vmid"], "name": item.get("name", f"vm-{item['vmid']}"),
                  "status": item.get("status", "unknown"),
-                 "cpu_percent": float(item.get("cpu", 0)) * 100,
+                 "cpu_percent": _cpu_percent(item.get("cpu")),
                  "memory_used_bytes": item.get("mem"), "memory_total_bytes": item.get("maxmem"),
                  "disk_used_bytes": item.get("disk"), "disk_total_bytes": item.get("maxdisk"),
                  "uptime_seconds": item.get("uptime"),
