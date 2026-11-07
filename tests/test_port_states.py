@@ -111,6 +111,42 @@ def test_time_wait_is_terminal_and_not_a_listener() -> None:
     assert set(states) <= {"TIME-WAIT"}
 
 
+def test_legacy_listener_without_reuse_blocks_new_reuse_listener() -> None:
+    """Model the Beta.22 -> Beta.26 transition on Linux."""
+    probe = socket.socket()
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+
+    old_listener = socket.socket()
+    old_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+    old_listener.bind(("127.0.0.1", port))
+    old_listener.listen(1)
+    client = socket.create_connection(("127.0.0.1", port))
+    accepted, _ = old_listener.accept()
+    accepted.close()
+    old_listener.close()
+    client.close()
+
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline and "TIME-WAIT" not in _states(port):
+        time.sleep(0.01)
+    if "TIME-WAIT" not in _states(port):
+        raise SkipTest("Kernel hat für diesen Test keinen sichtbaren TIME-WAIT-Eintrag erzeugt")
+
+    new_listener = socket.socket()
+    new_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        try:
+            new_listener.bind(("127.0.0.1", port))
+        except OSError as exc:
+            assert exc.errno == 98
+        else:
+            raise AssertionError("legacy TIME-WAIT did not block the new bind")
+    finally:
+        new_listener.close()
+
+
 def test_state_policy_blocks_everything_except_time_wait() -> None:
     # This mirrors the updater's awk policy without opening a production port.
     policy = 'awk \'$1 != "TIME-WAIT" { found = 1 } END { exit(found ? 0 : 1) }\''
