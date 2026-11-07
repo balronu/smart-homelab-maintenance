@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.1.0-beta.16 – Fehlerisolierung für Update-Abfragen (Prerelease)
+
+### Deutsch
+
+- Behebt einen Beta.15-Fehler, bei dem ein HTTP-Fehler der optionalen
+  `/api/v1/updates`-Abfrage Host-, VM- und LXC-Daten komplett ausblendete.
+- Führt Update-Abfragen getrennt vom Kerninventar aus; bei einem Fehler bleiben
+  die Bestandsdaten sichtbar und der Updatezustand wird als unbekannt gemeldet.
+- Behebt den von Home Assistant 2026.11 gemeldeten thread-unsicheren Aufruf
+  von `hass.async_create_task` im Intervall-Callback.
+- Echte Updateausführung bleibt serverseitig deaktiviert; Dry Runs bleiben die
+  einzige erlaubte Aktionsstufe.
+- Der iPhone-Scrollfix ist weiterhin nicht durch einen echten iOS-Praxistest
+  bestätigt.
+
+### English
+
+- Fixes a Beta.15 regression where an HTTP error from the optional
+  `/api/v1/updates` request hid all host, VM, and LXC inventory data.
+- Runs update polling separately from core inventory; when it fails, inventory
+  remains visible and the update state is reported as unknown.
+- Fixes the thread-unsafe `hass.async_create_task` call in the interval
+  callback reported by Home Assistant 2026.11.
+- Real update execution remains server-disabled; dry runs remain the only
+  permitted action level.
+- The iPhone scroll fix is still not confirmed by a real iOS field test.
+
 ## 0.1.0-beta.15 – Sichere Update-Prüfung und Simulation (Kandidat)
 
 ### Deutsch
