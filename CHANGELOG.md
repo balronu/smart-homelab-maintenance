@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-beta.24 – Kanonischer Dry-Run-Planvergleich (Kandidat)
+
+### Deutsch
+
+- Normalisiert Paketpläne vor dem Digest-Vergleich; reine Reihenfolgeänderungen
+  zwischen APT-Cache und Simulation lösen keinen falschen Stale-Abbruch mehr aus.
+- Behält den sicheren Abbruch bei echten Planänderungen unverändert bei.
+- Zeigt unbekannte Speicherwerte nicht mehr als 0 % und übersetzt fehlenden
+  Gastzugriff verständlich.
+- Stabilisiert das responsive Aktionslayout ohne Installationspfad.
+
+### English
+
+- Canonicalizes package plans before digest comparison so source ordering alone
+  no longer causes a false stale-plan rejection.
+- Keeps the safety abort for real plan changes unchanged.
+- Does not render unknown memory values as 0% and localizes missing guest access.
+- Stabilizes the responsive action layout without adding an installation path.
+
 ## 0.1.0-beta.23 – Dry-Run-Serviceauswahl (Kandidat)
 
 ### Deutsch

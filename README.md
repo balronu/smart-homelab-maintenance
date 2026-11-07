@@ -3,6 +3,18 @@
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
+## Beta.24: Dry-Run-Planvergleich und Kartenanzeige (Kandidat)
+
+Beta.24 normalisiert Updatepläne vor dem Vergleich. Dadurch wird ein identischer
+Plan aus passiver APT-Prüfung und `apt-get --simulate` nicht mehr nur wegen
+unterschiedlicher Paket-Reihenfolge als veraltet abgebrochen. Echte Plan-
+abweichungen bleiben sicher blockiert. Unbekannte RAM-Werte werden nicht als
+0 % angezeigt; Gastzugriffsfehler werden auf Deutsch dargestellt und die beiden
+Aktionsschaltflächen bleiben responsiv stabil.
+
+Die zweisprachigen Release Notes liegen unter
+[`docs/releases/v0.1.0-beta.24.md`](docs/releases/v0.1.0-beta.24.md).
+
 ## Beta.23: Dry-Run-Servicefehler behoben (Kandidat)
 
 Der `smart_homelab_maintenance.dry_run`-Service wählt seinen Coordinator nun
