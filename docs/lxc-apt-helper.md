@@ -57,7 +57,7 @@ sicherheitsrelevanten Eigenschaften:
 ```ini
 [Service]
 User=root
-Group=root
+Group=smart-homelab-maintenance
 ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve
 NoNewPrivileges=true
 PrivateTmp=true

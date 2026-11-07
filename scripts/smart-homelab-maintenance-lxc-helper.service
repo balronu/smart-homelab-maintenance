@@ -22,7 +22,6 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictRealtime=true
 LockPersonality=true
-CapabilityBoundingSet=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ReadOnlyPaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml
 Restart=on-failure
