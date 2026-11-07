@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-beta.22 – sicherer Agent-Preflight (Prerelease)
+
+### Deutsch
+
+- Erkennt eindeutig historische Rollback-Staging-Stände und lässt sie
+  unverändert bestehen.
+- Blockiert weiterhin aktive, ungültige oder mehrdeutige Upgrade-Zustände.
+- Wählt den Rollback-Stand beim Austausch anhand der zuvor aktiven Version
+  statt anhand einer zufälligen Verzeichnisreihenfolge.
+- Keine produktive Agent-, HA- oder LXC-Änderung durch dieses Release.
+
+### English
+
+- Recognizes provably historical rollback staging and preserves it unchanged.
+- Continues to block active, invalid, or ambiguous upgrade states.
+- Selects the rollback state by the previously active version instead of an
+  arbitrary directory order during an update.
+- This release makes no productive agent, HA, or LXC changes.
+
 ## 0.1.0-beta.21 – sicherer LXC-Gastzugriff (Prerelease)
 
 ### Deutsch
