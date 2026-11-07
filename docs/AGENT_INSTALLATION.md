@@ -57,6 +57,24 @@ Nach jedem HACS-Update ist die Kompatibilitätssensorik zu prüfen. Bei
 `outdated`, `incompatible` oder `unknown` bleibt der Agent unverändert und es
 ist eine separate, ausdrücklich freigegebene Agent-Aktualisierung erforderlich.
 
+### 1b. Historisches Rollback-Staging
+
+`scripts/upgrade-agent.sh` löscht, verschiebt oder überschreibt vorhandene
+`agent.previous.*.staging`-Verzeichnisse niemals automatisch. Ein vorhandener
+Rollback-Stand blockiert den Ablauf weiterhin, wenn sein Inhalt nicht eindeutig
+als historisch eingestuft werden kann. Die Vorprüfung akzeptiert mehrere alte
+Stände nur dann, wenn alle eine lesbare Beta-Version tragen, die strikt älter
+als die aktive Agent-Version ist, der Dienst aktiv ist und der aktuelle Agent
+über den TLS-validierten API-Healthcheck erreichbar bleibt. Ein fehlender,
+ungültiger, gleich neuerer oder mehrdeutiger Stand führt zu einem Abbruch mit
+manueller Prüfung.
+
+Beim eigentlichen, separat freizugebenden Austausch wird der neue Rollback-
+Stand anhand der zuvor aktiven Agent-Version ausgewählt, nicht anhand einer
+zufälligen Dateireihenfolge. Dadurch bleiben historische Staging-Daten
+erhalten, während ein unklarer oder konkurrierender Upgrade-Zustand weiterhin
+sicher blockiert wird.
+
 ## 2. Quelle und Integrität
 
 Der Installer lädt nichts aus dem Internet. Die Quelle wird von einem
