@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-beta.11 – Lovelace-Scrollstabilität (Prerelease-Kandidat)
+
+- Verhindert unnötiges Entfernen und Wiedereinfügen bestehender VM-/LXC-Karten
+  bei gewöhnlichen `hass`-Aktualisierungen.
+- Ergänzt Regressionen für Scrollposition, DOM-Identität, Grid-Mutationen,
+  Fokus, äußeren Kartenbaum und drei unabhängige Karteninstanzen.
+- Vollständige Browser-Matrix für iPhone-, iPad- und Desktop-Viewports sowie
+  Home-Assistant-Runtime- und HACS-Prüfungen bleiben erforderlich.
+- Kein automatischer Home-Assistant-Neustart, keine Installation und keine
+  Änderungen an Proxmox oder dem Agenten.
+
 ## 0.1.0-beta.9 – Mobile Kartenstabilität (Kandidat)
 
 - Bewahrt den geöffneten Proxmox-Hostbereich über mehrere Home-Assistant-
