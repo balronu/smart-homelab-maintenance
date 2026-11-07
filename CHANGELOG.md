@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-beta.24 – Kanonischer Dry-Run-Planvergleich (Kandidat)
+## 0.1.0-beta.24 – Kanonischer Dry-Run-Planvergleich (Prerelease)
 
 ### Deutsch
 
@@ -463,7 +463,7 @@ system was changed by this release.
   classification remains unknown when the source cannot prove it.
 - The visible “Install updates” button is permanently disabled and has no
   server-side execution route.
-## Unreleased – Agent-Port-Bind-Race
+## 0.1.0-beta.25 – Agent-Lifecycle und Port-Bind-Race (Prerelease)
 
 ### Deutsch
 

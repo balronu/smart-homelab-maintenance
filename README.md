@@ -1,6 +1,6 @@
 # Smart Homelab Maintenance
 
-## Unreleased: Agent-Port-Bind-Race
+## Beta.25: Agent-Lifecycle und Port-Bind-Race
 
 Der externe Agent beendet seinen HTTPS-Server bei Stop-Signalen kontrolliert
 und schließt Port 48128, bevor systemd einen neuen Prozess starten kann. Der
@@ -17,7 +17,10 @@ rollback staging directories are never deleted automatically.
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
-## Beta.24: Dry-Run-Planvergleich und Kartenanzeige (Kandidat)
+Die zweisprachigen Release Notes liegen unter
+[`docs/releases/v0.1.0-beta.25.md`](docs/releases/v0.1.0-beta.25.md).
+
+## Beta.24: Dry-Run-Planvergleich und Kartenanzeige
 
 Beta.24 normalisiert Updatepläne vor dem Vergleich. Dadurch wird ein identischer
 Plan aus passiver APT-Prüfung und `apt-get --simulate` nicht mehr nur wegen
