@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sections scroll regression</title>
+<style>
+  :root { --row-gap: 8px; --column-gap: 8px; }
+  body { margin: 0; font: 16px sans-serif; }
+  .section-container { position: relative; }
+  .section { display: flex; flex-direction: column; gap: var(--row-gap); }
+  .container { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); grid-auto-rows: auto; gap: var(--row-gap) var(--column-gap); }
+  .card-slot { grid-column: 1 / -1; overflow: hidden; border: 2px solid #b71c1c; }
+  .card-slot.fixed { border-color: #1b5e20; }
+  #after { height: 240px; padding: 24px; background: #eee; }
+</style></head>
+<body>
+  <main>
+    <section class="section-container"><div class="section"><div class="container">
+      <div class="card-slot" id="legacy-slot"><smart-homelab-maintenance-card></smart-homelab-maintenance-card></div>
+      <div class="card-slot fixed" id="fixed-slot"><smart-homelab-maintenance-card></smart-homelab-maintenance-card></div>
+    </div></div></section>
+    <div id="after">Dashboard element below the card</div>
+  </main>
+  <pre id="result"></pre>
+<script type="module">
+import "./smart-homelab-maintenance-card.js";
+const states = {
+  "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
+  "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
+  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { online: true, memory_used_bytes: 100, memory_total_bytes: 200, storage_used_bytes: 300, storage_total_bytes: 600 } },
+  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => { const id = [101,102,103,105,107,108,109,110,111,112][i]; return [`sensor.smart_homelab_maintenance_container_${id}`, { state: "running", attributes: { container_id: id, name: `container-${id}`, os_name: "Debian", os_version: "12", memory_used_bytes: 20, memory_total_bytes: 50, disk_used_bytes: 30, disk_total_bytes: 100 } }]; }))
+};
+const cards = [...document.querySelectorAll("smart-homelab-maintenance-card")];
+for (const card of cards) { card.setConfig({ show_vms: false, show_containers: true }); card.hass = { language: "en", states }; }
+await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+const legacySlot = document.querySelector("#legacy-slot");
+const fixedSlot = document.querySelector("#fixed-slot");
+const fixedCard = fixedSlot.querySelector("smart-homelab-maintenance-card");
+const legacyCard = legacySlot.querySelector("smart-homelab-maintenance-card");
+legacySlot.style.height = `${legacyCard.getBoundingClientRect().height}px`;
+fixedSlot.style.height = `${fixedCard.getBoundingClientRect().height}px`;
+fixedCard.addEventListener("card-updated", () => { fixedSlot.style.height = `${fixedCard.getBoundingClientRect().height}px`; });
+const last = card => [...card.shadowRoot.querySelectorAll(".container-grid .item")].at(-1);
+last(legacyCard).open = true;
+last(fixedCard).open = true;
+await new Promise(resolve => setTimeout(resolve, 120));
+window.scrollTo(0, document.documentElement.scrollHeight);
+await new Promise(resolve => requestAnimationFrame(resolve));
+const measure = (slot, card) => { const slotBox = slot.getBoundingClientRect(); const lastBox = last(card).getBoundingClientRect(); return { slotHeight: slot.getBoundingClientRect().height, cardHeight: card.getBoundingClientRect().height, lastBottom: lastBox.bottom, slotBottom: slotBox.bottom, clipped: lastBox.bottom > slotBox.bottom + 2 }; };
+const result = { legacy: measure(legacySlot, legacyCard), fixed: measure(fixedSlot, fixedCard), legacyReproducesClip: measure(legacySlot, legacyCard).clipped, fixedReachable: !measure(fixedSlot, fixedCard).clipped, cardCount: cards.length, lastText: last(fixedCard).textContent };
+document.querySelector("#result").textContent = JSON.stringify(result);
+</script></body></html>

@@ -205,6 +205,15 @@ class ProxmoxInventoryBackend:
             "release": str(raw.get("release", "unknown")),
             "kernel": str(raw.get("kernel", "unknown")),
             "online": bool(raw.get("online", True)),
+            "cpu_percent": raw.get("cpu_percent"),
+            "cpu_cores": raw.get("cpu_cores"),
+            "memory_used_bytes": raw.get("memory_used_bytes"),
+            "memory_total_bytes": raw.get("memory_total_bytes"),
+            "memory_available_bytes": raw.get("memory_available_bytes"),
+            "storage_used_bytes": raw.get("storage_used_bytes"),
+            "storage_total_bytes": raw.get("storage_total_bytes"),
+            "storage_available_bytes": raw.get("storage_available_bytes"),
+            "uptime_seconds": raw.get("uptime_seconds"),
         }
 
     def containers(self) -> list[dict[str, Any]]:
@@ -220,8 +229,14 @@ class ProxmoxInventoryBackend:
                 "running": item.get("status") == "running" if "status" in item else bool(item.get("running", False)),
                 "os_name": str(item.get("os_name", "unknown")),
                 "os_version": str(item.get("os_version", "unknown")),
+                "cpu_percent": item.get("cpu_percent"),
+                "memory_used_bytes": item.get("memory_used_bytes"),
+                "memory_total_bytes": item.get("memory_total_bytes"),
                 "memory_available_bytes": item.get("memory_available_bytes"),
+                "disk_used_bytes": item.get("disk_used_bytes"),
+                "disk_total_bytes": item.get("disk_total_bytes"),
                 "free_bytes": item.get("free_bytes"),
+                "uptime_seconds": item.get("uptime_seconds"),
                 "package_manager": item.get("package_manager"),
                 "applications": list(item.get("applications", ())),
             })
@@ -240,5 +255,13 @@ class ProxmoxInventoryBackend:
                 "running": item.get("status") == "running" if "status" in item else bool(item.get("running", False)),
                 "os_name": str(item.get("os_name", "unknown")),
                 "os_version": str(item.get("os_version", "unknown")),
+                "cpu_percent": item.get("cpu_percent"),
+                "memory_used_bytes": item.get("memory_used_bytes"),
+                "memory_total_bytes": item.get("memory_total_bytes"),
+                "memory_available_bytes": item.get("memory_available_bytes"),
+                "disk_used_bytes": item.get("disk_used_bytes"),
+                "disk_total_bytes": item.get("disk_total_bytes"),
+                "free_bytes": item.get("free_bytes"),
+                "uptime_seconds": item.get("uptime_seconds"),
             })
         return result

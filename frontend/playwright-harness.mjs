@@ -18,7 +18,7 @@ const server = http.createServer((request, response) => {
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const port = server.address().port;
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium" });
 try {
   const contexts = [
     { name: "iphone-dark", options: { ...devices["iPhone 13"], colorScheme: "dark" } },
@@ -40,7 +40,7 @@ try {
     if (sectionsSizing?.rows !== "auto" || Object.hasOwn(sectionsSizing, "min_rows") || sectionsSizing?.columns !== "full") throw new Error(`${name} Sections sizing failed: ${JSON.stringify(sectionsSizing)}`);
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
     const result = JSON.parse(await page.locator("#result").textContent());
-    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.hasAvailableResources || !result.cardHasSize || !result.localizedEditor || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.reopenedEditorSafe || !result.emptyCardSafe || !result.initialCardSafe || !result.unknownSafe || !result.unknownContainerSafe || !result.hostDetailsPreservedAfterUpdates || !result.languageEnglish || !result.languageGerman || !result.localeObjectSafe || !result.missingLanguageFallback || !result.hostOfflineWithoutAgentContradiction || !result.statusStatesSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasTextOverlap || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
+    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.hasAvailableResources || !result.cardHasSize || !result.dryRunUi || !result.localizedEditor || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.reopenedEditorSafe || !result.emptyCardSafe || !result.initialCardSafe || !result.unknownSafe || !result.unknownContainerSafe || !result.hostDetailsPreservedAfterUpdates || !result.languageEnglish || !result.languageGerman || !result.localeObjectSafe || !result.missingLanguageFallback || !result.hostOfflineWithoutAgentContradiction || !result.statusStatesSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasTextOverlap || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
     await page.screenshot({ path: `/tmp/card-${name}.png`, fullPage: true });
     await page.goto(`http://127.0.0.1:${port}/frontend/ha-editor-harness.html`);
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("pickerRegistered"), null, { timeout: 10000 });
@@ -97,6 +97,12 @@ try {
     });
     if (clipping.overflowY !== "hidden" || !clipping.clipped) {
       throw new Error(`${name} clipping negative control failed: ${JSON.stringify(clipping)}`);
+    }
+    await page.goto(`http://127.0.0.1:${port}/frontend/sections-scroll-regression.html`);
+    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("legacyReproducesClip"), null, { timeout: 10000 });
+    const sectionsRegression = JSON.parse(await page.locator("#result").textContent());
+    if (!sectionsRegression.legacyReproducesClip || !sectionsRegression.fixedReachable || sectionsRegression.cardCount !== 2 || !sectionsRegression.lastText.includes("112")) {
+      throw new Error(`${name} Sections stale-height regression failed: ${JSON.stringify(sectionsRegression)}`);
     }
     await page.close();
     await context.close();

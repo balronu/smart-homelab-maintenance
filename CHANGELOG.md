@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.1.0-beta.15 – Sichere Update-Prüfung und Simulation (Kandidat)
+
+### Deutsch
+
+- Ergänzt passive Update-Erkennung für den Proxmox-Host und autorisierte
+  Debian-/Ubuntu-LXC-Ziele über einen festen, begrenzten APT-Prüfpfad.
+- Zeigt `aktuell`, `Updates verfügbar`, `unbekannt`, `nicht unterstützt` und
+  Fehler getrennt; fehlende Messwerte werden nicht erfunden.
+- Ergänzt einen ausdrücklich bestätigten Dry Run mit
+  `apt-get --simulate --no-remove upgrade`. Paketindex-Aktualisierung,
+  Installation, Entfernung und Neustarts finden nicht statt.
+- Die Ausführung echter Updates ist serverseitig deaktiviert; die spätere
+  Freischaltung muss zusätzlich aktuellen Dry Run, unveränderten Plan,
+  Konflikt-/Entfernungsprüfung und ausdrückliche Bestätigung erzwingen.
+- Beta.15 ist ein Releasekandidat. Der iPhone-Scrollfix bleibt ohne echten
+  iOS-Praxistest unbestätigt.
+
+### English
+
+- Adds passive update detection for the Proxmox host and authorized
+  Debian/Ubuntu LXC targets through a fixed, bounded APT inspection path.
+- Distinguishes up to date, updates available, unknown, unsupported, and error;
+  missing measurements are never fabricated.
+- Adds an explicitly confirmed dry run using
+  `apt-get --simulate --no-remove upgrade`. It does not refresh indexes,
+  install or remove packages, or restart services.
+- Real update execution is server-disabled. Any later enablement must enforce
+  a current dry run, unchanged plan, conflict/removal checks, and explicit
+  confirmation server-side.
+- Beta.15 is a release candidate. The iPhone scroll fix remains unverified
+  without a real iOS field test.
+
+## 0.1.0-beta.14 – Sections-Resize- und Ressourcen-Kandidat
+
+### Deutsch
+
+- Meldet Änderungen der tatsächlichen Kartenhöhe über `ResizeObserver` als
+  `card-updated`, damit Home Assistants Sections-Wrapper nach dem Öffnen von
+  Detailbereichen neu layouten können.
+- Ergänzt eine Sections-Fixture, die einen veralteten Wrapper-Höhenwert und
+  das abgeschnittene Kartenende reproduziert; CT112 muss im reparierten Pfad
+  erreichbar bleiben.
+- Reicht CPU-, RAM-, Speicher- und Laufzeitfelder des read-only Proxmox-
+  Backends bis zu den HA-Entitätsattributen durch.
+- Die iPhone-Praxisbehebung bleibt unbestätigt; diese Version ist nur ein
+  Kandidat und wurde nicht veröffentlicht oder produktiv installiert.
+
+### English
+
+- Reports actual card-size changes through `ResizeObserver` as `card-updated`,
+  allowing Home Assistant Sections wrappers to re-layout after details open.
+- Adds a Sections fixture reproducing stale wrapper height and clipped card
+  endings; CT112 must remain reachable in the fixed path.
+- Preserves CPU, RAM, storage, and uptime fields from the read-only Proxmox
+  backend through to Home Assistant entity attributes.
+- The iPhone fix remains unverified; this is a candidate only and was neither
+  published nor installed in production.
+
 ## 0.1.0-beta.13 – Next Generation Dashboard (Kandidat)
 
 - Modernisiert die read-only Lovelace-Karte mit klarer Statusübersicht,

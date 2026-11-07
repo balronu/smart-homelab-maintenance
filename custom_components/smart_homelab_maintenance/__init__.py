@@ -55,16 +55,23 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 call.service,
                 job_id=call.data.get("job_id"),
                 cursor=int(call.data.get("after", 0)),
+                target=call.data.get("target"),
+                confirm=call.data.get("confirm", False),
             )
+            if call.service == "dry_run":
+                coordinator.record_dry_run(str(call.data.get("target")), result.get("data", result))
+                await coordinator.async_request_refresh()
             hass.data[DOMAIN].setdefault("last_action_result", {})[call.service] = result
             return result
 
         schema = vol.Schema({
             vol.Optional("entry_id"): str,
             vol.Optional("job_id"): str,
+            vol.Optional("target"): str,
+            vol.Optional("confirm", default=False): cv.boolean,
             vol.Optional("after", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=1000000)),
         })
-        for action in ("check", "get_job", "get_job_events"):
+        for action in ("check", "get_job", "get_job_events", "dry_run"):
             kwargs = {"schema": schema}
             if SupportsResponse is not None:
                 kwargs["supports_response"] = SupportsResponse.ONLY

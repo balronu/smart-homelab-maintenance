@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
+import re
 import ssl
 import urllib.error
 import urllib.request
@@ -130,6 +131,46 @@ class AgentHttpTransport:
 
     async def containers(self) -> dict[str, Any]:
         return await self.get("/api/v1/containers?limit=100")
+
+    async def host(self) -> dict[str, Any]:
+        return await self.get("/api/v1/host")
+
+    async def virtual_machines(self) -> dict[str, Any]:
+        return await self.get("/api/v1/virtual-machines?limit=100")
+
+    async def updates(self) -> dict[str, Any]:
+        return await self.get("/api/v1/updates")
+
+    async def dry_run(self, target: str) -> dict[str, Any]:
+        if not isinstance(target, str) or not re.fullmatch(r"(?:host|container:[1-9][0-9]{0,5})", target):
+            raise TransportError("invalid_target", "update target is not allowed")
+        return await asyncio.wait_for(asyncio.to_thread(self._post_json_sync, f"/api/v1/updates/{target}/dry-run", {"confirm": True}), self.config.timeout_seconds)
+
+    def _post_json_sync(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        request = urllib.request.Request(
+            self.config.base_url.rstrip("/") + path,
+            data=json.dumps(payload, separators=(",", ":")).encode(),
+            headers={"Authorization": "Bearer " + self.config.token, "Accept": "application/json", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.config.timeout_seconds, context=self._ssl_context()) as response:
+                raw = response.read(self.config.max_response_bytes + 1)
+        except urllib.error.HTTPError as exc:
+            code = "authentication" if exc.code in {401, 403} else "http_error"
+            raise TransportError(code, "agent returned an HTTP error") from exc
+        if len(raw) > self.config.max_response_bytes:
+            raise TransportError("response_too_large", "agent response exceeds limit")
+        try:
+            result = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise TransportError("invalid_json", "agent returned invalid JSON") from exc
+        if not isinstance(result, dict) or result.get("schema_version") != self.config.api_version:
+            raise TransportError("api_version", "unsupported agent API version")
+        if "error" in result:
+            error = result["error"]
+            raise TransportError(str(error.get("code", "agent_error")), "agent request failed")
+        return result
 
     async def capabilities(self) -> dict[str, Any]:
         return await self.get("/api/v1/capabilities")
