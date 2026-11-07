@@ -19,6 +19,10 @@ Home-Assistant-Entitydaten (`hass`), niemals Agent-URLs oder Tokens.
 - Wartungsbereich ausschließlich mit laufenden Jobs und Read-only-Hinweis
 - `getConfigElement()`, `getStubConfig()` und idempotente Registrierung in
   `window.customCards`
+- VM- und LXC-Einträge sind als native, zugängliche `<details>`-Elemente
+  aufklappbar; ihre DOM-Identität bleibt bei `hass`-Updates erhalten.
+- Sections-Grid-Vertrag: `columns: "full"` und `rows: "auto"`; es wird keine
+  feste Kartenhöhe oder verschachtelte Haupt-Scrollfläche erzeugt.
 
 ## Beta-9-Kandidat
 
@@ -45,3 +49,7 @@ Entity-Zustände, JavaScript-Fehler, fehlgeschlagene Requests, den Lovelace-
 Editor-Lifecycle und Light-/Dark-Mode.
 
 Der Playwright-Harness benötigt eine installierte `playwright`-Abhängigkeit.
+Beta.13 prüft zusätzlich 0, 1, 10, 20 und 50 Container sowie das Erreichen
+des Kartenendes in simulierten Sections-/Masonry-Layouts. Diese Fixtures sind
+kein Beweis für ein echtes iOS-Home-Assistant-Rendering; der Praxistest bleibt
+vor einer Veröffentlichung erforderlich.
