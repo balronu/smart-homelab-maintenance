@@ -73,6 +73,17 @@ def test_update_service_keeps_passive_reader_separate_from_button_simulation():
     assert result["success"] is True and runner.calls == [107]
 
 
+def test_dry_run_accepts_same_plan_with_different_source_order():
+    class Reader:
+        def list_upgradable(self, vmid=None):
+            return 0, "Listing...\ncurl/stable 2 [upgradable from: 1]\nopenssl/stable 4 [upgradable from: 3]\n", ""
+
+    runner = Runner("Inst openssl [3] (4)\nInst curl [1] (2)\n")
+    checked = UpdateService(lambda: (target(),), reader=Reader(), runner=runner)
+    result = checked.dry_run("container:107", confirmed=True)
+    assert result["success"] is True and result["safe"] is True
+
+
 def test_default_allowlist_does_not_authorize_guest_targets_or_start_stopped_lxc():
     targets = make_targets(
         {"name": "pve"},

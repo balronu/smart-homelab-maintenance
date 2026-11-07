@@ -310,7 +310,15 @@ def _parse_apt_upgradable(stdout: str, stderr: str) -> tuple[PackageChange, ...]
 
 
 def _package_digest(packages: Sequence[PackageChange]) -> str:
-    value = "\n".join("|".join(str(part or "") for part in (item.name, item.operation, item.installed_version, item.available_version)) for item in packages)
+    # ``apt list --upgradable`` and ``apt-get --simulate`` are equivalent
+    # sources for the package plan, but do not promise the same ordering.
+    # Compare a canonical, sorted representation so ordering alone cannot
+    # turn an unchanged plan into a stale-plan rejection.
+    canonical = sorted(
+        (item.name, item.operation, item.installed_version or "", item.available_version or "")
+        for item in packages
+    )
+    value = "\n".join("|".join(part) for part in canonical)
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
