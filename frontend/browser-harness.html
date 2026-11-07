@@ -25,7 +25,7 @@ card.hass = { locale: "en", states: {
   "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", memory_used_bytes: 900, memory_total_bytes: 1000, memory_available_bytes: 100, disk_used_bytes: 800, disk_total_bytes: 1000, free_bytes: 200, os_name: "Debian", os_version: "12" } }
 } };
 let dryRunCall = null;
-card.hass = { locale: "en", callService: (...args) => { dryRunCall = args; }, states: {
+card.hass = { locale: "en", callService: (...args) => { dryRunCall = args; return Promise.resolve({ response: { data: { success: true, safe: true, packages: [{ name: "curl", installed_version: "1", available_version: "2" }] } } }); }, states: {
   "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
   "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
   "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", available_count: 2, dry_run_supported: true } } },
@@ -33,7 +33,25 @@ card.hass = { locale: "en", callService: (...args) => { dryRunCall = args; }, st
 } };
 const simulateButton = card.shadowRoot.querySelector(".container-grid .simulate");
 simulateButton?.click();
-const dryRunUi = Boolean(simulateButton && !simulateButton.hidden && dryRunCall?.[0] === "smart_homelab_maintenance" && dryRunCall?.[1] === "dry_run" && dryRunCall?.[2]?.target === "container:101" && dryRunCall?.[2]?.confirm === true);
+const dryRunUi = Boolean(simulateButton && !simulateButton.hidden && dryRunCall?.[0] === "smart_homelab_maintenance" && dryRunCall?.[1] === "dry_run" && dryRunCall?.[2]?.target === "container:101" && dryRunCall?.[2]?.confirm === true && dryRunCall?.[5] === true);
+await new Promise((resolve) => setTimeout(resolve, 0));
+const dryRunResponseShown = card.shadowRoot.textContent.includes("Simulation successful") && card.shadowRoot.textContent.includes("curl 1 → 2");
+card.hass = { locale: "en", callService: () => Promise.resolve(null), states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true } } } } };
+const missingResponseButton = card.shadowRoot.querySelector(".host-details .simulate");
+missingResponseButton?.click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+const dryRunMissingResponseShown = card.shadowRoot.textContent.includes("Serviceantwort ist leer");
+card.hass = { locale: "en", callService: () => Promise.reject(new Error("service unavailable")), states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true } } } } };
+const errorButton = card.shadowRoot.querySelector(".host-details .simulate");
+errorButton?.click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+const dryRunServiceErrorShown = card.shadowRoot.textContent.includes("service unavailable");
+globalThis.__SMART_HOMELAB_DRY_RUN_TIMEOUT_MS__ = 10;
+card.hass = { locale: "en", callService: () => new Promise(() => {}), states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true } } } } };
+const timeoutButton = card.shadowRoot.querySelector(".host-details .simulate");
+timeoutButton?.click();
+await new Promise((resolve) => setTimeout(resolve, 25));
+const dryRunTimeoutShown = card.shadowRoot.textContent.includes("Zeitüberschreitung");
 const hostDetails = card.shadowRoot.querySelector('details[data-section="host"]');
 hostDetails.open = true;
 for (let index = 0; index < 4; index += 1) card.hass = { language: "en", states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { online: false } } } };
@@ -69,6 +87,6 @@ const reopenedEditorSafe = editor.querySelector('[data-field="title"]').value ==
 const barRects = [...card.shadowRoot.querySelectorAll(".bar-row span")].map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
 const hasTextOverlap = barRects.some((left, index) => barRects.slice(index + 1).some((right) => Math.abs(left.top - right.top) < 2 && left.left < right.right && right.left < left.right));
 const initialCardSafe = (() => { const initial = document.createElement("smart-homelab-maintenance-card"); document.body.append(initial); return Boolean(initial.shadowRoot.querySelector(".card")); })();
-window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), hasAvailableResources: card.shadowRoot.textContent.includes("Free RAM") && card.shadowRoot.textContent.includes("Free storage"), cardHasSize: card.getCardSize() >= 1, dryRunUi, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, initialCardSafe, unknownSafe, unknownContainerSafe, hostDetailsPreservedAfterUpdates, languageEnglish, languageGerman, localeObjectSafe, missingLanguageFallback, hostOfflineWithoutAgentContradiction, statusStatesSafe, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), hasAvailableResources: card.shadowRoot.textContent.includes("Free RAM") && card.shadowRoot.textContent.includes("Free storage"), cardHasSize: card.getCardSize() >= 1, dryRunUi, dryRunResponseShown, dryRunMissingResponseShown, dryRunServiceErrorShown, dryRunTimeoutShown, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, initialCardSafe, unknownSafe, unknownContainerSafe, hostDetailsPreservedAfterUpdates, languageEnglish, languageGerman, localeObjectSafe, missingLanguageFallback, hostOfflineWithoutAgentContradiction, statusStatesSafe, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
 document.querySelector("#result").textContent = JSON.stringify(window.__HARNESS__);
 </script></body></html>

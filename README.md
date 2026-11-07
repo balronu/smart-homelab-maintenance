@@ -3,6 +3,13 @@
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
+## Beta.19: Serviceantworten für Dry Runs
+
+Beta.19 behebt den Lovelace-Aufruf für `smart_homelab_maintenance.dry_run`:
+Die Karte fordert die verpflichtende Home-Assistant-Serviceantwort an und
+zeigt Paketänderungen, Warnungen, Sicherheitsbewertung, Fehler und
+Zeitüberschreitungen sichtbar an. Echte Updates bleiben deaktiviert.
+
 ## Beta.18: gemeinsamer Versions- und Updatevertrag
 
 Integration, Karte und Agent tragen dieselbe Beta-Version. Der Agent meldet
@@ -18,6 +25,10 @@ Rollback-Stand vor und stellt ihn bei einem fehlgeschlagenen Healthcheck
 wieder her. Er verändert weder Proxmox, VMs noch LXCs.
 
 ## Status
+
+Beta.19-Fix-Kandidat: Der Dry-Run-Button verarbeitet den verpflichtenden
+Service-Response-Vertrag. Die Veröffentlichung bleibt bis vollständig grüner
+CI ausstehend.
 
 Beta.18-Prerelease: gemeinsamer Versions-/API-Vertrag für Integration, Karte
 und Agent sowie ein ausdrücklich bestätigungspflichtiger Agent-Updatepfad.
