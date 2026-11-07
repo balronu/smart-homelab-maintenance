@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-beta.19 – Dry-Run-Serviceantwort (Fix-Kandidat)
+
+### Deutsch
+
+- Fordert die verpflichtende Home-Assistant-Serviceantwort für
+  `smart_homelab_maintenance.dry_run` korrekt an.
+- Zeigt Simulationsergebnis, Paketänderungen, Warnungen, Sicherheitsbewertung,
+  leere Antworten, Servicefehler und Zeitüberschreitungen in der Karte an.
+- Keine echten Updates, keine automatische Freigabe und keine produktiven
+  Änderungen.
+
+### English
+
+- Correctly requests the mandatory Home Assistant service response for
+  `smart_homelab_maintenance.dry_run`.
+- Displays simulation results, package changes, warnings, safety assessment,
+  empty responses, service errors, and timeouts in the card.
+- No real updates, automatic approval, or productive changes are enabled.
+
 ## 0.1.0-beta.18 – gemeinsamer Versions- und Updatevertrag
 
 - DE: Integration, Lovelace-Karte und Agent melden eine gemeinsame Version und

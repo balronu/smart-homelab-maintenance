@@ -70,7 +70,6 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   _sectionRefs(kind) { const section = this.shadowRoot.querySelector(`.${kind}-section`); return { section, heading: section.querySelector("h3"), grid: section.querySelector(`.${kind}-grid`), empty: section.querySelector(`.empty-${kind === "vm" ? "vms" : "containers"}`) }; }
   _setMetric(metricNode, label, value, sub = "") { metricNode.label.textContent = label; metricNode.value.textContent = value ?? "–"; metricNode.sub.textContent = sub; metricNode.sub.hidden = !sub; }
   _setBar(barNode, label, used, total, free, freeLabel) { const value = pct(used, total); barNode.node.hidden = value === null; if (value !== null) { barNode.label.textContent = label; barNode.progress.value = value; barNode.value.textContent = free != null ? `${value.toFixed(0)}% · ${freeLabel}: ${bytes(free)}` : `${value.toFixed(0)}%`; } }
-  _dryRunButton(target) { const button = document.createElement("button"); button.className = "simulate"; button.type = "button"; button.hidden = true; button.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); this._hass?.callService?.("smart_homelab_maintenance", "dry_run", { target, confirm: true }); }); return button; }
   _item(kind, id) { const article = document.createElement("details"); article.className = "item"; article.dataset.itemId = String(id); const head = document.createElement("summary"); head.className = "item-head"; const strong = document.createElement("strong"); const pill = document.createElement("span"); pill.className = "pill"; head.append(strong, pill); const body = document.createElement("div"); body.className = "item-body"; article.append(head, body); const bars = [this._bar(), this._bar(), this._bar()]; bars.forEach((b) => body.append(b.node)); const updateText = document.createElement("div"); updateText.className = "muted"; body.append(updateText); const button = this._dryRunButton(`${kind}:${id}`); body.append(button); const extra = document.createElement("div"); extra.className = "muted"; body.append(extra); const refs = { article, strong, pill, bars, updateText, button, extra }; this._items[kind].set(String(id), refs); return refs; }
   _updateItems(kind, items, labels, prefix) { const target = kind === "vm" ? this._shell.vm.grid : this._shell.container.grid; const seen = new Set(); [...items].sort((a, b) => Number(kind === "vm" ? a.vmid : a.container_id) - Number(kind === "vm" ? b.vmid : b.container_id)).forEach((item) => { const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id); let refs = this._items[kind].get(id); const isNew = !refs; if (!refs) refs = this._item(kind, id); seen.add(id); refs.strong.textContent = `${prefix} ${id} · ${item.name}`; refs.pill.textContent = item.running ? labels.running : labels.stopped; refs.article.ariaLabel = `${prefix} ${id} ${item.name}`; this._setBar(refs.bars[0], labels.cpu, item.cpu_percent, 100); this._setBar(refs.bars[1], labels.memory, item.memory_used_bytes, item.memory_total_bytes, item.memory_available_bytes, labels.availableMemory); this._setBar(refs.bars[2], labels.storage, item.disk_used_bytes, item.disk_total_bytes, item.free_bytes, labels.freeStorage); const update = item.update === null ? { status: "not_checked" } : (item.update || {}); refs.updateText.textContent = updateText(update, labels); refs.updateText.hidden = !refs.updateText.textContent; refs.button.textContent = labels.simulate; refs.button.hidden = !(update.dry_run_supported && update.status === "updates_available" && update.fresh === true); const extra = [displayValue(item.os_name), displayValue(item.os_version)].filter(Boolean).join(" "); refs.extra.textContent = extra; refs.extra.hidden = !extra; if (isNew) target.append(refs.article); }); for (const [id, refs] of this._items[kind]) if (!seen.has(id)) { refs.article.remove(); this._items[kind].delete(id); } }
   render() {
@@ -110,6 +109,59 @@ export class SmartHomelabMaintenanceCardEditor extends HTMLElement {
     }
   }
 }
+const DRY_RUN_TIMEOUT_MS = 12000;
+function dryRunData(response) {
+  const payload = response?.response ?? response;
+  return payload?.data && typeof payload.data === "object" ? payload.data : payload;
+}
+function dryRunSummary(response, german = true) {
+  const data = dryRunData(response);
+  if (!data || typeof data !== "object") throw new Error("Die Serviceantwort ist leer oder ungültig.");
+  const packages = Array.isArray(data.packages) ? data.packages : [];
+  const warnings = [
+    ...(Array.isArray(data.held_packages) ? data.held_packages.map((name) => `zurückgehalten: ${name}`) : []),
+    ...(Array.isArray(data.conflicts) ? data.conflicts.map((item) => `Konflikt: ${item}`) : []),
+    ...(Array.isArray(data.removals) ? data.removals.map((name) => `Entfernung: ${name}`) : []),
+  ];
+  const packageText = packages.length ? packages.map((item) => `${item.name || "?"} ${item.installed_version || "?"} → ${item.available_version || "?"}`).join(", ") : (german ? "keine Paketänderungen" : "no package changes");
+  const safety = data.safe === true ? (german ? "Sicherheitsprüfung: bestanden" : "Safety assessment: passed") : (german ? "Sicherheitsprüfung: Warnung" : "Safety assessment: warning");
+  const status = data.success === false ? `${german ? "Simulation fehlgeschlagen" : "Simulation failed"}: ${data.error || (german ? "unbekannter Fehler" : "unknown error")}` : `${german ? "Simulation erfolgreich" : "Simulation successful"} · ${packages.length} ${german ? "Paketänderung(en)" : "package change(s)"}`;
+  return `${status}. ${safety}. ${german ? "Pakete" : "Packages"}: ${packageText}.${warnings.length ? ` ${german ? "Warnungen" : "Warnings"}: ${warnings.join("; ")}.` : ""}`;
+}
+SmartHomelabMaintenanceCard.prototype._dryRunButton = function (target) {
+  const button = document.createElement("button");
+  button.className = "simulate";
+  button.type = "button";
+  button.hidden = true;
+  button.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const result = document.createElement("div");
+    result.className = "muted simulation-result";
+    result.setAttribute("role", "status");
+    result.textContent = "Simulation läuft …";
+    button.after(result);
+    button.disabled = true;
+    let timer;
+    try {
+      const call = this._hass?.callService?.("smart_homelab_maintenance", "dry_run", { target, confirm: true }, undefined, true, true);
+      if (!call || typeof call.then !== "function") throw new Error("Home Assistant hat keine Serviceantwort geliefert.");
+      const response = await Promise.race([
+        call,
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Zeitüberschreitung bei der Simulation.")), Number(globalThis.__SMART_HOMELAB_DRY_RUN_TIMEOUT_MS__) || DRY_RUN_TIMEOUT_MS); }),
+      ]);
+      result.textContent = dryRunSummary(response, resolveLanguage(this._hass) === "de");
+      result.classList.toggle("warning", Boolean(dryRunData(response)?.success === false || dryRunData(response)?.safe === false));
+    } catch (error) {
+      result.textContent = `Simulation fehlgeschlagen: ${error?.message || "unbekannter Servicefehler"}`;
+      result.classList.add("warning");
+    } finally {
+      clearTimeout(timer);
+      button.disabled = false;
+    }
+  });
+  return button;
+};
 if (!customElements.get("smart-homelab-maintenance-card")) customElements.define("smart-homelab-maintenance-card", SmartHomelabMaintenanceCard);
 if (!customElements.get("smart-homelab-maintenance-card-editor")) customElements.define("smart-homelab-maintenance-card-editor", SmartHomelabMaintenanceCardEditor);
 if (typeof window !== "undefined") { window.customCards = window.customCards || []; if (!window.customCards.some((entry) => entry.type === "smart-homelab-maintenance-card")) window.customCards.push({ type: "smart-homelab-maintenance-card", name: "Smart Homelab Maintenance", description: "Read-only Proxmox host, VM and LXC overview" }); }
