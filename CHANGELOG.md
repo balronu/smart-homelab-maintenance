@@ -347,7 +347,7 @@ system was changed by this release.
   Debian/Ubuntu APT guest targets without changing production configuration.
 - Displays update counts, security updates, check time, and errors clearly.
 - Real update execution and automatic package-index refresh remain disabled.
-## Unreleased – Beta.20 Updateverwaltung
+## 0.1.0-beta.20 – Updateverwaltung ohne Ausführung
 
 ### Deutsch
 
