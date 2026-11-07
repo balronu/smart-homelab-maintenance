@@ -174,10 +174,19 @@ class AgentHttpTransport:
     async def dry_run(self, target: str) -> dict[str, Any]:
         if not isinstance(target, str) or not re.fullmatch(r"(?:host|container:[1-9][0-9]{0,5})", target):
             raise TransportError("invalid_target", "update target is not allowed")
-        return await asyncio.wait_for(
-            asyncio.to_thread(self._post_json_sync, f"/api/v1/updates/{target}/dry-run", {"confirm": True}),
-            self.config.timeout_seconds,
-        )
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._post_json_sync, f"/api/v1/updates/{target}/dry-run", {"confirm": True}),
+                self.config.timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            raise TransportError("timeout", "agent request timed out") from exc
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, ssl.SSLError):
+                raise TransportError("tls_error", "agent TLS verification failed") from exc
+            raise TransportError("connection", "agent connection failed") from exc
+        except (ConnectionError, OSError) as exc:
+            raise TransportError("connection", "agent connection failed") from exc
 
     def _post_json_sync(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = urllib.request.Request(
@@ -205,39 +214,6 @@ class AgentHttpTransport:
             raise TransportError(str(error.get("code", "agent_error")), "agent request failed")
         return result
 
-    async def updates(self) -> dict[str, Any]:
-        return await self.get("/api/v1/updates")
-
-    async def dry_run(self, target: str) -> dict[str, Any]:
-        if not isinstance(target, str) or (target != "host" and not target.startswith("container:")):
-            raise TransportError("invalid_target", "update target is not allowed")
-        return await asyncio.wait_for(asyncio.to_thread(self._post_json_sync, f"/api/v1/updates/{target}/dry-run", {"confirm": True}), self.config.timeout_seconds)
-
-    def _post_json_sync(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        request = urllib.request.Request(
-            self.config.base_url.rstrip("/") + path,
-            data=json.dumps(payload, separators=(",", ":")).encode(),
-            headers={"Authorization": "Bearer " + self.config.token, "Accept": "application/json", "Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=self.config.timeout_seconds, context=self._ssl_context()) as response:
-                raw = response.read(self.config.max_response_bytes + 1)
-        except urllib.error.HTTPError as exc:
-            code = "authentication" if exc.code in {401, 403} else "http_error"
-            raise TransportError(code, "agent returned an HTTP error") from exc
-        if len(raw) > self.config.max_response_bytes:
-            raise TransportError("response_too_large", "agent response exceeds limit")
-        try:
-            result = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise TransportError("invalid_json", "agent returned invalid JSON") from exc
-        if not isinstance(result, dict) or result.get("schema_version") != self.config.api_version:
-            raise TransportError("api_version", "unsupported agent API version")
-        if "error" in result:
-            error = result["error"]
-            raise TransportError(str(error.get("code", "agent_error")), "agent request failed")
-        return result
 
     async def capabilities(self) -> dict[str, Any]:
         return await self.get("/api/v1/capabilities")

@@ -27,6 +27,27 @@ except ImportError:  # pragma: no cover - exercised by the offline environment
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN) if cv else None
 
 
+def _find_coordinator(hass: HomeAssistant, entry_id: str | None):
+    """Return only a registered coordinator, never domain metadata.
+
+    ``hass.data[DOMAIN]`` also contains setup metadata such as the boolean
+    ``card_registered`` flag.  Selecting the first non-action value therefore
+    allowed a service call without ``entry_id`` to treat that flag as a
+    coordinator and fail before the transport was called.
+    """
+
+    domain_data = hass.data.get(DOMAIN, {})
+    if entry_id:
+        candidate = domain_data.get(entry_id)
+        return candidate if callable(getattr(candidate, "async_request_refresh", None)) and hasattr(candidate, "transport") else None
+    for key, candidate in domain_data.items():
+        if key == "actions":
+            continue
+        if callable(getattr(candidate, "async_request_refresh", None)) and hasattr(candidate, "transport"):
+            return candidate
+    return None
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Register the domain without starting any update execution."""
     hass.data.setdefault(DOMAIN, {})
@@ -44,9 +65,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     if vol is not None:
         async def handle_action(call):
             entry_id = call.data.get("entry_id")
-            coordinator = hass.data[DOMAIN].get(entry_id) if entry_id else next(
-                (value for key, value in hass.data[DOMAIN].items() if key != "actions"), None
-            )
+            coordinator = _find_coordinator(hass, entry_id)
             if coordinator is None:
                 return {"error": "not_configured"}
             from .actions import async_action

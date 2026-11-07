@@ -71,6 +71,8 @@ def patched_transport(monkeypatch):
     async def fake_capabilities(self): return capabilities
     async def fake_updates(self): return updates
     async def fake_health(self): return health
+    async def fake_dry_run(self, target):
+        return {"schema_version": "1", "data": {"target": target, "status": "simulated", "packages": []}}
 
     monkeypatch.setattr(AgentHttpTransport, "host", fake_host)
     monkeypatch.setattr(AgentHttpTransport, "virtual_machines", fake_virtual_machines)
@@ -79,6 +81,7 @@ def patched_transport(monkeypatch):
     monkeypatch.setattr(AgentHttpTransport, "capabilities", fake_capabilities)
     monkeypatch.setattr(AgentHttpTransport, "updates", fake_updates)
     monkeypatch.setattr(AgentHttpTransport, "health", fake_health)
+    monkeypatch.setattr(AgentHttpTransport, "dry_run", fake_dry_run)
 
 
 async def _create_entry(hass: HomeAssistant, token="fixture-token"):
@@ -177,3 +180,24 @@ async def test_actions_return_read_only_data_and_diagnostics_are_secret_free(has
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
     assert diagnostics["execution_enabled"] is False
     assert "fixture-token" not in str(diagnostics)
+
+
+async def test_dry_run_without_entry_id_ignores_setup_metadata_and_returns_response(hass, patched_transport):
+    from custom_components import smart_homelab_maintenance as integration
+
+    assert await integration.async_setup(hass, {})
+    result = await _create_entry(hass)
+    assert result["type"] == "create_entry"
+    await hass.async_block_till_done()
+
+    # Regression guard: setup metadata contains booleans before the entry.
+    assert hass.data[DOMAIN]["card_registered"] is True
+    response = await hass.services.async_call(
+        DOMAIN,
+        "dry_run",
+        {"target": "host", "confirm": True},
+        blocking=True,
+        return_response=True,
+    )
+    assert response["data"]["target"] == "host"
+    assert response["data"]["status"] == "simulated"
