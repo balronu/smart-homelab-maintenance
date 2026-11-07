@@ -5,23 +5,28 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Beta.15-Kandidat: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
+Beta.16-Prerelease: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
 aufklappbaren Host-/VM-/LXC-Details und einem Größenänderungssignal für das
 Home-Assistant-Sections-Layout. Eine echte iOS-Home-Assistant-Praxisprüfung
 bleibt vor Veröffentlichung erforderlich; der Scrollfehler ist nicht als
 behoben bestätigt.
-Letzter veröffentlichter Release: [v0.1.0-beta.13](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.13).
+Letzter veröffentlichter Release: [v0.1.0-beta.16](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.16).
 Der abschließende Praxistest in der Home-Assistant-iOS-App steht noch aus.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
 konfiguriert und geprüft werden.
 
-Beta.15 ergänzt passive Paketprüfungen für nachweislich unterstützte
+Beta.16 enthält passive Paketprüfungen für nachweislich unterstützte
 Debian-/Ubuntu-Ziele und einen ausdrücklich bestätigten `apt-get --simulate`
 Dry Run. Paketlisten werden nicht aktualisiert, Pakete werden nicht installiert
 und Systeme werden nicht neu gestartet. Eine spätere Ausführung bleibt
 serverseitig gesperrt und benötigt eine eigene, separat freizugebende Phase;
 ein deaktivierter UI-Button allein wäre keine Sicherheitsgrenze.
+
+Beta.16 isoliert Fehler der optionalen Update-Abfrage vom Kerninventar. Wenn
+der Update-Endpunkt ausfällt, bleiben Host, VMs und LXCs sichtbar und der
+Updatezustand wird als unbekannt gemeldet. Intervall-Refreshes werden über den
+thread-sicheren Home-Assistant-Scheduler eingeplant.
 
 ## Bestandteile
 
