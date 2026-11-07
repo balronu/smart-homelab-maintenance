@@ -292,3 +292,25 @@
   Karteninstanzen sowie iPhone-, iPad- und Desktop-Browser-Matrix.
 - Keine automatische Installation, kein HA-Neustart und keine Änderungen an
   Proxmox oder Agent.
+## 0.1.0-beta.19 – passive update status clarity (candidate)
+
+### Deutsch
+
+- Unterscheidet `unsupported`, `unauthorized`, `not_checked`, `error`,
+  `stale`, `current` und `updates_available` im API-Vertrag und in der Karte.
+- Ergänzt eine eng begrenzte, optionale Allowlist für ausdrücklich autorisierte
+  Debian-/Ubuntu-APT-Gastziele; sie verändert keine produktive Konfiguration.
+- Zeigt Updateanzahl, Sicherheitsupdates, Prüfzeitpunkt und Fehler verständlich
+  an. Ungeprüfte oder nicht unterstützte Ziele werden nicht als aktuell bewertet.
+- Beta.19 enthält weiterhin keine echte Updateausführung und keine automatische
+  Paketlistenaktualisierung.
+
+### English
+
+- Preserves explicit update states in the API and Lovelace card instead of
+  collapsing unsupported, unauthorized, not-checked, error, and stale results
+  into one generic label.
+- Adds a tightly allowlisted opt-in format for explicitly authorized
+  Debian/Ubuntu APT guest targets without changing production configuration.
+- Displays update counts, security updates, check time, and errors clearly.
+- Real update execution and automatic package-index refresh remain disabled.

@@ -21,7 +21,7 @@ from .errors import ValidationError
 from .types import utc_now
 
 _VMID = re.compile(r"^[1-9][0-9]{0,5}$")
-_TARGET = re.compile(r"^(host|container:[1-9][0-9]{0,5})$")
+_TARGET = re.compile(r"^(host|container:[1-9][0-9]{0,5}|vm:[1-9][0-9]{0,5})$")
 _INST = re.compile(r"^Inst\s+(\S+)(?:\s+\[([^]]*)\])?\s+\(([^ )]+)")
 _REMV = re.compile(r"^Remv\s+(\S+)")
 
@@ -63,7 +63,9 @@ class UpdateResult:
         result["held_packages"] = list(self.held_packages)
         result["conflicts"] = list(self.conflicts)
         result["removals"] = list(self.removals)
-        result["fresh"] = bool(self.checked_at and self.status not in {"unknown", "error", "unsupported"})
+        result["fresh"] = self.is_fresh()
+        if self.status in {"current", "updates_available"} and not result["fresh"]:
+            result["status"] = "stale"
         return result
 
     def is_fresh(self, now: float | None = None) -> bool:
@@ -108,6 +110,8 @@ class ProbeTarget:
     os_name: str = "unknown"
     os_version: str = "unknown"
     package_manager: str | None = None
+    authorized: bool = True
+    checkable: bool = True
 
 
 class AptCommandRunner:
@@ -191,6 +195,10 @@ class UpdateService:
         return {target.target: target for target in self._targets()}
 
     def _check_uncached(self, target: ProbeTarget) -> UpdateResult:
+        if not target.checkable:
+            return UpdateResult(target.target, target.name, True, False, target.os_name, target.os_version, target.package_manager, "not_checked", None, None, error="authorized guest package access is unavailable")
+        if not target.authorized:
+            return UpdateResult(target.target, target.name, False, False, target.os_name, target.os_version, target.package_manager, "unauthorized", None, None, error="update target is not authorized")
         if target.package_manager != "apt" or target.os_name.lower() not in {"debian", "ubuntu"}:
             return UpdateResult(target.target, target.name, False, False, target.os_name, target.os_version, target.package_manager, "unsupported", None, None, error="supported Debian/Ubuntu apt target not proven")
         try:
@@ -234,11 +242,36 @@ class UpdateService:
         return DryRunResult(target_id, True, True, safe, latest.plan_digest, latest.packages, latest.held_packages, latest.conflicts, latest.removals, utc_now(), None if safe else "plan contains warnings").as_dict()
 
 
-def make_targets(host: Mapping[str, Any], containers: Sequence[Mapping[str, Any]]) -> list[ProbeTarget]:
+def make_targets(host: Mapping[str, Any], containers: Sequence[Mapping[str, Any]], target_overrides: Mapping[str, Mapping[str, Any]] | None = None, virtual_machines: Sequence[Mapping[str, Any]] = ()) -> list[ProbeTarget]:
     # A Proxmox node is Debian-based, but the probe remains read-only and will
     # still report an explicit error if apt is not installed or permitted.
-    targets = [ProbeTarget("host", str(host.get("name", "Proxmox host")), None, str(host.get("os_name", "Debian")), str(host.get("os_version", "unknown")), host.get("package_manager") or "apt")]
+    overrides = target_overrides or {}
+    host_override = overrides.get("host", {})
+    targets = [ProbeTarget(
+        "host", str(host.get("name", "Proxmox host")), None,
+        str(host_override.get("os_name", host.get("os_name", "Debian"))),
+        str(host_override.get("os_version", host.get("os_version", "unknown"))),
+        host_override.get("package_manager", host.get("package_manager")) or "apt",
+        bool(host_override.get("authorized", True)),
+    )]
     for item in containers:
         cid = int(item["container_id"])
-        targets.append(ProbeTarget(f"container:{cid}", str(item.get("name", cid)), cid, str(item.get("os_name", "unknown")), str(item.get("os_version", "unknown")), item.get("package_manager")))
+        target_id = f"container:{cid}"
+        override = overrides.get(target_id, {})
+        targets.append(ProbeTarget(
+            target_id, str(item.get("name", cid)), cid,
+            str(override.get("os_name", item.get("os_name", "unknown"))),
+            str(override.get("os_version", item.get("os_version", "unknown"))),
+            override.get("package_manager", item.get("package_manager")),
+            bool(override.get("authorized", True)),
+        ))
+    for item in virtual_machines:
+        vmid = int(item["vmid"])
+        target_id = f"vm:{vmid}"
+        override = overrides.get(target_id, {})
+        targets.append(ProbeTarget(
+            target_id, str(item.get("name", vmid)), vmid,
+            str(override.get("os_name", "unknown")), str(override.get("os_version", "unknown")),
+            override.get("package_manager"), bool(override.get("authorized", True)), False,
+        ))
     return targets

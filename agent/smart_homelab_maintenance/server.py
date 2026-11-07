@@ -14,8 +14,9 @@ import ssl
 import ipaddress
 import argparse
 import json
+import re
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
@@ -62,6 +63,7 @@ class AgentRuntimeConfig:
     state_directory: str
     proxmox: ProxmoxClientConfig
     max_response_bytes: int = 256_000
+    update_targets: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
@@ -91,7 +93,24 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
     max_bytes = int(raw.get("max_response_bytes", 256_000))
     if max_bytes < 1024:
         raise ValueError("max_response_bytes is too small")
-    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes)
+    raw_targets = raw.get("update_targets", {})
+    if not isinstance(raw_targets, dict):
+        raise ValueError("update_targets must be a TOML table")
+    update_targets: dict[str, dict[str, Any]] = {}
+    for target, values in raw_targets.items():
+        if not isinstance(target, str) or not isinstance(values, dict):
+            raise ValueError("update_targets entries are invalid")
+        if not re.fullmatch(r"(?:host|container:[1-9][0-9]{0,5}|vm:[1-9][0-9]{0,5})", target):
+            raise ValueError("update target is not allowed")
+        allowed = {"authorized", "os_name", "os_version", "package_manager"}
+        if set(values) - allowed:
+            raise ValueError("update target contains unsupported fields")
+        if "authorized" in values and not isinstance(values["authorized"], bool):
+            raise ValueError("update target authorization must be boolean")
+        if any(key in values and not isinstance(values[key], str) for key in {"os_name", "os_version", "package_manager"}):
+            raise ValueError("update target metadata must be strings")
+        update_targets[target] = dict(values)
+    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets)
 
 
 def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:
@@ -107,7 +126,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
     repository = JobRepository(str(Path(config.state_directory) / "jobs.sqlite"))
     backend = ProxmoxInventoryBackend(ProxmoxApiClient(proxmox_config))
     discovery = DiscoveryService(backend)
-    updates = UpdateService(lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()]))
+    updates = UpdateService(lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()], config.update_targets, discovery.virtual_machines()))
     application = ApiApplication(discovery, repository, updates=updates,
                                 read_token=agent_token, max_bytes=config.max_response_bytes)
     return application, repository
