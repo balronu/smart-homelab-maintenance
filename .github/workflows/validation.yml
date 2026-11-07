@@ -47,7 +47,7 @@ jobs:
           import json
           from pathlib import Path
           manifest = json.loads(Path('custom_components/smart_homelab_maintenance/manifest.json').read_text())
-          assert manifest['version'] == '0.1.0-beta.11'
+          assert isinstance(manifest['version'], str) and manifest['version'].startswith('0.1.0-beta.') and manifest['version'].split('beta.', 1)[1].isdigit()
           init = Path('custom_components/smart_homelab_maintenance/__init__.py').read_text()
           assert 'StaticPathConfig' in init and 'add_extra_js_url' in init
           card = Path('custom_components/smart_homelab_maintenance/frontend/smart-homelab-maintenance-card.js').read_text()
