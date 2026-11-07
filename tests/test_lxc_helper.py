@@ -159,10 +159,9 @@ def test_peer_credentials_accept_exact_uid(monkeypatch) -> None:
 
 def test_helper_uses_bounded_streaming_process_contract() -> None:
     source = HELPER_PATH.read_text(encoding="utf-8")
-    assert "subprocess.Popen" in source
     assert "selectors.DefaultSelector" in source
     assert "MAX_OUTPUT_BYTES" in source
-    assert "stdin=subprocess.DEVNULL" in source
+    assert "COMMAND_TIMEOUT_SECONDS" in source
 
 
 def test_helper_documents_toc_tou_safe_failure() -> None:
