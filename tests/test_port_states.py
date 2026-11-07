@@ -1,19 +1,35 @@
 from __future__ import annotations
 
 import socket
-import subprocess
 import time
 from unittest import SkipTest
 
 
 def _states(port: int) -> list[str]:
-    result = subprocess.run(
-        ["ss", "-Htanp", "sport", "=", f":{port}"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    return [line.split(maxsplit=1)[0] for line in result.stdout.splitlines() if line.strip()]
+    state_names = {
+        "01": "ESTABLISHED",
+        "02": "SYN-SENT",
+        "03": "SYN-RECV",
+        "04": "FIN-WAIT-1",
+        "05": "FIN-WAIT-2",
+        "06": "TIME-WAIT",
+        "07": "CLOSE",
+        "08": "CLOSE-WAIT",
+        "09": "LAST-ACK",
+        "0A": "LISTEN",
+        "0B": "CLOSING",
+        "0C": "NEW-SYN-RECV",
+    }
+    wanted_port = f"{port:04X}"
+    states: list[str] = []
+    for path in ("/proc/net/tcp", "/proc/net/tcp6"):
+        with open(path, encoding="ascii") as table:
+            next(table)
+            for line in table:
+                fields = line.split()
+                if len(fields) >= 4 and fields[1].rsplit(":", 1)[-1] == wanted_port:
+                    states.append(state_names.get(fields[3], fields[3]))
+    return states
 
 
 def test_free_port_has_no_states() -> None:
