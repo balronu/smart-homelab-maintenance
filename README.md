@@ -3,7 +3,7 @@
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
-## Beta.20-Kandidat: vollständige Updateverwaltung ohne Ausführung
+## Beta.20: vollständige Updateverwaltung ohne Ausführung
 
 Dieser Entwicklungsstand trennt die passive APT-Cache-Auswertung vom bewusst
 angeforderten Dry Run. Nur ausdrücklich allowlistete, laufende Debian-/Ubuntu-
@@ -13,9 +13,9 @@ ist sichtbar, dauerhaft deaktiviert und besitzt keinen Serviceaufruf. Echte
 Updateausführung bleibt auch bei manipulierten Frontend-Anfragen serverseitig
 gesperrt.
 
-Der zweisprachige Release-Notes-Entwurf liegt unter
+Die zweisprachigen Release Notes liegen unter
 [`docs/releases/v0.1.0-beta.20.md`](docs/releases/v0.1.0-beta.20.md). Beta.20
-ist noch nicht veröffentlicht.
+ist als Prerelease veröffentlicht; der Agent wird weiterhin separat aktualisiert.
 
 ## Beta.19: Dry Runs und passive Update-Erkennung
 
@@ -27,12 +27,12 @@ außerdem die eindeutigen Zustände aktuell, Updates verfügbar, noch nicht
 geprüft, nicht unterstützt, nicht autorisiert, fehlgeschlagen, veraltet und
 unbekannt. Echte Updates bleiben deaktiviert.
 
-Der separate Agent-Updater wird in diesem Entwicklungsstand gegen einen
+Der separate Agent-Updater ist gegen einen
 Restart-/Readiness-Race gehärtet: Der TLS-Healthcheck wird innerhalb eines
 begrenzten Zeitfensters wiederholt, ein Fehler führt über einen EXIT-sicheren
 Rollbackpfad zurück zum vorherigen Agent-Code, und Rollback-Staging wird nicht
-automatisch gelöscht. Diese Korrektur ist zunächst ein PR-Kandidat und noch
-kein neuer Release.
+automatisch gelöscht. Diese Korrektur ist in Beta.20 enthalten; der produktive
+Agent muss separat auf eine kompatible Agent-Version aktualisiert werden.
 
 ## Beta.18: gemeinsamer Versions- und Updatevertrag
 
