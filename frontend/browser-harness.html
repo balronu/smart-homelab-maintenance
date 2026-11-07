@@ -20,9 +20,9 @@ card.hass = { locale: "en", states: {
   "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
   "sensor.smart_homelab_maintenance_last_error": { state: "none", attributes: {} },
   "sensor.smart_homelab_maintenance_running_jobs": { state: "0", attributes: {} },
-  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { cpu_percent: 24.3, memory_used_bytes: 13751140352, memory_total_bytes: 16632160256, storage_used_bytes: 40958152704, storage_total_bytes: 72722055168, release: "pve-manager/9.2.26" } },
+  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { cpu_percent: 24.3, memory_used_bytes: 13751140352, memory_total_bytes: 16632160256, memory_available_bytes: 2881019904, storage_used_bytes: 40958152704, storage_total_bytes: 72722055168, storage_available_bytes: 31763902464, release: "pve-manager/9.2.26" } },
   "sensor.smart_homelab_maintenance_haos": { state: "running", attributes: { vmid: 104, name: "haos" } },
-  "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", memory_available_bytes: 100, free_bytes: 200, os_name: "Debian", os_version: "12" } }
+  "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", memory_used_bytes: 900, memory_total_bytes: 1000, memory_available_bytes: 100, disk_used_bytes: 800, disk_total_bytes: 1000, free_bytes: 200, os_name: "Debian", os_version: "12" } }
 } };
 let dryRunCall = null;
 card.hass = { locale: "en", callService: (...args) => { dryRunCall = args; }, states: {
@@ -59,9 +59,9 @@ card.hass = { locale: "en", states: {
   "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
   "sensor.smart_homelab_maintenance_last_error": { state: "none", attributes: {} },
   "sensor.smart_homelab_maintenance_running_jobs": { state: "0", attributes: {} },
-  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { cpu_percent: 24.3, memory_used_bytes: 13751140352, memory_total_bytes: 16632160256, storage_used_bytes: 40958152704, storage_total_bytes: 72722055168, release: "pve-manager/9.2.26" } },
+  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { cpu_percent: 24.3, memory_used_bytes: 13751140352, memory_total_bytes: 16632160256, memory_available_bytes: 2881019904, storage_used_bytes: 40958152704, storage_total_bytes: 72722055168, storage_available_bytes: 31763902464, release: "pve-manager/9.2.26" } },
   "sensor.smart_homelab_maintenance_haos": { state: "running", attributes: { vmid: 104, name: "haos" } },
-  "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", memory_available_bytes: 100, free_bytes: 200, os_name: "Debian", os_version: "12" } }
+  "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", memory_used_bytes: 900, memory_total_bytes: 1000, memory_available_bytes: 100, disk_used_bytes: 800, disk_total_bytes: 1000, free_bytes: 200, os_name: "Debian", os_version: "12" } }
 } };
 const savedConfig = { ...editor.config };
 editor.setConfig(savedConfig);
