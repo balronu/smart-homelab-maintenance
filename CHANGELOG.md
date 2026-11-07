@@ -347,3 +347,29 @@ system was changed by this release.
   Debian/Ubuntu APT guest targets without changing production configuration.
 - Displays update counts, security updates, check time, and errors clearly.
 - Real update execution and automatic package-index refresh remain disabled.
+## Unreleased – Beta.20 Updateverwaltung
+
+### Deutsch
+
+- Passive Update-Erkennung liest ausschließlich vorhandene APT-Cache-Daten;
+  der ausdrücklich angeforderte Dry Run bleibt ein getrennt validierter Pfad.
+- LXC-Ziele sind standardmäßig nicht autorisiert; nur eine explizite Allowlist
+  kann ein laufendes Debian-/Ubuntu-Ziel freigeben. Gestoppte Container werden
+  nicht gestartet oder angesprochen.
+- Paketname sowie installierte und verfügbare Versionen werden angezeigt;
+  Sicherheitsklassifizierungen bleiben unbekannt, wenn die Datenquelle sie
+  nicht belastbar liefert.
+- Der sichtbare Button „Updates installieren“ ist dauerhaft deaktiviert und
+  serverseitig nicht implementiert.
+
+### English
+
+- Passive update detection reads existing APT cache data only; the explicitly
+  requested dry run remains a separate, validated path.
+- LXC targets are unauthorized by default; only an explicit allowlist can
+  authorize a running Debian/Ubuntu target. Stopped containers are never
+  started or probed.
+- Package names and installed/available versions are exposed; security
+  classification remains unknown when the source cannot prove it.
+- The visible “Install updates” button is permanently disabled and has no
+  server-side execution route.

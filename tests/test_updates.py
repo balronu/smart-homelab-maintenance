@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from agent.smart_homelab_maintenance.api import ApiApplication
 from agent.smart_homelab_maintenance.discovery import DiscoveryService, FixtureProxmoxBackend, phase1_fixture
 from agent.smart_homelab_maintenance.jobs import JobRepository
-from agent.smart_homelab_maintenance.updates import AptCommandRunner, ProbeTarget, UpdateService, _parse_apt, make_targets
+from agent.smart_homelab_maintenance.updates import AptCommandRunner, AptUpdateReader, ProbeTarget, UpdateService, _parse_apt, _parse_apt_upgradable, make_targets
 
 
 def target(os_name="Debian"):
@@ -38,6 +39,49 @@ def test_apt_parser_distinguishes_current_updates_security_and_removal():
     assert packages[0].security is True
     assert removals == ("obsolete",)
     assert held == () and conflicts == ()
+
+
+def test_passive_apt_reader_parses_existing_cache_without_simulation_flags():
+    calls = []
+    class Completed:
+        returncode, stdout, stderr = 0, "Listing...\nopenssl/stable-security 3.0.2 [upgradable from: 3.0.1]\ncurl/stable 8.0 [upgradable from: 7.0]\n", ""
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return Completed()
+    with patch("shutil.which", return_value="/usr/bin/apt"):
+        reader = AptUpdateReader(run=run)
+        code, stdout, stderr = reader.list_upgradable()
+    packages = _parse_apt_upgradable(stdout, stderr)
+    assert code == 0 and [item.name for item in packages] == ["openssl", "curl"]
+    assert calls[0][0] == ["apt", "list", "--upgradable"]
+    assert "simulate" not in calls[0][0] and "update" not in calls[0][0]
+
+
+def test_update_service_keeps_passive_reader_separate_from_button_simulation():
+    class Reader:
+        def list_upgradable(self, vmid=None):
+            return 0, "Listing...\ncurl/stable 2 [upgradable from: 1]\n", ""
+    class Simulation(Runner):
+        def simulate(self, vmid=None):
+            self.calls.append(vmid)
+            return 0, "Inst curl [1] (2)", ""
+    runner = Simulation()
+    checked = UpdateService(lambda: (target(),), reader=Reader(), runner=runner)
+    assert checked.check("container:107").available_count == 1
+    assert runner.calls == []
+    result = checked.dry_run("container:107", confirmed=True)
+    assert result["success"] is True and runner.calls == [107]
+
+
+def test_default_allowlist_does_not_authorize_guest_targets_or_start_stopped_lxc():
+    targets = make_targets(
+        {"name": "pve"},
+        [{"container_id": 107, "name": "running", "running": True, "os_name": "Debian", "os_version": "12", "package_manager": "apt"},
+         {"container_id": 112, "name": "stopped", "running": False, "os_name": "Debian", "os_version": "12", "package_manager": "apt"}],
+    )
+    results = {item.target: item for item in targets}
+    assert results["container:107"].authorized is False
+    assert results["container:112"].checkable is False
 
 
 def test_update_check_reports_current_and_unsupported_without_faking_values():
