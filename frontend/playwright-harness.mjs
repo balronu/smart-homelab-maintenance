@@ -4,6 +4,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
+const BROWSER_TIMEOUT = 15000;
+const NAVIGATION_TIMEOUT = 15000;
+const ACTION_TIMEOUT = 10000;
+const TEST_TIMEOUT = 150000;
 const cardSource = fs.readFileSync(path.join(root, "frontend/smart-homelab-maintenance-card.js"), "utf8");
 if (/\b(?:scrollIntoView|scrollTo)\s*\(/.test(cardSource)) throw new Error("production card must not programmatically scroll");
 const server = http.createServer((request, response) => {
@@ -18,8 +22,20 @@ const server = http.createServer((request, response) => {
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const port = server.address().port;
 
-const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium" });
+let browser;
+let timedOut = false;
+const watchdog = setTimeout(() => {
+  timedOut = true;
+  console.error(`browser matrix timeout after ${TEST_TIMEOUT}ms`);
+  process.exitCode = 124;
+  void (async () => {
+    await browser?.close().catch(() => {});
+    await new Promise((resolve) => server.close(resolve));
+    process.exit(124);
+  })();
+}, TEST_TIMEOUT);
 try {
+  browser = await chromium.launch({ headless: true, timeout: BROWSER_TIMEOUT, executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium" });
   const contexts = [
     { name: "iphone-dark", options: { ...devices["iPhone 13"], colorScheme: "dark" } },
     { name: "ipad-light", options: { ...devices["iPad (gen 7)"], colorScheme: "light" } },
@@ -28,11 +44,13 @@ try {
   for (const { name, options } of contexts) {
     const context = await browser.newContext(options);
     const page = await context.newPage();
+    page.setDefaultTimeout(ACTION_TIMEOUT);
+    page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT);
     const browserErrors = [];
     const failedRequests = [];
     page.on("pageerror", (error) => browserErrors.push(error.message));
     page.on("requestfailed", (request) => failedRequests.push(`${request.url()}: ${request.failure()?.errorText || "failed"}`));
-    await page.goto(`http://127.0.0.1:${port}/frontend/browser-harness.html`);
+    await page.goto(`http://127.0.0.1:${port}/frontend/browser-harness.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
     const sectionsSizing = await page.evaluate(() => {
       const card = document.createElement("smart-homelab-maintenance-card");
       return typeof card.getGridOptions === "function" ? card.getGridOptions() : null;
@@ -41,22 +59,22 @@ try {
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
     const result = JSON.parse(await page.locator("#result").textContent());
     if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.hasAvailableResources || !result.cardHasSize || !result.dryRunUi || !result.localizedEditor || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.reopenedEditorSafe || !result.emptyCardSafe || !result.initialCardSafe || !result.unknownSafe || !result.unknownContainerSafe || !result.hostDetailsPreservedAfterUpdates || !result.languageEnglish || !result.languageGerman || !result.localeObjectSafe || !result.missingLanguageFallback || !result.hostOfflineWithoutAgentContradiction || !result.statusStatesSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasTextOverlap || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
-    await page.screenshot({ path: `/tmp/card-${name}.png`, fullPage: true });
-    await page.goto(`http://127.0.0.1:${port}/frontend/ha-editor-harness.html`);
+    await page.screenshot({ path: `/tmp/card-${name}.png`, fullPage: true, timeout: ACTION_TIMEOUT });
+    await page.goto(`http://127.0.0.1:${port}/frontend/ha-editor-harness.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("pickerRegistered"), null, { timeout: 10000 });
     const haResult = JSON.parse(await page.locator("#result").textContent());
     if (!haResult.pickerRegistered || !haResult.editorVisible || !haResult.previewVisible || !haResult.savedAndReopened || !haResult.noHorizontalOverflow) throw new Error(`${name} HA editor harness failed: ${JSON.stringify(haResult)}`);
-    await page.screenshot({ path: `/tmp/card-${name}-ha-editor.png`, fullPage: true });
-    await page.goto(`http://127.0.0.1:${port}/frontend/scroll-harness.html`);
+    await page.screenshot({ path: `/tmp/card-${name}-ha-editor.png`, fullPage: true, timeout: ACTION_TIMEOUT });
+    await page.goto(`http://127.0.0.1:${port}/frontend/scroll-harness.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("cardCount"), null, { timeout: 10000 });
     const scrollResult = JSON.parse(await page.locator("#result").textContent());
     if (!scrollResult.stableScroll || !scrollResult.stableDom || !scrollResult.stableOrder || scrollResult.gridMutations !== 0 || scrollResult.dashboardMutations !== 0 || !scrollResult.focusStable || !scrollResult.hostCardsStable || !scrollResult.independentDetails || !scrollResult.noHorizontalOverflow || scrollResult.cardCount !== 3) throw new Error(`${name} scroll harness failed: ${JSON.stringify(scrollResult)}`);
-    await page.screenshot({ path: `/tmp/card-${name}-scroll.png`, fullPage: true });
+    await page.screenshot({ path: `/tmp/card-${name}-scroll.png`, fullPage: true, timeout: ACTION_TIMEOUT });
     // Reachability test with a long container list. Layouts here are simulated,
     // not Home Assistant's real Sections/Masonry layout implementation.
     for (const count of [0, 1, 10, 20, 50]) for (const layout of ["sections", "masonry"]) {
-      await page.goto(`http://127.0.0.1:${port}/frontend/long-card-scroll-harness.html?count=${count}`);
-      await page.waitForFunction(() => window.__FIXTURE_READY__ === true);
+      await page.goto(`http://127.0.0.1:${port}/frontend/long-card-scroll-harness.html?count=${count}`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
+      await page.waitForFunction(() => window.__FIXTURE_READY__ === true, null, { timeout: ACTION_TIMEOUT });
       const reachability = await page.evaluate((layout) => {
         document.querySelector("#dashboard").className = layout;
         const card = document.querySelector("smart-homelab-maintenance-card");
@@ -76,12 +94,12 @@ try {
           reachability.scrollY < reachability.maxScroll - 2) {
         throw new Error(`${name} ${layout} long-card scroll reachability failed: ${JSON.stringify(reachability)}`);
       }
-      await page.screenshot({ path: `/tmp/card-${name}-long-${layout}.png`, fullPage: true });
+      await page.screenshot({ path: `/tmp/card-${name}-long-${layout}.png`, fullPage: true, timeout: ACTION_TIMEOUT });
     }
     // Negative control: a clipping ancestor must be detected even when the
     // document scrolls to its maximum. This reproduces the symptom, not HA internals.
-    await page.goto(`http://127.0.0.1:${port}/frontend/long-card-scroll-harness.html`);
-    await page.waitForFunction(() => window.__FIXTURE_READY__ === true);
+    await page.goto(`http://127.0.0.1:${port}/frontend/long-card-scroll-harness.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
+    await page.waitForFunction(() => window.__FIXTURE_READY__ === true, null, { timeout: ACTION_TIMEOUT });
     const clipping = await page.evaluate(() => {
       const dashboard = document.querySelector("#dashboard");
       dashboard.style.height = "400px";
@@ -98,7 +116,7 @@ try {
     if (clipping.overflowY !== "hidden" || !clipping.clipped) {
       throw new Error(`${name} clipping negative control failed: ${JSON.stringify(clipping)}`);
     }
-    await page.goto(`http://127.0.0.1:${port}/frontend/sections-scroll-regression.html`);
+    await page.goto(`http://127.0.0.1:${port}/frontend/sections-scroll-regression.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("legacyReproducesClip"), null, { timeout: 10000 });
     const sectionsRegression = JSON.parse(await page.locator("#result").textContent());
     if (!sectionsRegression.legacyReproducesClip || !sectionsRegression.fixedReachable || sectionsRegression.cardCount !== 2 || !sectionsRegression.lastText.includes("112")) {
@@ -108,7 +126,8 @@ try {
     await context.close();
   }
 } finally {
-  await browser.close();
+  clearTimeout(watchdog);
+  await browser?.close();
   await new Promise((resolve) => server.close(resolve));
 }
-console.log("browser matrix passed");
+if (!timedOut) console.log("browser matrix passed");

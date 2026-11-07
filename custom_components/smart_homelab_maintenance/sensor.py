@@ -19,6 +19,7 @@ def coordinator_sensors(data: Any) -> tuple[SensorValue, ...]:
         SensorValue("agent_connection", "Agent-Verbindung", "connected" if data.connected else "offline", {"error": data.error, "update_error": data.update_error}),
         SensorValue("agent_running_jobs", "Laufende Jobs", len([j for j in data.jobs if j.get("state") in {"preflight", "running", "postcheck"}]), {}),
         SensorValue("agent_last_error", "Letzter Fehler", data.error or data.update_error or "none", {}),
+        SensorValue("agent_compatibility", "Agent-Kompatibilität", data.compatibility.status, data.compatibility.as_attributes()),
     )
 
 
@@ -56,6 +57,7 @@ try:
             _ProjectedSensor(coordinator, "agent_connection", "Agent connection", lambda d: "connected" if d.connected else "offline", lambda d: {"error": d.error}),
             _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"preflight", "running", "postcheck"}])),
             _ProjectedSensor(coordinator, "agent_last_error", "Last error", lambda d: d.error or "none"),
+            _ProjectedSensor(coordinator, "agent_compatibility", "Agent compatibility", lambda d: d.compatibility.status, lambda d: d.compatibility.as_attributes()),
             _ProjectedSensor(coordinator, "host", "Host", lambda d: d.host.get("name", "unknown") if d.host else "unknown", lambda d: d.host or {}),
         ]
         for vm in coordinator.data.virtual_machines:

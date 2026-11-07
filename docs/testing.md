@@ -41,3 +41,10 @@ Proxmox-API, Live-Agent, Integrationstests und reale Update-Postchecks.
   kein horizontaler Überlauf erkannt
 - HA-2026.11-Laufzeit, Hassfest, HACS und Browser-Matrix mit mehreren Geräten:
   **BLOCKED/NOT RUN**
+
+Der Playwright-Harness verwendet begrenzte Timeouts: Browserstart und
+Navigation brechen nach 15 Sekunden ab, einzelne Aktionen nach 10 Sekunden
+und die gesamte Matrix nach 150 Sekunden. Ein Suite-Timeout endet mit
+Exit-Code 124 und einer eindeutigen Fehlermeldung. Browser und lokaler
+Fixture-Server werden im `finally`-Pfad geschlossen; es gibt keine
+automatischen Wiederholungen.

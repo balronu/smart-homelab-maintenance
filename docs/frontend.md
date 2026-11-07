@@ -62,3 +62,9 @@ Beta.14 prüft zusätzlich 0, 1, 10, 20 und 50 Container sowie das Erreichen
 des Kartenendes in simulierten Sections-/Masonry-Layouts. Diese Fixtures sind
 kein Beweis für ein echtes iOS-Home-Assistant-Rendering; der Praxistest bleibt
 vor einer Veröffentlichung erforderlich.
+
+Der Browser-Harness verwendet begrenzte Timeouts für Browserstart (15 s),
+Navigation (15 s), Aktionen (10 s) und den gesamten Testlauf (150 s). Bei
+Überschreitung wird Exit-Code 124 mit einer eindeutigen Fehlermeldung geliefert;
+Browser und Fixture-Server werden anschließend geschlossen. Es gibt keine
+unbegrenzten Wiederholungsversuche.

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from .http_transport import AgentHttpTransport, TransportConfig, TransportError
+from .compatibility import Compatibility, evaluate_agent
 
 from .const import CONF_AGENT_URL, CONF_CA_FILE, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL
 
@@ -23,6 +24,7 @@ class CoordinatorData:
     dry_runs: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     error: str | None = None
     update_error: str | None = None
+    compatibility: Compatibility = field(default_factory=lambda: evaluate_agent(None, None))
 
 
 class SmartHomelabCoordinator:
@@ -55,6 +57,17 @@ class SmartHomelabCoordinator:
                     self.transport.jobs(), self.transport.capabilities()
                 )
                 update_error = None
+                compatibility = evaluate_agent(None, None)
+                try:
+                    health_method = getattr(self.transport, "health", None)
+                    if not callable(health_method):
+                        raise TransportError("health_unavailable", "agent healthcheck is unavailable")
+                    health = await health_method()
+                    health_data = health.get("data", {})
+                    compatibility = evaluate_agent(health_data.get("agent_version"), health_data.get("api_contract"))
+                except TransportError as exc:
+                    compatibility = evaluate_agent(None, None)
+                    update_error = exc.code
                 try:
                     updates = await self.transport.updates()
                 except TransportError as exc:
@@ -76,7 +89,7 @@ class SmartHomelabCoordinator:
                 self.data = CoordinatorData(
                     True, host_data, tuple(vm_items), tuple(container_items),
                     tuple(jdata.get("items", [])), capabilities.get("data"), update_items, dry_runs, None,
-                    update_error
+                    update_error, compatibility
                 )
                 self.last_error = None
                 self._failure_count = 0
