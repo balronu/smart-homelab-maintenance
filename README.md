@@ -30,6 +30,16 @@ separaten Freigabegates stehen in
 [`docs/lxc-apt-helper.md`](docs/lxc-apt-helper.md) und
 [`docs/security.md`](docs/security.md).
 
+## Beta.22: sicherer Agent-Preflight
+
+Beta.22 übernimmt den gehärteten Agent-Updater. Eindeutig historische
+Rollback-Staging-Stände bleiben erhalten und blockieren den Preflight nicht,
+während aktive, beschädigte oder mehrdeutige Zustände weiterhin sicher stoppen.
+Der API-Vertrag bleibt 1.1; Root-Helper, Socket und LXC-Allowlist bleiben
+standardmäßig deaktiviert. Beta.22 ist als GitHub-Prerelease veröffentlicht.
+Details stehen in
+[`docs/releases/v0.1.0-beta.22.md`](docs/releases/v0.1.0-beta.22.md).
+
 ## Beta.19: Dry Runs und passive Update-Erkennung
 
 Beta.19 behebt den Lovelace-Aufruf für `smart_homelab_maintenance.dry_run`:
@@ -63,11 +73,13 @@ wieder her. Er verändert weder Proxmox, VMs noch LXCs.
 
 ## Status
 
-Beta.21-Prerelease: Der optionale root-seitige LXC-Helper prüft Peer-UID,
+Beta.22-Prerelease: Der Agent-Updater klassifiziert historisches Rollback-
+Staging sicher und bewahrt es unverändert. Der optionale root-seitige
+LXC-Helper prüft Peer-UID,
 Allowlist, feste Operationen, Laufstatus, Timeout und Ausgabelimit pro Anfrage.
 Der Helper ist nicht installiert oder aktiviert; echte Paketupdates bleiben
 serverseitig gesperrt. Die zweisprachigen Release Notes stehen in
-[`docs/releases/v0.1.0-beta.21.md`](docs/releases/v0.1.0-beta.21.md).
+[`docs/releases/v0.1.0-beta.22.md`](docs/releases/v0.1.0-beta.22.md).
 
 Beta.19-Prerelease: Dry-Run-Serviceantworten und passive Update-Erkennung
 sind veröffentlicht. Der Dry-Run-Button verarbeitet den verpflichtenden
