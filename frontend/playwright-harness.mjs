@@ -77,6 +77,26 @@ try {
       }
       await page.screenshot({ path: `/tmp/card-${name}-long-${layout}.png`, fullPage: true });
     }
+    // Negative control: a clipping ancestor must be detected even when the
+    // document scrolls to its maximum. This reproduces the symptom, not HA internals.
+    await page.goto(`http://127.0.0.1:${port}/frontend/long-card-scroll-harness.html`);
+    await page.waitForFunction(() => window.__FIXTURE_READY__ === true);
+    const clipping = await page.evaluate(() => {
+      const dashboard = document.querySelector("#dashboard");
+      dashboard.style.height = "900px";
+      dashboard.style.overflow = "hidden";
+      const card = document.querySelector("smart-homelab-maintenance-card");
+      const last = [...card.shadowRoot.querySelectorAll(".container-grid .item")].at(-1);
+      const parent = card.parentElement;
+      const style = getComputedStyle(parent);
+      const parentBox = parent.getBoundingClientRect();
+      const lastBox = last.getBoundingClientRect();
+      return { overflowY: style.overflowY, parentBottom: parentBox.bottom,
+        lastBottom: lastBox.bottom, clipped: lastBox.bottom > parentBox.bottom + 2 };
+    });
+    if (clipping.overflowY !== "hidden" || !clipping.clipped) {
+      throw new Error(`${name} clipping negative control failed: ${JSON.stringify(clipping)}`);
+    }
     await page.close();
     await context.close();
   }
