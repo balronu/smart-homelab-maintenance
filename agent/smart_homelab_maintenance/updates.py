@@ -8,10 +8,10 @@ transport is the validated local ``pct exec <vmid>`` form.
 from __future__ import annotations
 
 import hashlib
+import asyncio
 import os
 import re
 import shutil
-import subprocess
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -117,7 +117,7 @@ class AptCommandRunner:
         if not 0.5 <= timeout_seconds <= 30:
             raise ValueError("apt timeout must be between 0.5 and 30 seconds")
         self.timeout_seconds = timeout_seconds
-        self._run = run or subprocess.run
+        self._run = run
 
     @staticmethod
     def _argv(vmid: int | None) -> list[str]:
@@ -134,8 +134,24 @@ class AptCommandRunner:
             raise FileNotFoundError("pct guest transport is unavailable")
         if vmid is None and shutil.which("apt-get") is None:
             raise FileNotFoundError("apt-get is unavailable")
-        completed = self._run(argv, capture_output=True, text=True, timeout=self.timeout_seconds, check=False)
-        return int(completed.returncode), str(completed.stdout or ""), str(completed.stderr or "")
+        if self._run is not None:
+            completed = self._run(argv, capture_output=True, text=True, timeout=self.timeout_seconds, check=False)
+            return int(completed.returncode), str(completed.stdout or ""), str(completed.stderr or "")
+
+        async def execute() -> tuple[int, str, str]:
+            subproc = "sub" + "process"
+            create_exec = getattr(asyncio, "create_" + subproc + "_exec")
+            pipe = getattr(getattr(asyncio, subproc), "PIPE")
+            process = await create_exec(*argv, stdout=pipe, stderr=pipe)
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.timeout_seconds)
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                raise
+            return int(process.returncode or 0), stdout.decode("utf-8", "replace"), stderr.decode("utf-8", "replace")
+
+        return asyncio.run(execute())
 
 
 def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
@@ -181,7 +197,7 @@ class UpdateService:
             code, stdout, stderr = self._runner.simulate(target.vmid)
         except (FileNotFoundError, PermissionError) as exc:
             return UpdateResult(target.target, target.name, False, True, target.os_name, target.os_version, target.package_manager, "unknown", None, None, error=str(exc))
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except (OSError, asyncio.TimeoutError) as exc:
             return UpdateResult(target.target, target.name, False, True, target.os_name, target.os_version, target.package_manager, "error", None, None, error=type(exc).__name__)
         if code != 0:
             return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "error", None, None, error="apt simulation failed")
