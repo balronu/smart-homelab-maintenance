@@ -126,13 +126,26 @@ wait_for_health() {
 wait_for_port_free() {
     local deadline=$((SECONDS + 10))
     while (( SECONDS < deadline )); do
-        if ! ss -Hln "sport = :$AGENT_PORT" | grep -q .; then
+        if ! systemctl is-active --quiet "$SERVICE_NAME" \
+            && ! ss -Htanp "sport = :$AGENT_PORT" | grep -q .; then
             return 0
         fi
         sleep 0.25
     done
-    printf 'ERROR: Port %s bleibt nach dem Dienststopp belegt. Kein Startversuch ausgeführt.\n' "$AGENT_PORT" >&2
+    printf 'ERROR: Dienst oder TCP-Zustand auf Port %s bleibt nach dem Dienststopp bestehen. Kein Startversuch ausgeführt.\n' "$AGENT_PORT" >&2
     return 1
+}
+
+port_forensics() {
+    local phase="$1" control_group main_pid control_pid
+    control_group="$(systemctl show --property=ControlGroup --value "$SERVICE_NAME" 2>/dev/null || true)"
+    main_pid="$(systemctl show --property=MainPID --value "$SERVICE_NAME" 2>/dev/null || true)"
+    control_pid="$(systemctl show --property=ControlPID --value "$SERVICE_NAME" 2>/dev/null || true)"
+    info "Port-Diagnose ($phase): MainPID=$main_pid ControlPID=$control_pid ControlGroup=$control_group"
+    ss -Htanp "sport = :$AGENT_PORT" 2>/dev/null || true
+    if [[ -n "$control_group" && -r "/sys/fs/cgroup$control_group/cgroup.procs" ]]; then
+        info "Cgroup-Prozesse ($phase): $(tr '\n' ' ' < "/sys/fs/cgroup$control_group/cgroup.procs")"
+    fi
 }
 
 version_is_older() {
@@ -239,13 +252,16 @@ expected_agent_version="$(read_agent_version "$source_dir/agent")"
 update_started=1
 trap finish EXIT
 
+port_forensics "vor-stop"
 systemctl stop "$SERVICE_NAME"
+port_forensics "nach-stop"
 if ! wait_for_port_free; then
     # Do not leave the productive service stopped when a stale listener makes
     # the transaction unsafe. No agent tree has been swapped at this point.
     systemctl start "$SERVICE_NAME" || true
     die "Portfreigabe vor dem Agent-Start nicht nachweisbar; Update abgebrochen."
 fi
+port_forensics "vor-swap"
 bash "$SCRIPT_DIR/update-agent.sh" --source-dir "$source_dir" --expected-commit "$expected_commit" --apply --keep-rollback
 for candidate_dir in "$AGENT_ROOT"/agent.previous.*.staging; do
     [[ -d "$candidate_dir" ]] || continue
@@ -256,6 +272,7 @@ for candidate_dir in "$AGENT_ROOT"/agent.previous.*.staging; do
 done
 [[ -n "$rollback_dir" ]] || die "Rollback-Staging wurde nicht erzeugt."
 systemctl start "$SERVICE_NAME"
+port_forensics "nach-start"
 wait_for_health "$expected_agent_version" || exit "$READINESS_FAILURE_EXIT"
 
 trap - EXIT

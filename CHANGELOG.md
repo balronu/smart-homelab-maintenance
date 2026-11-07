@@ -475,6 +475,28 @@ system was changed by this release.
 - `TimeoutStopSec=30` begrenzt den systemd-Stopp; historische und fehlgeschlagene
   Rollback-Stagings bleiben erhalten.
 
+## Nächster Beta-Kandidat – Port-Bind-Forensik
+
+### Deutsch
+
+- Der Updater prüft für Port 48128 neben `LISTEN` auch alle TCP-Zustände und
+  bestätigt, dass die systemd-Unit tatsächlich inaktiv ist, bevor der
+  Quellbaum ausgetauscht wird.
+- Vor und nach Stopp, Swap und Start werden ausschließlich nicht-sensitive
+  MainPID-, ControlPID-, Cgroup- und Socketdaten protokolliert.
+- Die vorhandenen Journale beweisen den wiederholten Bind-Fehler, aber nicht
+  mehr nachträglich die historische Halter-PID. Diese Unsicherheit bleibt
+  ausdrücklich dokumentiert.
+
+### English
+
+- Before swapping the agent tree, the updater checks all TCP states for port
+  48128, not only `LISTEN`, and confirms that the systemd unit is inactive.
+- Non-sensitive MainPID, ControlPID, cgroup, and socket diagnostics are logged
+  around stop, swap, and start.
+- Existing journals prove the repeated bind failure but cannot recover the
+  historical holder PID after the fact; that uncertainty is documented.
+
 ### English
 
 - The external agent now shuts down its HTTPS server explicitly on

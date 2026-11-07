@@ -17,9 +17,12 @@ Bei einem freigegebenen Update gilt:
 1. Quelle, Commit, Dienst, Zielpfad und CA werden geprüft.
 2. Die zuvor installierte Agent-Version wird erfasst.
 3. Nur `smart-homelab-maintenance-agent.service` wird gestoppt.
-4. Nach dem Stopp muss Port 48128 tatsächlich frei sein. Bleibt ein Listener
-   bestehen, wird der Austausch nicht begonnen und der Dienst wird nicht mit
-   einer zweiten Instanz überlagert.
+4. Nach dem Stopp muss die Unit inaktiv sein und dürfen für Port 48128 keine
+   TCP-Zustände mehr vorhanden sein. Der Check verwendet nicht nur `LISTEN`,
+   weil ein reiner Listener-Check einen Übergangszustand zwischen Stopp und
+   neuem Bind-Versuch übersehen kann. Bleibt der Dienst oder ein TCP-Zustand
+   bestehen, wird der Austausch nicht begonnen und keine zweite Instanz
+   gestartet.
 5. Der Agent-Code wird atomar ausgetauscht; Konfiguration, TLS-Dateien,
    Credentials und Firewall-Skripte liegen außerhalb des ersetzten `agent/`-
    Baums.
@@ -36,6 +39,15 @@ Bei einem freigegebenen Update gilt:
 10. Der Rollback-Code wird erneut mit demselben TLS-/API-Healthcheck geprüft.
    Scheitert auch dieser Check, bleibt der Dienst gestoppt und der Updater
    liefert einen eindeutigen Rollback-Fehlercode.
+
+## Forensikdaten
+
+Der Updater schreibt an den Übergängen `vor-stop`, `nach-stop`, `vor-swap` und
+`nach-start` nur nicht-sensitive Diagnosewerte: systemd MainPID/ControlPID,
+ControlGroup, Cgroup-Prozesse sowie `ss -Htanp` für Port 48128. Diese Daten
+ermöglichen die Zuordnung eines künftigen Bind-Fehlers. Historische PID- oder
+Socket-Zuordnungen, die nicht im Journal erfasst wurden, können nachträglich
+nicht rekonstruiert werden und dürfen nicht als bewiesen ausgegeben werden.
 
 ## Staging-Regeln
 

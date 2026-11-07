@@ -16,7 +16,8 @@ def test_upgrade_process_requires_explicit_confirmation_and_healthcheck():
     assert "READINESS_TIMEOUT_SECONDS=30" in script
     assert "READINESS_FAILURE_EXIT=72" in script
     assert "wait_for_port_free" in script
-    assert 'ss -Hln "sport = :$AGENT_PORT"' in script
+    assert 'ss -Htanp "sport = :$AGENT_PORT"' in script
+    assert "port_forensics" in script
 
 
 def test_update_transaction_has_interrupted_swap_recovery():
@@ -69,6 +70,7 @@ def test_upgrade_checks_port_before_swapping_agent_tree():
     swap = script.index('bash "$SCRIPT_DIR/update-agent.sh"')
     assert stop < script.index("wait_for_port_free", stop) < swap
     assert 'systemctl start "$SERVICE_NAME" || true' in script
+    assert 'systemctl is-active --quiet "$SERVICE_NAME"' in script[script.index("wait_for_port_free") :]
 
 
 def test_unit_bounds_stop_and_keeps_single_restart_owner():
