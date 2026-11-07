@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased – Beta.21 LXC-Gastzugriff
+## 0.1.0-beta.21 – sicherer LXC-Gastzugriff (Prerelease)
 
 ### Deutsch
 
-- Root-seitiger Helper-Kandidat für strikt allowlistete, passive LXC-APT-Lese-
+- Root-seitiger Helper für strikt allowlistete, passive LXC-APT-Lese-
   und Dry-Run-Operationen dokumentiert und mit Sicherheitsregressionen
   abgesichert.
 - Socket-Clients werden per `SO_PEERCRED` auf die exakte Agent-UID begrenzt;
