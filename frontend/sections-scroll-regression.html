@@ -43,7 +43,7 @@ last(fixedCard).open = true;
 await new Promise(resolve => setTimeout(resolve, 120));
 window.scrollTo(0, document.documentElement.scrollHeight);
 await new Promise(resolve => requestAnimationFrame(resolve));
-const measure = (slot, card) => { const slotBox = slot.getBoundingClientRect(); const lastBox = last(card).getBoundingClientRect(); return { slotHeight: slot.getBoundingClientRect().height, cardHeight: card.getBoundingClientRect().height, lastBottom: lastBox.bottom, slotBottom: slotBox.bottom, clipped: lastBox.bottom > slotBox.bottom + 2 }; };
+const measure = (slot, card) => { const slotBox = slot.getBoundingClientRect(); const lastBox = last(card).getBoundingClientRect(); const relativeLastBottom = lastBox.bottom - slotBox.top; return { slotHeight: slot.getBoundingClientRect().height, cardHeight: card.getBoundingClientRect().height, lastBottom: lastBox.bottom, slotBottom: slotBox.bottom, relativeLastBottom, clipped: relativeLastBottom > slotBox.height + 2 }; };
 const result = { legacy: measure(legacySlot, legacyCard), fixed: measure(fixedSlot, fixedCard), legacyReproducesClip: measure(legacySlot, legacyCard).clipped, fixedReachable: !measure(fixedSlot, fixedCard).clipped, cardCount: cards.length, lastText: last(fixedCard).textContent };
 document.querySelector("#result").textContent = JSON.stringify(result);
 </script></body></html>
