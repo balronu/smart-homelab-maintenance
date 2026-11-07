@@ -17,6 +17,18 @@ Die zweisprachigen Release Notes liegen unter
 [`docs/releases/v0.1.0-beta.20.md`](docs/releases/v0.1.0-beta.20.md). Beta.20
 ist als Prerelease veröffentlicht; der Agent wird weiterhin separat aktualisiert.
 
+## Beta.21-Kandidat: sicherer LXC-Gastzugriff
+
+Der Beta.21-Kandidat ergänzt einen optionalen, root-seitigen Unix-Socket-Helper
+für ausdrücklich allowlistete LXC-Ziele. Der Helper akzeptiert ausschließlich
+die festen Operationen `read` und `simulate`, prüft die CT-Allowlist bei jeder
+Anfrage und lehnt alle anderen Befehle, Pfade und Ziele ab. Der Agent bleibt
+standardmäßig deaktiviert (`lxc_helper_enabled = false`); eine bloße HACS-
+oder Agent-Aktualisierung aktiviert den Gastzugriff nicht. Details und die
+separaten Freigabegates stehen in
+[`docs/lxc-apt-helper.md`](docs/lxc-apt-helper.md) und
+[`docs/security.md`](docs/security.md).
+
 ## Beta.19: Dry Runs und passive Update-Erkennung
 
 Beta.19 behebt den Lovelace-Aufruf für `smart_homelab_maintenance.dry_run`:

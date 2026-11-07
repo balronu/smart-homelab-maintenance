@@ -57,3 +57,13 @@ visible install button is permanently disabled and has no service call.
 The explicit status model is `updates_available`, `current`, `not_checked`,
 `unsupported`, `unauthorized`, `error`, `stale`, and `unknown`. Security counts
 are emitted only when the source provides a reliable classification.
+
+## Beta.21-Vorbereitung: privilegierter LXC-Gastweg
+
+Beta.20 aktiviert keinen Gastzugriff. Für die nächste Beta gibt es einen
+separaten, nicht installierten Helper-Kandidaten in
+[`docs/lxc-apt-helper.md`](lxc-apt-helper.md). Er ersetzt eine weitreichende
+`pct`- oder sudo-Freigabe durch einen festen root-seitigen Pfad mit Allowlist,
+Statusprüfung, begrenzten Operationen und ohne Shell. Bis alle Aktivierungs-
+Gates geprüft und ausdrücklich freigegeben sind, bleiben LXC-Ziele
+`unauthorized` und echte Updates serverseitig deaktiviert.

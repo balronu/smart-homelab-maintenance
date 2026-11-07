@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import asyncio
+import json
 import os
+import socket
 import re
 import shutil
 import time
@@ -24,6 +26,7 @@ _VMID = re.compile(r"^[1-9][0-9]{0,5}$")
 _TARGET = re.compile(r"^(host|container:[1-9][0-9]{0,5}|vm:[1-9][0-9]{0,5})$")
 _INST = re.compile(r"^Inst\s+(\S+)(?:\s+\[([^]]*)\])?\s+\(([^ )]+)")
 _REMV = re.compile(r"^Remv\s+(\S+)")
+LXC_HELPER_SOCKET = "/run/smart-homelab-maintenance/lxc-apt-helper.sock"
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,11 +120,12 @@ class ProbeTarget:
 class AptCommandRunner:
     """Run only a fixed apt simulation, never an install or index refresh."""
 
-    def __init__(self, *, timeout_seconds: float = 8.0, run: Callable[..., Any] | None = None) -> None:
+    def __init__(self, *, timeout_seconds: float = 8.0, run: Callable[..., Any] | None = None, guest_transport: "RootHelperTransport | None" = None) -> None:
         if not 0.5 <= timeout_seconds <= 30:
             raise ValueError("apt timeout must be between 0.5 and 30 seconds")
         self.timeout_seconds = timeout_seconds
         self._run = run
+        self._guest_transport = guest_transport
 
     @staticmethod
     def _argv(vmid: int | None) -> list[str]:
@@ -135,7 +139,11 @@ class AptCommandRunner:
     def simulate(self, vmid: int | None = None) -> tuple[int, str, str]:
         argv = self._argv(vmid)
         if vmid is not None and shutil.which("pct") is None:
+            if self._guest_transport is not None:
+                return self._guest_transport.simulate(vmid)
             raise FileNotFoundError("pct guest transport is unavailable")
+        if vmid is not None and self._guest_transport is not None:
+            return self._guest_transport.simulate(vmid)
         if vmid is None and shutil.which("apt-get") is None:
             raise FileNotFoundError("apt-get is unavailable")
         if self._run is not None:
@@ -161,11 +169,12 @@ class AptCommandRunner:
 class AptUpdateReader:
     """Read the existing APT cache without refreshing indexes or simulating."""
 
-    def __init__(self, *, timeout_seconds: float = 8.0, run: Callable[..., Any] | None = None) -> None:
+    def __init__(self, *, timeout_seconds: float = 8.0, run: Callable[..., Any] | None = None, guest_transport: "RootHelperTransport | None" = None) -> None:
         if not 0.5 <= timeout_seconds <= 30:
             raise ValueError("apt cache timeout must be between 0.5 and 30 seconds")
         self.timeout_seconds = timeout_seconds
         self._run = run
+        self._guest_transport = guest_transport
 
     @staticmethod
     def _argv(vmid: int | None) -> list[str]:
@@ -178,6 +187,8 @@ class AptUpdateReader:
 
     def list_upgradable(self, vmid: int | None = None) -> tuple[int, str, str]:
         argv = self._argv(vmid)
+        if vmid is not None and self._guest_transport is not None:
+            return self._guest_transport.read(vmid)
         executable = "pct" if vmid is not None else "apt"
         if shutil.which(executable) is None:
             raise FileNotFoundError(f"{executable} is unavailable")
@@ -199,6 +210,63 @@ class AptUpdateReader:
             return int(process.returncode or 0), stdout.decode("utf-8", "replace"), stderr.decode("utf-8", "replace")
 
         return asyncio.run(execute())
+
+
+class RootHelperTransport:
+    """Call the fixed root-owned Unix-socket helper without free-form args."""
+
+    def __init__(self, *, timeout_seconds: float = 10.0, socket_path: str = LXC_HELPER_SOCKET, exchange: Callable[[bytes], bytes] | None = None) -> None:
+        if not 1.0 <= timeout_seconds <= 30.0:
+            raise ValueError("guest helper timeout must be between 1 and 30 seconds")
+        self.timeout_seconds = timeout_seconds
+        if not os.path.isabs(socket_path) or socket_path != LXC_HELPER_SOCKET:
+            raise ValueError("guest helper socket path is fixed")
+        self.socket_path = socket_path
+        self._exchange = exchange
+
+    def _call(self, operation: str, vmid: int) -> tuple[int, str, str]:
+        if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
+            raise ValidationError("container id is invalid")
+        if operation not in {"read", "simulate"}:
+            raise ValidationError("guest operation is not allowed")
+        request = json.dumps({"container_id": vmid, "operation": operation}, separators=(",", ":"))
+        payload = (request + "\n").encode("utf-8")
+        try:
+            if self._exchange is not None:
+                raw = self._exchange(payload)
+            else:
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+                    channel.settimeout(self.timeout_seconds)
+                    channel.connect(self.socket_path)
+                    channel.sendall(payload)
+                    chunks: list[bytes] = []
+                    total = 0
+                    while True:
+                        chunk = channel.recv(16_384)
+                        if not chunk:
+                            break
+                        total += len(chunk)
+                        if total > 256_000:
+                            raise OSError("guest helper response exceeded the limit")
+                        chunks.append(chunk)
+                        if b"\n" in chunk:
+                            break
+                    raw = b"".join(chunks)
+            response = json.loads(raw.decode("utf-8").splitlines()[0])
+        except (socket.timeout, asyncio.TimeoutError):
+            raise asyncio.TimeoutError from None
+        except (OSError, json.JSONDecodeError, IndexError) as exc:
+            raise OSError("guest helper socket is unavailable or returned invalid data") from exc
+        if response.get("ok") is True:
+            return 0, str(response.get("stdout", "")), str(response.get("stderr", ""))
+        error = response.get("error", {})
+        return 1, "", str(error.get("message", "guest helper rejected the request"))
+
+    def read(self, vmid: int) -> tuple[int, str, str]:
+        return self._call("read", vmid)
+
+    def simulate(self, vmid: int) -> tuple[int, str, str]:
+        return self._call("simulate", vmid)
 
 
 def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
