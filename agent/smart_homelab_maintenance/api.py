@@ -17,6 +17,7 @@ from .errors import MaintenanceError, ValidationError
 from .jobs import JobRepository
 from .security import redact_secrets
 from .updates import UpdateService
+from . import __version__
 
 
 class ApiApplication:
@@ -62,7 +63,7 @@ class ApiApplication:
 
     def _route(self, path: str, query: Mapping[str, list[str]], *, method: str, body: bytes) -> Any:
         if path == "/api/v1/health":
-            return {"status": "ok", "mode": "offline"}
+            return {"status": "ok", "mode": "offline", "agent_version": __version__}
         if path == "/api/v1/capabilities":
             return {"execution_enabled": False, "dry_run_enabled": self.updates is not None, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
         if path == "/api/v1/host":

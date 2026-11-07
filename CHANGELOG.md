@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.1.0-beta.17 – Ressourcen- und Agent-Vertrag (Fix-Kandidat)
+
+### Deutsch
+
+- Ergänzt `agent_version` im öffentlichen Healthcheck, damit HA-Integration
+  und separat laufender Wartungsagent auf denselben Beta-Stand geprüft werden
+  können.
+- Korrigiert die Proxmox-Projektion: fehlende CPU-/RAM-/Speicherwerte bleiben
+  unbekannt statt als `0` zu erscheinen; erfolgreiche API-Erreichbarkeit wird
+  nicht wegen fehlender optionaler Messwerte als Host-offline bewertet.
+- Bewahrt die funktionierenden LXC-Freiwerte und trennt sie von VM-Werten,
+  für die Proxmox keine Gast-Dateisystem- oder Gast-RAM-Freimessung liefert.
+- Verdichtet die Karte mit beschrifteten CPU-, RAM- und Speicherbalken. Freie
+  RAM-/Speicherwerte stehen direkt am jeweiligen Balken; fehlende Daten blenden
+  den Balken aus.
+- Keine echte Updateausführung, keine Paketinstallation und kein produktiver
+  Zugriff. Beta.17 ist ein Fix-Kandidat; ein echter iPhone-Praxistest bleibt
+  erforderlich.
+- Für die neuen Ressourcenwerte müssen Integration und separat laufender Agent
+  gemeinsam auf Beta.17 stehen; ein reines HACS-Update aktualisiert den Agenten
+  nicht.
+
+### English
+
+- Adds `agent_version` to the public health response so the HA integration and
+  separately running maintenance agent can be checked for the same beta line.
+- Fixes Proxmox projection: missing CPU, RAM, and storage values remain
+  unknown instead of becoming fabricated zeroes; successful API reachability
+  is not reported as host offline because optional metrics are absent.
+- Preserves working LXC free-resource values and separates them from VM
+  values when Proxmox does not provide guest filesystem or guest-RAM free data.
+- Makes the card more compact with labelled CPU, RAM, and storage bars. Free
+  RAM/storage values appear beside the relevant bar; missing data hides the bar.
+- No real update execution, package installation, or productive access. Beta.17
+  is a fix candidate; a real iPhone field test is still required.
+- The integration and separately running agent must both be on Beta.17 for the
+  new resource fields; a HACS update alone does not update the agent.
+
 ## 0.1.0-beta.16 – Fehlerisolierung für Update-Abfragen (Prerelease)
 
 ### Deutsch

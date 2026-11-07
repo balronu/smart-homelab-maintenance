@@ -342,7 +342,9 @@ class CoreTests(unittest.TestCase):
 
     def test_read_api_health_is_public_but_other_routes_are_authenticated(self) -> None:
         api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), self.repo, read_token="test-token")
-        self.assertEqual(api.handle("GET", "/api/v1/health")[0], 200)
+        status, body = api.handle("GET", "/api/v1/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.17")
         self.assertEqual(api.handle("GET", "/api/v1/containers")[0], 401)
         status, body = api.handle("GET", "/api/v1/containers?limit=2", headers={"Authorization": "Bearer test-token"})
         self.assertEqual(status, 200)
@@ -416,7 +418,7 @@ class CoreTests(unittest.TestCase):
         responses = {
             "status": {"pveversion": "pve-manager/8.4", "kversion": "6.8", "status": "online"},
             "lxc": [{"vmid": 101, "name": "fixture", "status": "running", "maxmem": 100, "mem": 40, "maxdisk": 1000, "disk": 250}],
-            "qemu": [{"vmid": 104, "name": "ha", "status": "stopped"}],
+            "qemu": [{"vmid": 104, "name": "ha", "status": "running", "cpu": 0.125, "mem": 600, "maxmem": 1000, "disk": 400, "maxdisk": 2000, "uptime": 3600}],
         }
         calls = []
         def opener(request, **kwargs):
@@ -425,9 +427,18 @@ class CoreTests(unittest.TestCase):
 
         config = ProxmoxClientConfig("https://pve.home.arpa/api2/json", "pve", "fixture-token")
         client = ProxmoxApiClient(config, opener=opener)
-        self.assertEqual(client.node_status()["release"], "pve-manager/8.4")
+        host = client.node_status()
+        self.assertEqual(host["release"], "pve-manager/8.4")
+        self.assertTrue(host["online"])
+        self.assertIsNone(host["cpu_percent"])
         self.assertEqual(client.lxc_list()[0]["memory_available_bytes"], 60)
-        self.assertEqual(client.vm_list()[0]["vmid"], 104)
+        vm = client.vm_list()[0]
+        self.assertEqual(vm["vmid"], 104)
+        self.assertEqual(vm["cpu_percent"], 12.5)
+        self.assertEqual(vm["memory_used_bytes"], 600)
+        self.assertEqual(vm["memory_total_bytes"], 1000)
+        self.assertNotIn("memory_available_bytes", vm)
+        self.assertNotIn("free_bytes", vm)
         self.assertEqual(len(calls), 3)
         self.assertTrue(all(call[0].get_method() == "GET" for call in calls))
         self.assertTrue(all(call[0].get_header("Authorization") == "PVEAPIToken fixture-token" for call in calls))
