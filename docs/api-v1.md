@@ -27,6 +27,9 @@ Antwortgröße und Bearer-Authentifizierung
 und `schema_version`; abgebrochene oder ungültige Antworten werden als
 strukturierte Transportfehler behandelt. Antworten besitzen `schema_version: "1"`, `request_id` und entweder `data`
 oder ein strukturiertes `error`. Antwortgröße und Pagination sind begrenzt.
+Der öffentliche Healthcheck enthält zusätzlich `agent_version`, damit eine
+HA-Integration und der separat laufende Agent nicht unbemerkt aus
+unterschiedlichen Beta-Ständen betrieben werden.
 Die einzige Update-POST-Route ist der bestätigte, read-only Dry Run; beliebige
 Shell-Kommandos und echte Updateausführung sind ausgeschlossen.
 Der Dry Run akzeptiert ausschließlich JSON `{\"confirm\":true}`. Es gibt keine

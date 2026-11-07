@@ -5,18 +5,18 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Beta.16-Prerelease: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
+Beta.17-Fix-Kandidat: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
 aufklappbaren Host-/VM-/LXC-Details und einem Größenänderungssignal für das
 Home-Assistant-Sections-Layout. Eine echte iOS-Home-Assistant-Praxisprüfung
 bleibt vor Veröffentlichung erforderlich; der Scrollfehler ist nicht als
 behoben bestätigt.
-Letzter veröffentlichter Release: [v0.1.0-beta.16](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.16).
+Letzter veröffentlichter Release: [v0.1.0-beta.16](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.16). Beta.17 ist noch nicht veröffentlicht.
 Der abschließende Praxistest in der Home-Assistant-iOS-App steht noch aus.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
 konfiguriert und geprüft werden.
 
-Beta.16 enthält passive Paketprüfungen für nachweislich unterstützte
+Beta.17 enthält passive Paketprüfungen für nachweislich unterstützte
 Debian-/Ubuntu-Ziele und einen ausdrücklich bestätigten `apt-get --simulate`
 Dry Run. Paketlisten werden nicht aktualisiert, Pakete werden nicht installiert
 und Systeme werden nicht neu gestartet. Eine spätere Ausführung bleibt
@@ -27,6 +27,14 @@ Beta.16 isoliert Fehler der optionalen Update-Abfrage vom Kerninventar. Wenn
 der Update-Endpunkt ausfällt, bleiben Host, VMs und LXCs sichtbar und der
 Updatezustand wird als unbekannt gemeldet. Intervall-Refreshes werden über den
 thread-sicheren Home-Assistant-Scheduler eingeplant.
+
+Beta.17 ergänzt einen versionierten Agent-Healthcheck und eine robuste
+Ressourcenprojektion. Fehlende Proxmox-Werte werden nicht als null erfunden;
+VM-Gast-Freiräume werden nur angezeigt, wenn eine Datenquelle sie tatsächlich
+liefert. Host, VM und LXC-Ressourcen sind in der Karte eindeutig beschriftet.
+Für korrekte Beta.17-Ressourcen müssen Home-Assistant-Integration und der
+separat laufende Wartungsagent gemeinsam auf Beta.17 aktualisiert werden;
+nur die HACS-Integration zu aktualisieren ersetzt den Agenten nicht.
 
 ## Bestandteile
 
