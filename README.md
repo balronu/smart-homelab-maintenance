@@ -3,7 +3,7 @@
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
-## Beta.18-Kandidat: gemeinsamer Versions- und Updatevertrag
+## Beta.18: gemeinsamer Versions- und Updatevertrag
 
 Integration, Karte und Agent tragen dieselbe Beta-Version. Der Agent meldet
 zusätzlich den API-Vertrag über `/api/v1/health`. Home Assistant bewertet die
@@ -19,12 +19,13 @@ wieder her. Er verändert weder Proxmox, VMs noch LXCs.
 
 ## Status
 
-Beta.17-Prerelease: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
-aufklappbaren Host-/VM-/LXC-Details und einem Größenänderungssignal für das
-Home-Assistant-Sections-Layout. Eine echte iOS-Home-Assistant-Praxisprüfung
-bleibt vor Veröffentlichung erforderlich; der Scrollfehler ist nicht als
-behoben bestätigt.
-Letzter veröffentlichter Release: [v0.1.0-beta.17](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.17).
+Beta.18-Prerelease: gemeinsamer Versions-/API-Vertrag für Integration, Karte
+und Agent sowie ein ausdrücklich bestätigungspflichtiger Agent-Updatepfad.
+Die responsive Lovelace-Karte behält stabile dynamische Höhe, aufklappbare
+Host-/VM-/LXC-Details und ein Größenänderungssignal für das Home-Assistant-
+Sections-Layout. Eine echte iOS-Home-Assistant-Praxisprüfung steht noch aus;
+der Scrollfehler ist nicht als behoben bestätigt.
+Letzter veröffentlichter Release: [v0.1.0-beta.18](https://github.com/balronu/smart-homelab-maintenance/releases/tag/v0.1.0-beta.18).
 Der abschließende Praxistest in der Home-Assistant-iOS-App steht noch aus.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat

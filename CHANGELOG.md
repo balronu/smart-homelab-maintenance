@@ -1,18 +1,17 @@
 # Changelog
 
-## 0.1.0-beta.18 – gemeinsamer Versions- und Updatevertrag (Kandidat)
+## 0.1.0-beta.18 – gemeinsamer Versions- und Updatevertrag
 
 - DE: Integration, Lovelace-Karte und Agent melden eine gemeinsame Version und
   einen expliziten API-Vertrag. Abweichungen werden als aktuell, veraltet,
   inkompatibel oder unbekannt angezeigt. Der Agent-Updateprozess ist
   ausdrücklich bestätigt, transaktional und nach dem Healthcheck rückrollbar;
-  echte Systemupdates bleiben deaktiviert. Dieser Stand ist noch nicht
-  veröffentlicht.
+  echte Systemupdates bleiben deaktiviert.
 - EN: Integration, Lovelace card, and agent expose one coordinated version plus
   an explicit API contract. Mismatches are shown as current, outdated,
   incompatible, or unknown. Agent updates require explicit confirmation, use a
   transactional health-checked path, and can roll back; real system updates
-  remain disabled. This candidate is not released yet.
+  remain disabled.
 
 ## 0.1.0-beta.17 – Ressourcen- und Agent-Vertrag (Prerelease)
 
