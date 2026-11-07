@@ -34,7 +34,9 @@ const legacySlot = document.querySelector("#legacy-slot");
 const fixedSlot = document.querySelector("#fixed-slot");
 const fixedCard = fixedSlot.querySelector("smart-homelab-maintenance-card");
 const legacyCard = legacySlot.querySelector("smart-homelab-maintenance-card");
-legacySlot.style.height = `${legacyCard.getBoundingClientRect().height}px`;
+// Deliberately under-allocate the legacy wrapper to model a stale Sections
+// measurement after the detail disclosure grows the card.
+legacySlot.style.height = `${Math.max(0, legacyCard.getBoundingClientRect().height - 100)}px`;
 fixedSlot.style.height = `${fixedCard.getBoundingClientRect().height}px`;
 fixedCard.addEventListener("card-updated", () => { fixedSlot.style.height = `${fixedCard.getBoundingClientRect().height}px`; });
 const last = card => [...card.shadowRoot.querySelectorAll(".container-grid .item")].at(-1);
