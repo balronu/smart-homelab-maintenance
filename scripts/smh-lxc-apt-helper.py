@@ -13,9 +13,13 @@ import os
 import argparse
 import socket
 import socketserver
+import selectors
 import subprocess
 import sys
+import time
 import tomllib
+import pwd
+import struct
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -23,12 +27,25 @@ DEFAULT_ALLOWLIST = Path("/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml"
 MAX_OUTPUT_BYTES = 256_000
 COMMAND_TIMEOUT_SECONDS = 10
 ALLOWED_OPERATIONS = {"read", "simulate"}
+EXPECTED_CLIENT_USER = "smart-homelab-maintenance"
+REQUEST_TIMEOUT_SECONDS = 10
+MAX_REQUEST_BYTES = 16_384
 
 
 class HelperError(Exception):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+def _require_agent_peer(sock: socket.socket) -> None:
+    try:
+        uid, _, _ = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+        expected_uid = pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
+    except (OSError, KeyError, struct.error) as exc:
+        raise HelperError("unauthorized_client", "client credentials could not be verified") from exc
+    if uid != expected_uid:
+        raise HelperError("unauthorized_client", "client is not authorized")
 
 
 def _load_allowlist(path: Path = DEFAULT_ALLOWLIST) -> set[int]:
@@ -85,15 +102,49 @@ def build_argv(vmid: int, operation: str) -> list[str]:
 
 
 def _run(argv: list[str]) -> tuple[int, str, str]:
+    process: subprocess.Popen[bytes] | None = None
     try:
-        completed = subprocess.run(argv, capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SECONDS, check=False)
+        process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
+        assert process.stdout is not None and process.stderr is not None
+        selector = selectors.DefaultSelector()
+        try:
+            selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+            selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+            output = {"stdout": bytearray(), "stderr": bytearray()}
+            deadline = time.monotonic() + COMMAND_TIMEOUT_SECONDS
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(argv, COMMAND_TIMEOUT_SECONDS)
+                for key, _ in selector.select(remaining):
+                    chunk = os.read(key.fileobj.fileno(), 16_384)
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        key.fileobj.close()
+                        continue
+                    output[key.data].extend(chunk)
+                    if len(output["stdout"]) + len(output["stderr"]) > MAX_OUTPUT_BYTES:
+                        raise HelperError("output_limit", "guest operation output exceeded the limit")
+            returncode = process.wait(timeout=max(0.1, deadline - time.monotonic()))
+        finally:
+            selector.close()
     except subprocess.TimeoutExpired as exc:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait()
         raise HelperError("timeout", "fixed guest operation timed out") from exc
-    stdout = str(completed.stdout or "")
-    stderr = str(completed.stderr or "")
-    if len(stdout.encode()) + len(stderr.encode()) > MAX_OUTPUT_BYTES:
-        raise HelperError("output_limit", "guest operation output exceeded the limit")
-    return int(completed.returncode), stdout, stderr
+    except BaseException:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait()
+        raise
+    finally:
+        if process is not None:
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
+    return int(returncode), bytes(output["stdout"]).decode("utf-8", "replace"), bytes(output["stderr"]).decode("utf-8", "replace")
 
 
 def handle(request: Any, *, allowed_ids: set[int], run=_run) -> dict[str, Any]:
@@ -132,24 +183,39 @@ def main(argv: list[str] | None = None) -> int:
 
 class _SocketHandler(socketserver.StreamRequestHandler):
     def handle(self) -> None:
-        line = self.rfile.readline(16_385)
-        if len(line) > 16_384 or not line.endswith(b"\n"):
-            response = {"ok": False, "error": {"code": "request_limit", "message": "request exceeded the limit"}}
+        self.request.settimeout(REQUEST_TIMEOUT_SECONDS)
+        try:
+            _require_agent_peer(self.request)
+        except HelperError as exc:
+            response = {"ok": False, "error": {"code": exc.code, "message": str(exc)}}
         else:
             try:
+                line = self.rfile.readline(MAX_REQUEST_BYTES + 1)
+                if len(line) > MAX_REQUEST_BYTES or not line.endswith(b"\n"):
+                    raise HelperError("request_limit", "request exceeded the limit")
                 request = json.loads(line.decode("utf-8"))
-                response = handle(request, allowed_ids=self.server.allowed_ids)
+                allowed = _load_allowlist(self.server.allowlist_path)
+                response = handle(request, allowed_ids=allowed)
+            except socket.timeout:
+                response = {"ok": False, "error": {"code": "timeout", "message": "helper request timed out"}}
+            except HelperError as exc:
+                response = {"ok": False, "error": {"code": exc.code, "message": str(exc)}}
             except (UnicodeDecodeError, json.JSONDecodeError):
                 response = {"ok": False, "error": {"code": "invalid_request", "message": "request is not valid JSON"}}
-        self.wfile.write((json.dumps(response, separators=(",", ":")) + "\n").encode("utf-8"))
+            except OSError:
+                response = {"ok": False, "error": {"code": "allowlist_unavailable", "message": "root-owned LXC allowlist is unavailable"}}
+        try:
+            self.wfile.write((json.dumps(response, separators=(",", ":")) + "\n").encode("utf-8"))
+        except OSError:
+            return
 
 
 class _UnixHelperServer(socketserver.ThreadingUnixStreamServer):
     daemon_threads = True
     allow_reuse_address = False
 
-    def __init__(self, socket_path: str, allowed_ids: set[int]) -> None:
-        self.allowed_ids = allowed_ids
+    def __init__(self, socket_path: str, allowlist_path: Path) -> None:
+        self.allowlist_path = allowlist_path
         super().__init__(socket_path, _SocketHandler)
 
 
@@ -157,10 +223,10 @@ def serve(socket_path: str, *, allowlist: Path = DEFAULT_ALLOWLIST) -> None:
     """Serve the fixed protocol from a root-owned systemd service."""
     if socket_path != "/run/smart-homelab-maintenance/lxc-apt-helper.sock":
         raise HelperError("socket_path_invalid", "helper socket path is fixed")
-    allowed = _load_allowlist(allowlist)
+    _load_allowlist(allowlist)
     Path(socket_path).parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     try:
-        with _UnixHelperServer(socket_path, allowed) as server:
+        with _UnixHelperServer(socket_path, allowlist) as server:
             os.chmod(socket_path, 0o660)
             server.serve_forever()
     finally:

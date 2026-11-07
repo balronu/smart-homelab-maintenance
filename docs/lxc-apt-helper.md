@@ -16,19 +16,27 @@ Der Kandidat trennt die Privilegiengrenze vom Agenten:
 2. Ein root-owned systemd-Dienst stellt einen Unix-Socket unter
    `/run/smart-homelab-maintenance/lxc-apt-helper.sock` bereit. Der Agent
    übergibt dort ein JSON-Objekt über einen Socket mit enger Gruppenberechtigung.
-   Es gibt keine Befehls-, Pfad- oder Credential-Parameter.
+   Jeder Client wird zusätzlich per `SO_PEERCRED` auf die exakte UID des
+   Dienstbenutzers `smart-homelab-maintenance` geprüft. Es gibt keine Befehls-,
+   Pfad- oder Credential-Parameter.
 3. Der Helper liest eine separate, root-owned Allowlist
    `/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml`.
 4. Er akzeptiert nur numerische, allowlistete CT-IDs und die Operationen
    `read` und `simulate`.
-5. Vor jedem Gastaufruf wird `pct status <id>` gelesen. Alles außer exakt
-   `status: running` wird abgewiesen; Container werden nie gestartet.
+5. Die root-owned Allowlist wird bei jedem Socket-Aufruf neu gelesen und
+   geprüft. Vor jedem Gastaufruf wird `pct status <id>` gelesen. Alles außer
+   exakt `status: running` wird abgewiesen; Container werden nie gestartet.
+   Ein zwischen Statusprüfung und `pct exec` gestoppter Container führt zu
+   einem sicheren Fehler; der feste `pct exec`-Pfad kann daraus keinen Start-,
+   Installations- oder beliebigen Befehlspfad machen.
 6. Die einzigen Gastargv sind:
    - read: `/usr/bin/apt list --upgradable`
    - simulate: `/usr/bin/apt-get --simulate --no-remove -o
      Debug::NoLocking=true upgrade`
-7. Alle Aufrufe verwenden Argumentlisten ohne Shell, ein 10-Sekunden-Limit und
-   eine maximale kombinierte Ausgabegröße von 256 KiB.
+7. Alle Aufrufe verwenden Argumentlisten ohne Shell, ein 10-Sekunden-Limit,
+   ein 10-Sekunden-Socket-Limit und eine maximal gestreamte kombinierte
+   Ausgabegröße von 256 KiB. Prozesse werden bei Timeout oder Ausgabelimit
+   beendet und aufgeräumt.
 
 Die Simulation bleibt eine ausdrücklich angeforderte Simulation. Der Helper
 enthält keinen Installations-, Entfernungs-, `apt update`- oder Neustartpfad.
@@ -66,7 +74,8 @@ ProtectHome=true
 RestrictAddressFamilies=AF_UNIX
 ```
 
-Der Socket wird `root:smart-homelab-maintenance` mit Modus `0660`. Vor einer
+Der Socket wird `root:smart-homelab-maintenance` mit Modus `0660`; zusätzlich
+prüft der Dienst die Peer-Credentials und akzeptiert nur die Agent-UID. Vor einer
 produktiven Freigabe müssen Besitzer, Modus, Hash/Quelle des Helpers,
 Allowlist-Besitzer, Socket-Gruppe und die effektive Dienstisolierung separat
 geprüft werden. Der bestehende Agent mit `NoNewPrivileges=true` muss keine

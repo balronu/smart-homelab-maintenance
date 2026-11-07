@@ -67,6 +67,12 @@ class AgentRuntimeConfig:
     lxc_helper_enabled: bool = False
 
 
+def _strict_bool(value: Any, name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be boolean")
+    return value
+
+
 def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
     """Load non-secret runtime settings from a TOML file."""
 
@@ -79,7 +85,7 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
         server = AgentServerConfig(
             host=str(raw["listen_host"]), port=int(raw["listen_port"]),
             certificate=str(raw["certificate"]), private_key=str(raw["private_key"]),
-            execution_enabled=bool(raw.get("execution_enabled", False)),
+            execution_enabled=_strict_bool(raw.get("execution_enabled", False), "execution_enabled"),
         )
         proxmox = ProxmoxClientConfig(
             base_url=str(raw["proxmox_url"]), node=str(raw["proxmox_node"]),
@@ -111,7 +117,8 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
         if any(key in values and not isinstance(values[key], str) for key in {"os_name", "os_version", "package_manager"}):
             raise ValueError("update target metadata must be strings")
         update_targets[target] = dict(values)
-    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets, bool(raw.get("lxc_helper_enabled", False)))
+    helper_enabled = _strict_bool(raw.get("lxc_helper_enabled", False), "lxc_helper_enabled")
+    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets, helper_enabled)
 
 
 def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:

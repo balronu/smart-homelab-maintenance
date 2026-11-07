@@ -123,6 +123,56 @@ def test_helper_is_opt_in_and_disabled_by_default(tmp_path: Path) -> None:
     assert load_runtime_config(config).lxc_helper_enabled is False
     config.write_text(config.read_text(encoding="utf-8") + "lxc_helper_enabled = true\n", encoding="utf-8")
     assert load_runtime_config(config).lxc_helper_enabled is True
+    config.write_text(config.read_text(encoding="utf-8").replace("lxc_helper_enabled = true", 'lxc_helper_enabled = "false"'), encoding="utf-8")
+    with pytest.raises(ValueError, match="lxc_helper_enabled must be boolean"):
+        load_runtime_config(config)
+
+
+def test_socket_policy_requires_exact_agent_uid_and_per_request_allowlist() -> None:
+    source = HELPER_PATH.read_text(encoding="utf-8")
+    assert "SO_PEERCRED" in source
+    assert "pwd.getpwnam(EXPECTED_CLIENT_USER)" in source
+    assert "_load_allowlist(self.server.allowlist_path)" in source
+    assert "self.server.allowed_ids" not in source
+
+
+def test_peer_credentials_reject_wrong_uid(monkeypatch) -> None:
+    class FakeSocket:
+        def getsockopt(self, *_args):
+            import struct
+            return struct.pack("3i", 424242, 1, 1)
+
+    monkeypatch.setattr(helper.pwd, "getpwnam", lambda _name: type("Pw", (), {"pw_uid": 1234})())
+    with pytest.raises(helper.HelperError, match="not authorized"):
+        helper._require_agent_peer(FakeSocket())
+
+
+def test_peer_credentials_accept_exact_uid(monkeypatch) -> None:
+    class FakeSocket:
+        def getsockopt(self, *_args):
+            import struct
+            return struct.pack("3i", 1234, 1, 1)
+
+    monkeypatch.setattr(helper.pwd, "getpwnam", lambda _name: type("Pw", (), {"pw_uid": 1234})())
+    helper._require_agent_peer(FakeSocket())
+
+
+def test_helper_uses_bounded_streaming_process_contract() -> None:
+    source = HELPER_PATH.read_text(encoding="utf-8")
+    assert "subprocess.Popen" in source
+    assert "selectors.DefaultSelector" in source
+    assert "MAX_OUTPUT_BYTES" in source
+    assert "stdin=subprocess.DEVNULL" in source
+
+
+def test_helper_documents_toc_tou_safe_failure() -> None:
+    response = helper.handle(
+        {"container_id": 101, "operation": "read"},
+        allowed_ids={101},
+        run=lambda argv, **_kwargs: (1, "", "container '101' not running"),
+    )
+    assert response["ok"] is False
+    assert response["error"]["code"] == "status_failed"
 
 
 def test_helper_service_is_root_scoped_and_not_a_general_pct_service() -> None:
