@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-beta.19 – Dry-Run-Serviceantwort (Fix-Kandidat)
+## 0.1.0-beta.19 – Dry-Run-Serviceantwort und Update-Erkennung (Prerelease)
 
 ### Deutsch
 
@@ -10,6 +10,11 @@
   leere Antworten, Servicefehler und Zeitüberschreitungen in der Karte an.
 - Keine echten Updates, keine automatische Freigabe und keine produktiven
   Änderungen.
+- Bewahrt eindeutige Zustände der passiven Update-Erkennung und macht
+  `unsupported`, `not_checked`, `unauthorized`, `error`, `stale` und `unknown`
+  in API und Karte sichtbar.
+- Erlaubt spätere Gast-Allowlist-Metadaten nur für feste Ziel-IDs, OS-/Versions-
+  und Paketmanagerangaben; Befehle, Pfade und Credentials bleiben ausgeschlossen.
 
 ### English
 
@@ -18,6 +23,16 @@
 - Displays simulation results, package changes, warnings, safety assessment,
   empty responses, service errors, and timeouts in the card.
 - No real updates, automatic approval, or productive changes are enabled.
+- Preserves explicit passive update states and displays `unsupported`,
+  `not_checked`, `unauthorized`, `error`, `stale`, and `unknown` in the API and
+  card.
+- Future guest allowlist metadata is limited to fixed target IDs, OS/version,
+  and package-manager fields; commands, paths, and credentials are excluded.
+
+Beta.19 is published as a GitHub prerelease. HACS updates the Home Assistant
+integration and card only; the separately running agent requires its own
+reviewed, explicitly approved update process. No productive agent or guest
+system was changed by this release.
 
 ## 0.1.0-beta.18 – gemeinsamer Versions- und Updatevertrag
 
