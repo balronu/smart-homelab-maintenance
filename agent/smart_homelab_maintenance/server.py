@@ -15,6 +15,8 @@ import ipaddress
 import argparse
 import json
 import re
+import signal
+import threading
 import tomllib
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -221,7 +223,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
 
 class AgentHTTPServer(ThreadingHTTPServer):
-    allow_reuse_address = False
+    # Permit a new listener after the previous process closed its socket. This
+    # does not permit two live listeners; SO_REUSEPORT is not enabled.
+    allow_reuse_address = True
     daemon_threads = True
 
     def __init__(self, address: tuple[str, int], application: ApiApplication, context: ssl.SSLContext) -> None:
@@ -237,14 +241,31 @@ def create_server(application: ApiApplication, config: AgentServerConfig) -> Age
 
 
 def serve_forever(application: ApiApplication, config: AgentServerConfig, *, server_factory: Callable[..., AgentHTTPServer] = create_server) -> None:
-    """Run a caller-supplied application until interrupted, then close it."""
+    """Run the application with bounded, signal-safe socket shutdown."""
 
     server = server_factory(application, config)
+    previous_handlers: dict[int, Any] = {}
+
+    def request_shutdown(signum: int, _frame: Any) -> None:
+        _LOGGER.info("agent shutdown requested by signal %s", signum)
+        # BaseServer.shutdown() must run from another thread than
+        # serve_forever(); doing so lets the loop leave cleanly and makes the
+        # finally block close the listening socket before systemd restarts us.
+        threading.Thread(target=server.shutdown, name="agent-shutdown", daemon=True).start()
+
     try:
+        for signum in (signal.SIGTERM, signal.SIGINT):
+            try:
+                previous_handlers[signum] = signal.getsignal(signum)
+                signal.signal(signum, request_shutdown)
+            except (ValueError, RuntimeError):
+                # Injectable test servers may run outside the main thread.
+                pass
         server.serve_forever(poll_interval=0.25)
     finally:
-        server.shutdown()
         server.server_close()
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
 
 
 def main(argv: list[str] | None = None) -> int:

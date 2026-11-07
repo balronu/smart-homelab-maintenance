@@ -7,6 +7,7 @@ readonly READINESS_TIMEOUT_SECONDS=30
 readonly READINESS_INTERVAL_SECONDS=1
 readonly READINESS_FAILURE_EXIT=72
 readonly ROLLBACK_FAILURE_EXIT=73
+readonly AGENT_PORT=48128
 
 source_dir=""
 expected_commit=""
@@ -51,6 +52,7 @@ require_root
 require_command git
 require_command systemctl
 require_command curl
+require_command ss
 require_command python3
 [[ -n "$source_dir" && -n "$expected_commit" && -n "$health_url" && -n "$ca_file" ]] || { usage >&2; die "Pflichtoption fehlt."; }
 [[ "$health_url" == https://* && "$health_url" != *\?* && "$health_url" != *\#* ]] || die "Health-URL muss HTTPS ohne Query/Fragment verwenden."
@@ -119,6 +121,18 @@ wait_for_health() {
     done
     printf 'ERROR: Readiness-Timeout nach %ss: %s\n' "$READINESS_TIMEOUT_SECONDS" "$last_error" >&2
     return "$READINESS_FAILURE_EXIT"
+}
+
+wait_for_port_free() {
+    local deadline=$((SECONDS + 10))
+    while (( SECONDS < deadline )); do
+        if ! ss -Hln "sport = :$AGENT_PORT" | grep -q .; then
+            return 0
+        fi
+        sleep 0.25
+    done
+    printf 'ERROR: Port %s bleibt nach dem Dienststopp belegt. Kein Startversuch ausgeführt.\n' "$AGENT_PORT" >&2
+    return 1
 }
 
 version_is_older() {
@@ -226,6 +240,12 @@ update_started=1
 trap finish EXIT
 
 systemctl stop "$SERVICE_NAME"
+if ! wait_for_port_free; then
+    # Do not leave the productive service stopped when a stale listener makes
+    # the transaction unsafe. No agent tree has been swapped at this point.
+    systemctl start "$SERVICE_NAME" || true
+    die "Portfreigabe vor dem Agent-Start nicht nachweisbar; Update abgebrochen."
+fi
 bash "$SCRIPT_DIR/update-agent.sh" --source-dir "$source_dir" --expected-commit "$expected_commit" --apply --keep-rollback
 for candidate_dir in "$AGENT_ROOT"/agent.previous.*.staging; do
     [[ -d "$candidate_dir" ]] || continue

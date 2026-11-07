@@ -18,6 +18,7 @@ LoadCredential=proxmox_api_token:/etc/smart-homelab-maintenance/proxmox-api-toke
 ExecStart=/opt/smart-homelab-maintenance/venv/bin/python -m smart_homelab_maintenance.server
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=30
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

@@ -17,17 +17,23 @@ Bei einem freigegebenen Update gilt:
 1. Quelle, Commit, Dienst, Zielpfad und CA werden geprüft.
 2. Die zuvor installierte Agent-Version wird erfasst.
 3. Nur `smart-homelab-maintenance-agent.service` wird gestoppt.
-4. Der Agent-Code wird atomar ausgetauscht; Konfiguration, TLS-Dateien,
+4. Nach dem Stopp muss Port 48128 tatsächlich frei sein. Bleibt ein Listener
+   bestehen, wird der Austausch nicht begonnen und der Dienst wird nicht mit
+   einer zweiten Instanz überlagert.
+5. Der Agent-Code wird atomar ausgetauscht; Konfiguration, TLS-Dateien,
    Credentials und Firewall-Skripte liegen außerhalb des ersetzten `agent/`-
    Baums.
-5. Nach dem Start wartet der Updater höchstens 30 Sekunden mit begrenzten
+6. Der Agent behandelt `SIGTERM`/`SIGINT` kontrolliert, beendet den
+   Server-Loop und schließt den Listen-Socket. `SO_REUSEPORT` bleibt bewusst
+   deaktiviert; zwei Agent-Instanzen können daher nicht parallel lauschen.
+7. Nach dem Start wartet der Updater höchstens 30 Sekunden mit begrenzten
    Versuchen auf einen TLS-validierten Healthcheck.
-6. Der Healthcheck muss Schema 1, Status `ok`, API-Vertrag 1.1 und exakt die
+8. Der Healthcheck muss Schema 1, Status `ok`, API-Vertrag 1.1 und exakt die
    erwartete Agent-Version melden.
-7. Bei einem Timeout, einer inkompatiblen Antwort oder einem Dienstfehler wird
+9. Bei einem Timeout, einer inkompatiblen Antwort oder einem Dienstfehler wird
    der Dienst gestoppt, ein systemd-Fehlerzustand zurückgesetzt und der
    vorherige Agent-Code wiederhergestellt.
-8. Der Rollback-Code wird erneut mit demselben TLS-/API-Healthcheck geprüft.
+10. Der Rollback-Code wird erneut mit demselben TLS-/API-Healthcheck geprüft.
    Scheitert auch dieser Check, bleibt der Dienst gestoppt und der Updater
    liefert einen eindeutigen Rollback-Fehlercode.
 

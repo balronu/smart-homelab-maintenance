@@ -1,5 +1,19 @@
 # Smart Homelab Maintenance
 
+## Unreleased: Agent-Port-Bind-Race
+
+Der externe Agent beendet seinen HTTPS-Server bei Stop-Signalen kontrolliert
+und schließt Port 48128, bevor systemd einen neuen Prozess starten kann. Der
+Updater prüft die Portfreigabe nach dem Dienststopp und bricht bei einem noch
+belegten Port sicher ab; ein längeres Readiness-Timeout ersetzt diese Prüfung
+nicht. Historische und fehlgeschlagene Rollback-Stagings werden nicht gelöscht.
+
+The external agent now performs controlled signal shutdown and closes port
+48128 before systemd can start another process. The updater verifies the port
+after stopping the service and safely aborts while it is still occupied; a
+longer readiness timeout is not used as a substitute. Historical and failed
+rollback staging directories are never deleted automatically.
+
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
