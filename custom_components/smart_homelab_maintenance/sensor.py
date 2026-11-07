@@ -16,9 +16,9 @@ class SensorValue:
 
 def coordinator_sensors(data: Any) -> tuple[SensorValue, ...]:
     return (
-        SensorValue("agent_connection", "Agent-Verbindung", "connected" if data.connected else "offline", {"error": data.error}),
+        SensorValue("agent_connection", "Agent-Verbindung", "connected" if data.connected else "offline", {"error": data.error, "update_error": data.update_error}),
         SensorValue("agent_running_jobs", "Laufende Jobs", len([j for j in data.jobs if j.get("state") in {"preflight", "running", "postcheck"}]), {}),
-        SensorValue("agent_last_error", "Letzter Fehler", data.error or "none", {}),
+        SensorValue("agent_last_error", "Letzter Fehler", data.error or data.update_error or "none", {}),
     )
 
 

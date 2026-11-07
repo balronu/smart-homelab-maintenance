@@ -87,7 +87,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     from datetime import timedelta
     from homeassistant.helpers.event import async_track_time_interval
     coordinator.set_unsub_interval(async_track_time_interval(
-        hass, lambda _now: hass.async_create_task(coordinator.async_request_refresh()),
+        # The interval callback may be delivered from a worker thread on
+        # current HA versions.  ``add_job`` is the thread-safe scheduler;
+        # ``async_create_task`` is restricted to the event-loop thread.
+        hass, lambda _now: hass.add_job(coordinator.async_request_refresh),
         timedelta(seconds=coordinator.update_interval),
     ))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
