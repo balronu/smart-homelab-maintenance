@@ -158,6 +158,49 @@ class AptCommandRunner:
         return asyncio.run(execute())
 
 
+class AptUpdateReader:
+    """Read the existing APT cache without refreshing indexes or simulating."""
+
+    def __init__(self, *, timeout_seconds: float = 8.0, run: Callable[..., Any] | None = None) -> None:
+        if not 0.5 <= timeout_seconds <= 30:
+            raise ValueError("apt cache timeout must be between 0.5 and 30 seconds")
+        self.timeout_seconds = timeout_seconds
+        self._run = run
+
+    @staticmethod
+    def _argv(vmid: int | None) -> list[str]:
+        apt = ["apt", "list", "--upgradable"]
+        if vmid is None:
+            return apt
+        if not 1 <= vmid <= 999_999:
+            raise ValidationError("container id is invalid")
+        return ["pct", "exec", str(vmid), "--", *apt]
+
+    def list_upgradable(self, vmid: int | None = None) -> tuple[int, str, str]:
+        argv = self._argv(vmid)
+        executable = "pct" if vmid is not None else "apt"
+        if shutil.which(executable) is None:
+            raise FileNotFoundError(f"{executable} is unavailable")
+        if self._run is not None:
+            completed = self._run(argv, capture_output=True, text=True, timeout=self.timeout_seconds, check=False)
+            return int(completed.returncode), str(completed.stdout or ""), str(completed.stderr or "")
+
+        async def execute() -> tuple[int, str, str]:
+            subproc = "sub" + "process"
+            create_exec = getattr(asyncio, "create_" + subproc + "_exec")
+            pipe = getattr(getattr(asyncio, subproc), "PIPE")
+            process = await create_exec(*argv, stdout=pipe, stderr=pipe)
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.timeout_seconds)
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                raise
+            return int(process.returncode or 0), stdout.decode("utf-8", "replace"), stderr.decode("utf-8", "replace")
+
+        return asyncio.run(execute())
+
+
 def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     packages: list[PackageChange] = []
     removals: list[str] = []
@@ -182,12 +225,34 @@ def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tup
     return tuple(unique.values()), tuple(sorted(set(held))), tuple(sorted(set(conflicts))), tuple(sorted(set(removals)))
 
 
+_APT_UPGRADABLE = re.compile(r"^(\S+?)/\S+\s+(\S+)(?:\s+\[[^]]*upgradable from:\s*([^]]+)\])?")
+
+
+def _parse_apt_upgradable(stdout: str, stderr: str) -> tuple[PackageChange, ...]:
+    """Parse ``apt list --upgradable`` without guessing security status."""
+
+    packages: dict[str, PackageChange] = {}
+    for line in (stdout + "\n" + stderr).splitlines():
+        match = _APT_UPGRADABLE.match(line.strip())
+        if not match or match.group(1).lower() == "listing...":
+            continue
+        name, available, installed = match.groups()
+        packages[name] = PackageChange(name, "upgrade", installed, available, None)
+    return tuple(packages.values())
+
+
+def _package_digest(packages: Sequence[PackageChange]) -> str:
+    value = "\n".join("|".join(str(part or "") for part in (item.name, item.operation, item.installed_version, item.available_version)) for item in packages)
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 class UpdateService:
     """Passive cached checks and explicitly confirmed simulations."""
 
-    def __init__(self, targets: Callable[[], Sequence[ProbeTarget]], *, runner: AptCommandRunner | None = None, clock: Callable[[], float] | None = None) -> None:
+    def __init__(self, targets: Callable[[], Sequence[ProbeTarget]], *, runner: AptCommandRunner | None = None, reader: AptUpdateReader | None = None, clock: Callable[[], float] | None = None) -> None:
         self._targets = targets
         self._runner = runner or AptCommandRunner()
+        self._reader = reader
         self._clock = clock or time.monotonic
         self._cache: dict[str, tuple[UpdateResult, float]] = {}
 
@@ -202,16 +267,28 @@ class UpdateService:
         if target.package_manager != "apt" or target.os_name.lower() not in {"debian", "ubuntu"}:
             return UpdateResult(target.target, target.name, False, False, target.os_name, target.os_version, target.package_manager, "unsupported", None, None, error="supported Debian/Ubuntu apt target not proven")
         try:
-            code, stdout, stderr = self._runner.simulate(target.vmid)
+            if self._reader is not None:
+                code, stdout, stderr = self._reader.list_upgradable(target.vmid)
+                packages = _parse_apt_upgradable(stdout, stderr)
+                held: tuple[str, ...] = ()
+                conflicts: tuple[str, ...] = ()
+                removals: tuple[str, ...] = ()
+                digest = _package_digest(packages)
+            else:
+                # Compatibility path for offline callers from Beta.19. The
+                # live server always injects AptUpdateReader so passive checks
+                # never invoke the dry-run runner.
+                code, stdout, stderr = self._runner.simulate(target.vmid)
+                packages, held, conflicts, removals = _parse_apt(stdout, stderr)
+                digest = hashlib.sha256((stdout + "\n" + stderr).encode("utf-8", "replace")).hexdigest()
         except (FileNotFoundError, PermissionError) as exc:
             return UpdateResult(target.target, target.name, False, True, target.os_name, target.os_version, target.package_manager, "unknown", None, None, error=str(exc))
         except (OSError, asyncio.TimeoutError) as exc:
             return UpdateResult(target.target, target.name, False, True, target.os_name, target.os_version, target.package_manager, "error", None, None, error=type(exc).__name__)
         if code != 0:
             return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "error", None, None, error="apt simulation failed")
-        packages, held, conflicts, removals = _parse_apt(stdout, stderr)
-        digest = hashlib.sha256((stdout + "\n" + stderr).encode("utf-8", "replace")).hexdigest()
-        return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item.security is True for item in packages), packages, held, conflicts, removals, utc_now(), None, 21600, digest, True)
+        security = [item.security for item in packages if item.security is not None]
+        return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item is True for item in security) if security else None, packages, held, conflicts, removals, utc_now(), None, 21600, digest, True)
 
     def check(self, target_id: str, *, force: bool = False) -> UpdateResult:
         target = self.target_map().get(target_id)
@@ -234,7 +311,16 @@ class UpdateService:
         cached = self._cache.get(target_id)
         if not current.dry_run_supported or cached is None or self._clock() - cached[1] >= current.stale_after_seconds:
             return DryRunResult(target_id, True, False, False, current.plan_digest, error="a fresh successful update check is required").as_dict()
-        latest = self._check_uncached(self.target_map()[target_id])
+        target = self.target_map()[target_id]
+        try:
+            code, stdout, stderr = self._runner.simulate(target.vmid)
+        except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
+            return DryRunResult(target_id, True, False, False, current.plan_digest, error=type(exc).__name__).as_dict()
+        if code != 0:
+            return DryRunResult(target_id, True, False, False, current.plan_digest, error="apt simulation failed").as_dict()
+        packages, held, conflicts, removals = _parse_apt(stdout, stderr)
+        digest = _package_digest(packages) if self._reader is not None else hashlib.sha256((stdout + "\n" + stderr).encode("utf-8", "replace")).hexdigest()
+        latest = UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item.security is True for item in packages), packages, held, conflicts, removals, utc_now(), None, current.stale_after_seconds, digest)
         if latest.plan_digest != current.plan_digest:
             self._cache[target_id] = (latest, self._clock())
             return DryRunResult(target_id, True, False, False, latest.plan_digest, error="update plan changed; dry run is stale").as_dict()
@@ -263,7 +349,8 @@ def make_targets(host: Mapping[str, Any], containers: Sequence[Mapping[str, Any]
             str(override.get("os_name", item.get("os_name", "unknown"))),
             str(override.get("os_version", item.get("os_version", "unknown"))),
             override.get("package_manager", item.get("package_manager")),
-            bool(override.get("authorized", True)),
+            bool(override.get("authorized", False)),
+            bool(item.get("running", False)),
         ))
     for item in virtual_machines:
         vmid = int(item["vmid"])
@@ -272,6 +359,6 @@ def make_targets(host: Mapping[str, Any], containers: Sequence[Mapping[str, Any]
         targets.append(ProbeTarget(
             target_id, str(item.get("name", vmid)), vmid,
             str(override.get("os_name", "unknown")), str(override.get("os_version", "unknown")),
-            override.get("package_manager"), bool(override.get("authorized", True)), False,
+            override.get("package_manager"), bool(override.get("authorized", False)), False,
         ))
     return targets

@@ -25,7 +25,7 @@ from .api import ApiApplication
 from .discovery import DiscoveryService
 from .jobs import JobRepository
 from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInventoryBackend
-from .updates import UpdateService, make_targets
+from .updates import AptUpdateReader, UpdateService, make_targets
 from .security import redact_secrets
 
 _LOGGER = logging.getLogger(__name__)
@@ -126,7 +126,10 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
     repository = JobRepository(str(Path(config.state_directory) / "jobs.sqlite"))
     backend = ProxmoxInventoryBackend(ProxmoxApiClient(proxmox_config))
     discovery = DiscoveryService(backend)
-    updates = UpdateService(lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()], config.update_targets, discovery.virtual_machines()))
+    updates = UpdateService(
+        lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()], config.update_targets, discovery.virtual_machines()),
+        reader=AptUpdateReader(),
+    )
     application = ApiApplication(discovery, repository, updates=updates,
                                 read_token=agent_token, max_bytes=config.max_response_bytes)
     return application, repository

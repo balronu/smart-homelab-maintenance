@@ -3,6 +3,20 @@
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
+## Beta.20-Kandidat: vollständige Updateverwaltung ohne Ausführung
+
+Dieser Entwicklungsstand trennt die passive APT-Cache-Auswertung vom bewusst
+angeforderten Dry Run. Nur ausdrücklich allowlistete, laufende Debian-/Ubuntu-
+Ziele können später geprüft werden; VMs ohne autorisierten Gastzugriff und
+gestoppte LXCs werden nicht angesprochen. Der Button **Updates installieren**
+ist sichtbar, dauerhaft deaktiviert und besitzt keinen Serviceaufruf. Echte
+Updateausführung bleibt auch bei manipulierten Frontend-Anfragen serverseitig
+gesperrt.
+
+Der zweisprachige Release-Notes-Entwurf liegt unter
+[`docs/releases/v0.1.0-beta.20.md`](docs/releases/v0.1.0-beta.20.md). Beta.20
+ist noch nicht veröffentlicht.
+
 ## Beta.19: Dry Runs und passive Update-Erkennung
 
 Beta.19 behebt den Lovelace-Aufruf für `smart_homelab_maintenance.dry_run`:
