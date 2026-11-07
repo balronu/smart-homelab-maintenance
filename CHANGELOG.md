@@ -479,9 +479,10 @@ system was changed by this release.
 
 ### Deutsch
 
-- Der Updater prüft für Port 48128 neben `LISTEN` auch alle TCP-Zustände und
-  bestätigt, dass die systemd-Unit tatsächlich inaktiv ist, bevor der
-  Quellbaum ausgetauscht wird.
+- Der Updater prüft für Port 48128 neben `LISTEN` auch aktive TCP-Zustände und
+  bestätigt, dass die systemd-Unit tatsächlich inaktiv ist. Der terminale,
+  kernelverwaltete `TIME-WAIT`-Zustand wird bei `SO_REUSEADDR` nicht als
+  blockierender Listener behandelt.
 - Vor und nach Stopp, Swap und Start werden ausschließlich nicht-sensitive
   MainPID-, ControlPID-, Cgroup- und Socketdaten protokolliert.
 - Die vorhandenen Journale beweisen den wiederholten Bind-Fehler, aber nicht

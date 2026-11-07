@@ -123,11 +123,21 @@ wait_for_health() {
     return "$READINESS_FAILURE_EXIT"
 }
 
+port_has_blocking_state() {
+    local sockets
+    sockets="$(ss -Htanp "sport = :$AGENT_PORT" 2>/dev/null || true)"
+    [[ -n "$sockets" ]] || return 1
+    # TIME-WAIT is a kernel-owned, terminal connection state. It has no
+    # listener or process owner and is safe for this server's SO_REUSEADDR
+    # bind. Every other state remains a safety block.
+    awk '$1 != "TIME-WAIT" { found = 1 } END { exit(found ? 0 : 1) }' <<<"$sockets"
+}
+
 wait_for_port_free() {
     local deadline=$((SECONDS + 10))
     while (( SECONDS < deadline )); do
         if ! systemctl is-active --quiet "$SERVICE_NAME" \
-            && ! ss -Htanp "sport = :$AGENT_PORT" | grep -q .; then
+            && ! port_has_blocking_state; then
             return 0
         fi
         sleep 0.25
@@ -271,6 +281,9 @@ for candidate_dir in "$AGENT_ROOT"/agent.previous.*.staging; do
     fi
 done
 [[ -n "$rollback_dir" ]] || die "Rollback-Staging wurde nicht erzeugt."
+if ! wait_for_port_free; then
+    die "Portfreigabe vor dem neuen Agent-Start nicht nachweisbar; Rollback wird ausgeführt."
+fi
 systemctl start "$SERVICE_NAME"
 port_forensics "nach-start"
 wait_for_health "$expected_agent_version" || exit "$READINESS_FAILURE_EXIT"
