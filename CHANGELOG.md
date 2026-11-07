@@ -553,3 +553,24 @@ system was changed by this release.
   failed upgrade start, even if a later attempt becomes healthy.
 - Existing rollback preserves the previous code and diagnostics; the safety
   gate is not replaced by a longer timeout.
+## 0.1.0-beta.27 – Restart-Race-Erkennung (Prerelease)
+
+### Deutsch
+
+- Der Updater erfasst den systemd-Restartzähler vor dem Agent-Austausch und
+  nochmals unmittelbar nach dem erfolgreichen TLS-/API-Healthcheck.
+- Jeder Restart-Anstieg wird als fehlgeschlagener Start behandelt und führt
+  zum bestehenden sicheren Rollback; wiederholte Bind-Fehler können nicht mehr
+  durch einen später erfolgreichen systemd-Versuch als Exit 0 verdeckt werden.
+- Die konkrete Beta.22→Beta.26-Socket-Semantik mit `TIME-WAIT` und fehlendem
+  `SO_REUSEADDR` ist als isolierte Regression dokumentiert.
+
+### English
+
+- The updater records the systemd restart counter before the agent swap and
+  again immediately after a successful TLS/API healthcheck.
+- Any restart increase is treated as a failed start and activates the existing
+  safe rollback; repeated bind failures can no longer be hidden by a later
+  successful systemd attempt returning exit 0.
+- The concrete Beta.22→Beta.26 socket semantics involving `TIME-WAIT` and
+  missing `SO_REUSEADDR` are covered by an isolated regression.
