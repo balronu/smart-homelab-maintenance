@@ -5,7 +5,7 @@ Wartungsagent für private Homelab-Umgebungen.
 
 ## Status
 
-Beta.14-Kandidat: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
+Beta.15-Kandidat: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
 aufklappbaren Host-/VM-/LXC-Details und einem Größenänderungssignal für das
 Home-Assistant-Sections-Layout. Eine echte iOS-Home-Assistant-Praxisprüfung
 bleibt vor Veröffentlichung erforderlich; der Scrollfehler ist nicht als
@@ -15,6 +15,13 @@ Der abschließende Praxistest in der Home-Assistant-iOS-App steht noch aus.
 Updateausführung ist deaktiviert. Agent-,
 Proxmox- und Containerzugriffe müssen vor einer späteren Aktivierung separat
 konfiguriert und geprüft werden.
+
+Beta.15 ergänzt passive Paketprüfungen für nachweislich unterstützte
+Debian-/Ubuntu-Ziele und einen ausdrücklich bestätigten `apt-get --simulate`
+Dry Run. Paketlisten werden nicht aktualisiert, Pakete werden nicht installiert
+und Systeme werden nicht neu gestartet. Eine spätere Ausführung bleibt
+serverseitig gesperrt und benötigt eine eigene, separat freizugebende Phase;
+ein deaktivierter UI-Button allein wäre keine Sicherheitsgrenze.
 
 ## Bestandteile
 

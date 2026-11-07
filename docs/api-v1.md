@@ -18,12 +18,19 @@ Alle übrigen Endpunkte verlangen `Authorization: Bearer <read-token>`.
 | GET | `/api/v1/jobs?offset=&limit=` | begrenzte Jobübersicht |
 | GET | `/api/v1/jobs/{job_id}` | Jobstatus ohne große Historie |
 | GET | `/api/v1/jobs/{job_id}/events?after=&limit=` | Cursor-basierte Ereignisse |
+| GET | `/api/v1/updates` | Passive Updateprüfung aller autorisierten Ziele |
+| GET | `/api/v1/updates/{target}` | Ergebnis für `host` oder `container:{vmid}` |
+| POST | `/api/v1/updates/{target}/dry-run` | Bestätigte, feste Paketmanager-Simulation |
 
 Der lokale Transport prüft private HTTPS-URLs, Zertifikatskette, Timeout,
 Antwortgröße und Bearer-Authentifizierung
 und `schema_version`; abgebrochene oder ungültige Antworten werden als
 strukturierte Transportfehler behandelt. Antworten besitzen `schema_version: "1"`, `request_id` und entweder `data`
 oder ein strukturiertes `error`. Antwortgröße und Pagination sind begrenzt.
-Der Server bindet standardmäßig nicht öffentlich, verlangt Zertifikat und
+Die einzige Update-POST-Route ist der bestätigte, read-only Dry Run; beliebige
+Shell-Kommandos und echte Updateausführung sind ausgeschlossen.
+Der Dry Run akzeptiert ausschließlich JSON `{\"confirm\":true}`. Es gibt keine
+Route zur echten Updateausführung: `/execute` und `/update` werden auch bei
+direktem API-Aufruf serverseitig abgewiesen. Der Server bindet standardmäßig nicht öffentlich, verlangt Zertifikat und
 privaten Schlüssel, TLS ab 1.2 und ein systemd-Credential für das Bearer-Token.
-Es gibt keine POST-Route für Updates oder beliebige Shell-Kommandos.
+Es gibt keine POST-Route für echte Updates oder beliebige Shell-Kommandos.

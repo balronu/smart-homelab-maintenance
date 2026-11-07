@@ -277,6 +277,8 @@ class CoreTests(unittest.TestCase):
                 return {"data": {"items": [{"job_id": "j1", "state": "running"}]}}
             async def capabilities(self):
                 return {"data": {"execution_enabled": False}}
+            async def updates(self):
+                return {"data": {"items": []}}
 
         async def scenario() -> None:
             coordinator = SmartHomelabCoordinator(None, {"agent_url": "https://agent.home.arpa:1", "token": "fixture"})

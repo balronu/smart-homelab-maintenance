@@ -62,12 +62,14 @@ def _payloads():
 @pytest.fixture
 def patched_transport(monkeypatch):
     host, virtual_machines, containers, jobs, capabilities, health = _payloads()
+    updates = {"schema_version": "1", "data": {"items": []}}
 
     async def fake_host(self): return host
     async def fake_virtual_machines(self): return virtual_machines
     async def fake_containers(self): return containers
     async def fake_jobs(self): return jobs
     async def fake_capabilities(self): return capabilities
+    async def fake_updates(self): return updates
     async def fake_health(self): return health
 
     monkeypatch.setattr(AgentHttpTransport, "host", fake_host)
@@ -75,6 +77,7 @@ def patched_transport(monkeypatch):
     monkeypatch.setattr(AgentHttpTransport, "containers", fake_containers)
     monkeypatch.setattr(AgentHttpTransport, "jobs", fake_jobs)
     monkeypatch.setattr(AgentHttpTransport, "capabilities", fake_capabilities)
+    monkeypatch.setattr(AgentHttpTransport, "updates", fake_updates)
     monkeypatch.setattr(AgentHttpTransport, "health", fake_health)
 
 

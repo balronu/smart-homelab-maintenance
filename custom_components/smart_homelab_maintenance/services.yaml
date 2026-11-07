@@ -44,3 +44,24 @@ get_job_events:
         number:
           min: 0
           mode: box
+dry_run:
+  name: Simulate update
+  description: Run the fixed, read-only package-manager simulation for one authorized target.
+  fields:
+    entry_id:
+      name: Config entry
+      required: false
+      selector:
+        text:
+    target:
+      name: Authorized target
+      description: host or container VMID, for example container:107.
+      required: true
+      selector:
+        text:
+    confirm:
+      name: Explicit confirmation
+      description: Required acknowledgement that this is a read-only simulation.
+      required: true
+      selector:
+        boolean:

@@ -16,16 +16,18 @@ from .discovery import DiscoveryService
 from .errors import MaintenanceError, ValidationError
 from .jobs import JobRepository
 from .security import redact_secrets
+from .updates import UpdateService
 
 
 class ApiApplication:
-    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, read_token: str | None = None, max_bytes: int = 256_000) -> None:
+    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, max_bytes: int = 256_000) -> None:
         self.discovery = discovery
         self.jobs = jobs
+        self.updates = updates
         self.read_token = read_token
         self.max_bytes = max_bytes
 
-    def handle(self, method: str, path: str, *, headers: Mapping[str, str] | None = None) -> tuple[int, dict[str, Any]]:
+    def handle(self, method: str, path: str, *, headers: Mapping[str, str] | None = None, body: bytes | None = None) -> tuple[int, dict[str, Any]]:
         request_id = secrets.token_hex(8)
         headers = {str(k).lower(): str(v) for k, v in (headers or {}).items()}
         raw_path, separator, raw_query = path.partition("?")
@@ -36,11 +38,12 @@ class ApiApplication:
                 if key:
                     query.setdefault(key, []).append(value if equals else "")
         try:
-            if method.upper() != "GET":
-                raise ValidationError("only GET is available")
+            method = method.upper()
+            if method not in {"GET", "POST"}:
+                raise ValidationError("method is not supported")
             if raw_path != "/api/v1/health" and not self._authorized(headers):
                 return 401, self._error("authentication_required", "authentication required", request_id)
-            payload = self._route(raw_path, query)
+            payload = self._route(raw_path, query, method=method, body=body or b"")
             body = {"schema_version": "1", "data": payload, "request_id": request_id}
             encoded = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode()
             if len(encoded) > self.max_bytes:
@@ -57,11 +60,11 @@ class ApiApplication:
         supplied = headers.get("authorization", "")
         return bool(self.read_token and secrets.compare_digest(supplied, "Bearer " + self.read_token))
 
-    def _route(self, path: str, query: Mapping[str, list[str]]) -> Any:
+    def _route(self, path: str, query: Mapping[str, list[str]], *, method: str, body: bytes) -> Any:
         if path == "/api/v1/health":
             return {"status": "ok", "mode": "offline"}
         if path == "/api/v1/capabilities":
-            return {"execution_enabled": False, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
+            return {"execution_enabled": False, "dry_run_enabled": self.updates is not None, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
         if path == "/api/v1/host":
             return self.discovery.host()
         if path == "/api/v1/virtual-machines":
@@ -70,7 +73,30 @@ class ApiApplication:
             return self._page([item.as_dict() for item in self.discovery.containers()], query)
         if path == "/api/v1/jobs":
             return self._page(self.jobs.list(offset=self._int(query, "offset", 0), limit=self._int(query, "limit", 50)), query)
+        if path == "/api/v1/updates" and method == "GET":
+            if self.updates is None:
+                return {"items": [], "status": "unknown"}
+            items = self.updates.all()
+            return {"items": items, "checked_at": max((item.get("checked_at") or "" for item in items), default=None)}
         parts = path.strip("/").split("/")
+        if len(parts) == 4 and parts[:3] == ["api", "v1", "updates"] and method == "GET":
+            if self.updates is None:
+                return {"status": "unknown", "error": "update checks are unavailable"}
+            return self.updates.check(parts[3]).as_dict()
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] == "dry-run" and method == "POST":
+            if self.updates is None:
+                return {"simulation": True, "success": False, "safe": False, "error": "dry run is unavailable"}
+            try:
+                request = json.loads(body.decode("utf-8")) if body else {}
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValidationError("dry-run body must be valid JSON") from exc
+            if not isinstance(request, dict) or set(request) - {"confirm"}:
+                raise ValidationError("dry-run accepts only confirm")
+            return self.updates.dry_run(parts[3], confirmed=request.get("confirm") is True)
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] in {"execute", "update"}:
+            raise ValidationError("update execution is disabled in Beta.15")
+        if path in {"/api/v1/update", "/api/v1/execute"}:
+            raise ValidationError("update execution is disabled in Beta.15")
         if len(parts) == 4 and parts[:3] == ["api", "v1", "apps"]:
             return self.discovery.app(parts[3]).as_dict()
         if len(parts) == 4 and parts[:3] == ["api", "v1", "jobs"]:

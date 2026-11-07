@@ -24,6 +24,7 @@ from .api import ApiApplication
 from .discovery import DiscoveryService
 from .jobs import JobRepository
 from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInventoryBackend
+from .updates import UpdateService, make_targets
 from .security import redact_secrets
 
 _LOGGER = logging.getLogger(__name__)
@@ -105,7 +106,9 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
     )
     repository = JobRepository(str(Path(config.state_directory) / "jobs.sqlite"))
     backend = ProxmoxInventoryBackend(ProxmoxApiClient(proxmox_config))
-    application = ApiApplication(DiscoveryService(backend), repository,
+    discovery = DiscoveryService(backend)
+    updates = UpdateService(lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()]))
+    application = ApiApplication(discovery, repository, updates=updates,
                                 read_token=agent_token, max_bytes=config.max_response_bytes)
     return application, repository
 
@@ -157,7 +160,28 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 pass
 
     def do_POST(self) -> None:  # noqa: N802
-        self.send_error(405, "method not allowed")
+        application: ApiApplication = self.server.application  # type: ignore[attr-defined]
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or length > 16_384:
+                self.send_error(413, "request body too large")
+                return
+            body = self.rfile.read(length)
+            status, payload = application.handle("POST", self.path, headers=self.headers, body=body)
+            encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError):
+            _LOGGER.debug("client disconnected before response was written")
+        except Exception as exc:
+            _LOGGER.warning("agent POST request failed: %s", redact_secrets(str(exc)))
+            try:
+                self.send_error(500, "internal server error")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
     def log_message(self, format: str, *args: object) -> None:
         # Access logs must never contain Authorization headers or query tokens.

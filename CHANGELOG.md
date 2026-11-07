@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.0-beta.15 – Sichere Update-Prüfung und Simulation (Kandidat)
+
+### Deutsch
+
+- Ergänzt passive Update-Erkennung für den Proxmox-Host und autorisierte
+  Debian-/Ubuntu-LXC-Ziele über einen festen, begrenzten APT-Prüfpfad.
+- Zeigt `aktuell`, `Updates verfügbar`, `unbekannt`, `nicht unterstützt` und
+  Fehler getrennt; fehlende Messwerte werden nicht erfunden.
+- Ergänzt einen ausdrücklich bestätigten Dry Run mit
+  `apt-get --simulate --no-remove upgrade`. Paketindex-Aktualisierung,
+  Installation, Entfernung und Neustarts finden nicht statt.
+- Die Ausführung echter Updates ist serverseitig deaktiviert; die spätere
+  Freischaltung muss zusätzlich aktuellen Dry Run, unveränderten Plan,
+  Konflikt-/Entfernungsprüfung und ausdrückliche Bestätigung erzwingen.
+- Beta.15 ist ein Releasekandidat. Der iPhone-Scrollfix bleibt ohne echten
+  iOS-Praxistest unbestätigt.
+
+### English
+
+- Adds passive update detection for the Proxmox host and authorized
+  Debian/Ubuntu LXC targets through a fixed, bounded APT inspection path.
+- Distinguishes up to date, updates available, unknown, unsupported, and error;
+  missing measurements are never fabricated.
+- Adds an explicitly confirmed dry run using
+  `apt-get --simulate --no-remove upgrade`. It does not refresh indexes,
+  install or remove packages, or restart services.
+- Real update execution is server-disabled. Any later enablement must enforce
+  a current dry run, unchanged plan, conflict/removal checks, and explicit
+  confirmation server-side.
+- Beta.15 is a release candidate. The iPhone scroll fix remains unverified
+  without a real iOS field test.
+
 ## 0.1.0-beta.14 – Sections-Resize- und Ressourcen-Kandidat
 
 ### Deutsch
