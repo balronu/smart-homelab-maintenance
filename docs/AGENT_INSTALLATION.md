@@ -40,6 +40,23 @@ Installer startet oder aktiviert den Dienst nicht. Dienstneustart und
 Änderung der HA-Konfiguration bleiben getrennte, ausdrücklich freizugebende
 Schritte. Ein HACS-Update allein darf nicht als Agent-Update betrachtet werden.
 
+Ab Beta.18 meldet der Healthcheck zusätzlich `api_contract`; Home Assistant
+zeigt `current`, `outdated`, `incompatible` oder `unknown` an. Eine
+Versionsnummer allein reicht nicht für Kompatibilität.
+
+Der vorbereitete gemeinsame Prozess liegt unter `scripts/upgrade-agent.sh`.
+Ohne `--apply` ist er rein lesend. Der mutierende Pfad verlangt sowohl
+`--apply` als auch `--confirm`, stoppt ausschließlich den Maintenance-Agenten,
+installiert nur den geprüften Agent-Code und startet nur diesen Dienst. Bis
+zum Healthcheck bleibt ein temporärer Rollback-Stand bestehen. Bei einem
+fehlenden oder inkompatiblen Healthcheck wird der alte Code wiederhergestellt;
+ein HACS-Update, ein HA-Neustart oder ein Agent-Start löst diesen Ablauf
+niemals automatisch aus.
+
+Nach jedem HACS-Update ist die Kompatibilitätssensorik zu prüfen. Bei
+`outdated`, `incompatible` oder `unknown` bleibt der Agent unverändert und es
+ist eine separate, ausdrücklich freigegebene Agent-Aktualisierung erforderlich.
+
 ## 2. Quelle und Integrität
 
 Der Installer lädt nichts aus dem Internet. Die Quelle wird von einem

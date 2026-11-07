@@ -3,6 +3,20 @@
 Read-only Home-Assistant-Integration, Lovelace-Karte und offline testbarer
 Wartungsagent für private Homelab-Umgebungen.
 
+## Beta.18-Kandidat: gemeinsamer Versions- und Updatevertrag
+
+Integration, Karte und Agent tragen dieselbe Beta-Version. Der Agent meldet
+zusätzlich den API-Vertrag über `/api/v1/health`. Home Assistant bewertet die
+Kombination als `current`, `outdated`, `incompatible` oder `unknown` und zeigt
+die Abweichung sichtbar an. Ein HACS-Update aktualisiert niemals automatisch
+den separat laufenden Agenten.
+
+Der vorbereitete Agent-Prozess in `scripts/upgrade-agent.sh` prüft Commit,
+Quellintegrität, TLS-CA, Dienst und Healthcheck. Der mutierende Pfad benötigt
+explizit `--apply --confirm`, hält während des Healthchecks einen temporären
+Rollback-Stand vor und stellt ihn bei einem fehlgeschlagenen Healthcheck
+wieder her. Er verändert weder Proxmox, VMs noch LXCs.
+
 ## Status
 
 Beta.17-Prerelease: responsive Lovelace-Karte mit stabiler dynamischer Höhe,
