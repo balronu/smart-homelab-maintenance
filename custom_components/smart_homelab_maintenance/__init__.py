@@ -88,8 +88,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 simulation_authorized=call.data.get("simulation_authorized", False),
                 update_authorized=call.data.get("update_authorized", False),
             )
-            if call.service == "dry_run":
-                coordinator.record_dry_run(str(call.data.get("target")), result.get("data", result))
+            if call.service in ("dry_run", "set_permissions"):
+                if call.service == "dry_run":
+                    coordinator.record_dry_run(str(call.data.get("target")), result.get("data", result))
                 await coordinator.async_request_refresh()
             hass.data[DOMAIN].setdefault("last_action_result", {})[call.service] = result
             return result

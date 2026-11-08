@@ -70,10 +70,37 @@ installButton?.click();
 await new Promise((resolve) => setTimeout(resolve, 0));
 const installUi = Boolean(installEnabled && executeCall?.[0] === "smart_homelab_maintenance" && executeCall?.[1] === "execute" && executeCall?.[2]?.target === "container:101" && executeCall?.[2]?.confirm === true && executeCall?.[2]?.plan_digest === "digest-101" && card.shadowRoot.textContent.includes("Update completed successfully"));
 card.hass = { locale: "en", callService: () => Promise.resolve(null), states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true, fresh: true } } } } };
+const dryRunMissingResponseButtonBeforePermission = card.shadowRoot.querySelector(".host-details .simulate");
+dryRunMissingResponseButtonBeforePermission?.click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+const dryRunMissingResponseShownBeforePermission = card.shadowRoot.textContent.includes("Serviceantwort ist leer");
+const permissionStates = { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true, fresh: true } } }, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", running: true, os_name: "Debian", os_version: "12", package_manager: "apt", update: { status: "unauthorized", authorized: false, simulation_authorized: false, update_authorized: false } } } };
+let permissionCall = null;
+window.confirm = () => true;
+card.hass = { language: "en", callService: (...args) => { permissionCall = args; return Promise.resolve({ response: { data: { success: true, simulation_authorized: true, update_authorized: false } } }); }, states: permissionStates };
+const permissionButton = card.shadowRoot.querySelector(".container-grid button.permission");
+permissionButton?.click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+const permissionResult = card.shadowRoot.querySelector(".permission-result");
+const permissionSuccessShown = Boolean(permissionResult?.textContent.includes("Permission changed successfully") && !permissionResult.classList.contains("warning") && !permissionButton?.disabled);
+const permissionCallCorrect = permissionCall?.[0] === "smart_homelab_maintenance" && permissionCall?.[1] === "set_permissions" && permissionCall?.[2]?.target === "container:101" && permissionCall?.[2]?.confirm === true && permissionCall?.[2]?.simulation_authorized === true && permissionCall?.[2]?.update_authorized === false;
+const permissionErrors = [];
+for (const status of [400, 403, 500]) {
+  card.hass = { language: "en", callService: () => Promise.reject(new Error(`HTTP ${status}: policy rejected`)), states: permissionStates };
+  card.shadowRoot.querySelector(".container-grid button.permission")?.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  permissionErrors.push(card.shadowRoot.querySelector(".permission-result")?.textContent.includes(`HTTP ${status}: policy rejected`) && card.shadowRoot.querySelector(".permission-result")?.classList.contains("warning") && !card.shadowRoot.querySelector(".container-grid button.permission")?.disabled);
+}
+globalThis.__SMART_HOMELAB_PERMISSION_TIMEOUT_MS__ = 10;
+card.hass = { language: "en", callService: () => new Promise(() => {}), states: permissionStates };
+card.shadowRoot.querySelector(".container-grid button.permission")?.click();
+await new Promise((resolve) => setTimeout(resolve, 25));
+const permissionTimeoutShown = Boolean(card.shadowRoot.querySelector(".permission-result")?.textContent.includes("Permission change timed out") && !card.shadowRoot.querySelector(".container-grid button.permission")?.disabled);
+delete globalThis.__SMART_HOMELAB_PERMISSION_TIMEOUT_MS__;
 const missingResponseButton = card.shadowRoot.querySelector(".host-details .simulate");
 missingResponseButton?.click();
 await new Promise((resolve) => setTimeout(resolve, 0));
-const dryRunMissingResponseShown = card.shadowRoot.textContent.includes("Serviceantwort ist leer");
+const dryRunMissingResponseShownAfterPermission = card.shadowRoot.textContent.includes("Serviceantwort ist leer");
 card.hass = { locale: "en", callService: () => Promise.reject(new Error("service unavailable")), states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true, fresh: true } } } } };
 const errorButton = card.shadowRoot.querySelector(".host-details .simulate");
 errorButton?.click();
@@ -133,6 +160,6 @@ const reopenedEditorSafe = editor.querySelector('[data-field="title"]').value ==
 const barRects = [...card.shadowRoot.querySelectorAll(".bar-row span")].map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
 const hasTextOverlap = barRects.some((left, index) => barRects.slice(index + 1).some((right) => Math.abs(left.top - right.top) < 2 && left.left < right.right && right.left < left.right));
 const initialCardSafe = (() => { const initial = document.createElement("smart-homelab-maintenance-card"); document.body.append(initial); return Boolean(initial.shadowRoot.querySelector(".card")); })();
-window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), hasAvailableResources: card.shadowRoot.textContent.includes("Free RAM") && card.shadowRoot.textContent.includes("Free storage"), inventoryCounts, cardHasSize: card.getCardSize() >= 1, dryRunUi, dryRunResponseShown, emptyDryRunUi, packageDetailsCollapsed, packageDetailsStructured, installButtonDisabled, installUi, dryRunMissingResponseShown, dryRunServiceErrorShown, dryRunTimeoutShown, dryRunLocalizedAuthorizationShown, unauthorizedSimulationUiSafe, actionLayoutContractSafe, stableButtonGeometry, vmExclusionEnglish, vmExclusionGerman, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, initialCardSafe, unknownSafe, unknownContainerSafe, unknownVmMemorySafe, guestAccessGermanSafe, updateStatusLabelsSafe, hostDetailsPreservedAfterUpdates, languageEnglish, languageGerman, localeObjectSafe, missingLanguageFallback, hostOfflineWithoutAgentContradiction, statusStatesSafe, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), hasAvailableResources: card.shadowRoot.textContent.includes("Free RAM") && card.shadowRoot.textContent.includes("Free storage"), inventoryCounts, cardHasSize: card.getCardSize() >= 1, dryRunUi, dryRunResponseShown, emptyDryRunUi, packageDetailsCollapsed, packageDetailsStructured, installButtonDisabled, installUi, permissionSuccessShown, permissionCallCorrect, permissionErrors: permissionErrors.every(Boolean), permissionTimeoutShown, dryRunMissingResponseShown: dryRunMissingResponseShownBeforePermission || dryRunMissingResponseShownAfterPermission, dryRunServiceErrorShown, dryRunTimeoutShown, dryRunLocalizedAuthorizationShown, unauthorizedSimulationUiSafe, actionLayoutContractSafe, stableButtonGeometry, vmExclusionEnglish, vmExclusionGerman, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, initialCardSafe, unknownSafe, unknownContainerSafe, unknownVmMemorySafe, guestAccessGermanSafe, updateStatusLabelsSafe, hostDetailsPreservedAfterUpdates, languageEnglish, languageGerman, localeObjectSafe, missingLanguageFallback, hostOfflineWithoutAgentContradiction, statusStatesSafe, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
 document.querySelector("#result").textContent = JSON.stringify(window.__HARNESS__);
 </script></body></html>

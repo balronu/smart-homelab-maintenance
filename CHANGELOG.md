@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased – post-Beta.45 permission feedback candidate
+
+### Deutsch
+
+- LXC-Berechtigungsbuttons zeigen laufende, erfolgreiche und fehlgeschlagene
+  Serviceaufrufe direkt in der Karte an.
+- HTTP-Fehler (400/403/500) und Timeouts werden nicht mehr nur im `title`-Attribut
+  versteckt; der Ladezustand wird immer zurückgesetzt.
+- Erfolgreiche `set_permissions`-Aufrufe lösen einen Coordinator-Refresh aus, damit
+  Entity-Registry und Update-Status zeitnah zurückgelesen werden.
+- Sicherheitsgrenzen bleiben unverändert: keine automatische Freigabe, keine
+  Änderungen an `execution_enabled`, Allowlist oder produktiven HA-Systemen.
+
+### English
+
+- LXC permission buttons now show in-progress, successful, and failed service calls
+  directly in the card.
+- HTTP 400/403/500 errors and timeouts are no longer hidden only in the `title`
+  attribute; loading state is always reset.
+- Successful `set_permissions` calls request a coordinator refresh so entity state
+  and update status are read back promptly.
+- Security boundaries remain unchanged: no automatic grant and no changes to
+  `execution_enabled`, allowlists, or productive Home Assistant systems.
+
 ## Unreleased – 0.1.0-beta.45 inventory recovery candidate
 
 ### Deutsch
