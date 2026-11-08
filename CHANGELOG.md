@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.0-beta.43 – systemd-Policy-Write-Fix-Kandidat
+
+### Deutsch
+
+- Behebt den nachgewiesenen Beta.42-Fehler beim ersten atomaren Policy-Write:
+  Die systemd-Unit gibt ausschließlich das root-owned Policy-Verzeichnis frei;
+  `ProtectSystem=strict` bleibt aktiv.
+- Der Helper prüft Verzeichnis, Symlinks, Besitzer, Modi und Daten vor dem
+  Schreiben, verwendet eine temporäre Datei auf demselben Dateisystem,
+  synchronisiert Datei und Verzeichnis und räumt Fehlerdateien auf.
+- Der Installer erhält bestehende Grants, setzt das Policy-Verzeichnis auf
+  root-owned `0700` und dokumentiert die Migration sowie den Rollbackpfad.
+- Der Orchestrierungsstatus wird pro API-Abfrage neu gelesen, damit ein
+  Startreihenfolge-/Caching-Rennen den HA-Status nicht dauerhaft auf
+  `unavailable` festhält.
+
+### English
+
+- Fixes the proven Beta.42 first atomic policy-write failure: the systemd unit
+  grants write access only to the root-owned policy directory and keeps
+  `ProtectSystem=strict` enabled.
+- The helper validates directory, symlink, ownership, mode and data safety,
+  uses a same-filesystem temporary file, synchronizes file and directory, and
+  removes temporary files on failure.
+- The installer preserves existing grants, enforces a root-owned `0700` policy
+  directory, and documents migration and rollback.
+- Orchestration status is read for each API request so startup ordering or
+  caching cannot leave the HA status stuck at `unavailable`.
+
+This is a release candidate only. Merge, publication, productive installation,
+grants, package actions and restarts require separate approval.
+
 ## 0.1.0-beta.42 – Read-only Grant-Eignungsprüfung
 
 ### Deutsch

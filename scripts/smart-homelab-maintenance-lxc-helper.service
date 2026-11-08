@@ -26,7 +26,9 @@ LockPersonality=true
 RestrictAddressFamilies=AF_UNIX
 # The root helper alone performs atomic policy reads/writes. The unprivileged
 # agent never receives filesystem access to this root-owned 0600 file.
-ReadWritePaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml
+# Atomic replacement creates a temporary file beside the target. Keep the
+# writable mount limited to this root-owned policy directory.
+ReadWritePaths=/etc/smart-homelab-maintenance
 Restart=on-failure
 RestartSec=5
 

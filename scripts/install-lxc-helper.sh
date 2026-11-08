@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 # Installs only the fixed root-side helper contract. It never discovers or
 # authorizes a guest implicitly: the initial allowlist is empty unless an
-# already existing, verified allowlist is preserved.
+# already existing, verified allowlist is preserved. No wildcards are ever
+# generated or accepted as authorization.
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 source "$SCRIPT_DIR/agent-common.sh"
@@ -74,6 +75,15 @@ for target in "$HELPER_PATH" "$HELPER_UNIT" "$DISCOVERY_PATH" "$DISCOVERY_UNIT" 
     fi
 done
 
+if [[ -e "$ETC_ROOT" && ( -L "$ETC_ROOT" || ! -d "$ETC_ROOT" ) ]]; then
+    die "Policy-Verzeichnis ist kein sicheres reguläres Verzeichnis: $ETC_ROOT"
+fi
+if [[ -d "$ETC_ROOT" ]]; then
+    [[ "$(stat -c '%u' "$ETC_ROOT")" == "0" ]] || die "Policy-Verzeichnis ist nicht root-owned."
+    dir_mode="$(stat -c '%a' "$ETC_ROOT")"
+    [[ "$((8#$dir_mode & 022))" -eq 0 ]] || die "Policy-Verzeichnis ist für Gruppe/Andere beschreibbar."
+fi
+
 if [[ -e "$HELPER_ETC" ]]; then
     mode="$(stat -c '%a' "$HELPER_ETC")"
     [[ "$(stat -c '%u' "$HELPER_ETC")" == "0" && "$mode" =~ ^(600|640|644)$ ]] || die "Bestehende Allowlist ist nicht root-owned/sicher modegeschützt."
@@ -86,7 +96,8 @@ if [[ "$apply" -ne 1 ]]; then
 fi
 
 getent group "$SERVICE_USER" >/dev/null 2>&1 || die "Agent-Gruppe fehlt: $SERVICE_USER"
-install -d -m 0755 -o root -g root "$HELPER_ROOT" "$ETC_ROOT"
+install -d -m 0755 -o root -g root "$HELPER_ROOT"
+install -d -m 0700 -o root -g root "$ETC_ROOT"
 install -d -m 0700 -o root -g root "$ROLLBACK_ROOT"
 
 stage="$(mktemp -d "/tmp/${AGENT_NAME}-helper.XXXXXX")"

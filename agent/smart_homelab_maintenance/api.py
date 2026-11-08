@@ -70,7 +70,8 @@ class ApiApplication:
         if path == "/api/v1/orchestration":
             if self.orchestration_status is None:
                 return {"status": "unavailable", "policy_mode": "discover_only"}
-            value = self.orchestration_status.as_dict() if hasattr(self.orchestration_status, "as_dict") else dict(self.orchestration_status)
+            current_status = self.orchestration_status() if callable(self.orchestration_status) else self.orchestration_status
+            value = current_status.as_dict() if hasattr(current_status, "as_dict") else dict(current_status)
             ready = value.get("helper_installed") is True and value.get("discovery_socket_active") is True and value.get("integrity_ok") is True
             return {"status": "ok" if ready else "unavailable", **value}
         if path == "/api/v1/host":
