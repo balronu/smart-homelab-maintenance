@@ -1,6 +1,6 @@
 """Fixed-scope discovery transport contract.
 
-No socket or subprocess is opened here.  The concrete root-owned service is a
+No live transport is opened here.  The concrete root-owned service is a
 separate deployment concern; this module makes its request/argv contract
 testable without granting a shell or a simulation path.
 """
