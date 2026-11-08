@@ -72,7 +72,7 @@ try:
                 return self.async_create_entry(data=data)
             return self.async_show_form(step_id="init", data_schema=vol.Schema({
                 vol.Required(CONF_SCAN_INTERVAL, default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)),
-                vol.Required(CONF_POLICY_MODE, default=self.config_entry.options.get(CONF_POLICY_MODE, "discover_only")): vol.In(POLICY_MODES),
+                vol.Optional(CONF_POLICY_MODE): vol.In(POLICY_MODES),
             }))
 except ImportError:
     SmartHomelabConfigFlow = None
