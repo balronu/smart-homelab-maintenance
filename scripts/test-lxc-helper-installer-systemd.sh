@@ -23,6 +23,7 @@ cleanup() {
   set +e
   systemctl stop "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >/dev/null 2>&1 || true
   systemctl disable "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >/dev/null 2>&1 || true
+  systemctl disable "${AGENT_NAME}-agent.service" >/dev/null 2>&1 || true
   rm -f "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST"
   rmdir "$HELPER_ROOT" "$ETC_ROOT" "$STATE_ROOT" 2>/dev/null || true
   systemctl daemon-reload >/dev/null 2>&1 || true
@@ -70,8 +71,13 @@ bash -n "$INSTALLER"
 systemd-analyze verify "$HELPER_UNIT" "$DISCOVERY_UNIT"
 
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --apply --start
-systemctl is-active --quiet "${AGENT_NAME}-lxc-helper.service"
-systemctl is-active --quiet "${AGENT_NAME}-lxc-discovery.service"
+for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"; do
+  systemctl is-active --quiet "$unit" || {
+    systemctl status --no-pager "$unit" >&2 || true
+    journalctl --no-pager -u "$unit" -n 40 >&2 || true
+    die "$unit did not become active"
+  }
+done
 [[ -S "/run/$AGENT_NAME/lxc-apt-helper.sock" ]]
 [[ -S "/run/$AGENT_NAME/lxc-discovery.sock" ]]
 
