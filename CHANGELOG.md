@@ -1,6 +1,6 @@
 # Changelog
 
-## Next beta candidate – Mobile UI und Gast-Simulationsvorbereitung
+## 0.1.0-beta.30 – Mobile UI und dauerhafter VM-Ausschluss (Prerelease)
 
 ### Deutsch
 

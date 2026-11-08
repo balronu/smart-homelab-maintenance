@@ -1,6 +1,6 @@
 # Smart Homelab Maintenance
 
-## Next beta candidate: mobile simulation and guest eligibility
+## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 
 Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen
 und liefert eine explizite Eignungsanzeige für Host, LXC und VM. LXC-Ziele
@@ -9,11 +9,13 @@ VMs werden niemals über `pct exec` angesprochen, solange kein unterstützter
 Gasttransport vorhanden ist. Der Installationsbutton bleibt dauerhaft
 deaktiviert.
 
-This development candidate improves mobile simulation rendering and exposes
-explicit eligibility for hosts, LXCs, and VMs. LXC targets remain blocked
-until an explicitly reviewed allowlist is enabled; VMs are never sent through
-`pct exec` without a supported guest transport. The install button remains
-permanently disabled.
+This Beta.30 candidate improves mobile simulation rendering and makes the
+permanent VM exclusion explicit. LXC targets remain blocked until an explicitly
+reviewed allowlist is enabled; VMs are never sent through `pct exec` or another
+update runner. The install button remains permanently disabled.
+
+Die zweisprachigen Release Notes liegen unter
+[`docs/releases/v0.1.0-beta.30.md`](docs/releases/v0.1.0-beta.30.md).
 
 ## Beta.29: Sichere systemd-Lebenszyklusprüfung
 
