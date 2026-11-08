@@ -99,18 +99,34 @@ PY
 
 wait_for_health() {
     local expected_version="$1" baseline_restarts="${2:-}"
+    local lifecycle_restarts="${3:-}" lifecycle_invocation="${4:-}" lifecycle_start="${5:-}"
     local deadline=$((SECONDS + READINESS_TIMEOUT_SECONDS))
     local payload=""
     local last_error="Dienst nicht bereit"
+    local lifecycle_snapshot current_restarts current_invocation current_start
     while (( SECONDS < deadline )); do
         if [[ -n "$baseline_restarts" ]]; then
-            local current_restarts
-            current_restarts="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
-            if [[ "$current_restarts" =~ ^[0-9]+$ && "$baseline_restarts" =~ ^[0-9]+$ ]] \
-                && (( current_restarts > baseline_restarts )); then
+            if ! lifecycle_snapshot="$(read_lifecycle_snapshot)"; then
+                printf 'ERROR: systemd-Lebenszyklusdaten sind während der Readiness unvollständig oder ungültig.\n' >&2
+                return "$READINESS_FAILURE_EXIT"
+            fi
+            IFS=$'\t' read -r current_restarts current_invocation current_start <<<"$lifecycle_snapshot"
+            if (( current_restarts > baseline_restarts )); then
                 printf 'ERROR: systemd hat den Agent während der Readiness neu gestartet (NRestarts %s -> %s).\n' \
                     "$baseline_restarts" "$current_restarts" >&2
                 return "$READINESS_FAILURE_EXIT"
+            fi
+            if [[ -n "$lifecycle_restarts" ]]; then
+                if (( current_restarts != lifecycle_restarts )); then
+                    printf 'ERROR: NRestarts hat sich nach dem kontrollierten Start verändert (%s -> %s); Neustart oder Zählerreset nicht eindeutig.\n' \
+                        "$lifecycle_restarts" "$current_restarts" >&2
+                    return "$READINESS_FAILURE_EXIT"
+                fi
+                if [[ "$current_invocation" != "$lifecycle_invocation" \
+                    || "$current_start" != "$lifecycle_start" ]]; then
+                    printf 'ERROR: systemd-Lebenszyklus hat sich während der Readiness geändert (InvocationID/Startzeitpunkt).\n' >&2
+                    return "$READINESS_FAILURE_EXIT"
+                fi
             fi
         fi
         if systemctl is-active --quiet "$SERVICE_NAME"; then
@@ -119,11 +135,21 @@ wait_for_health() {
                 "$health_url/health" 2>/dev/null)"; then
                 if validate_health_payload "$payload" "$expected_version" 2>/dev/null; then
                     if [[ -n "$baseline_restarts" ]]; then
-                        current_restarts="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
-                        if [[ "$current_restarts" =~ ^[0-9]+$ && "$baseline_restarts" =~ ^[0-9]+$ ]] \
-                            && (( current_restarts > baseline_restarts )); then
+                        if ! lifecycle_snapshot="$(read_lifecycle_snapshot)"; then
+                            printf 'ERROR: systemd-Lebenszyklusdaten fehlen unmittelbar nach dem Healthcheck.\n' >&2
+                            return "$READINESS_FAILURE_EXIT"
+                        fi
+                        IFS=$'\t' read -r current_restarts current_invocation current_start <<<"$lifecycle_snapshot"
+                        if (( current_restarts > baseline_restarts )); then
                             printf 'ERROR: systemd hat den Agent unmittelbar nach dem Healthcheck neu gestartet (NRestarts %s -> %s).\n' \
                                 "$baseline_restarts" "$current_restarts" >&2
+                            return "$READINESS_FAILURE_EXIT"
+                        fi
+                        if [[ -n "$lifecycle_restarts" \
+                            && ( "$current_restarts" != "$lifecycle_restarts" \
+                                || "$current_invocation" != "$lifecycle_invocation" \
+                                || "$current_start" != "$lifecycle_start" ) ]]; then
+                            printf 'ERROR: systemd-Lebenszyklus oder NRestarts änderte sich unmittelbar nach dem Healthcheck.\n' >&2
                             return "$READINESS_FAILURE_EXIT"
                         fi
                     fi
@@ -140,6 +166,17 @@ wait_for_health() {
     done
     printf 'ERROR: Readiness-Timeout nach %ss: %s\n' "$READINESS_TIMEOUT_SECONDS" "$last_error" >&2
     return "$READINESS_FAILURE_EXIT"
+}
+
+read_lifecycle_snapshot() {
+    local restarts invocation start
+    restarts="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
+    invocation="$(systemctl show --property=InvocationID --value "$SERVICE_NAME" 2>/dev/null || true)"
+    start="$(systemctl show --property=ExecMainStartTimestampMonotonic --value "$SERVICE_NAME" 2>/dev/null || true)"
+    [[ "$restarts" =~ ^[0-9]+$ ]] || return 1
+    [[ "$invocation" =~ ^[0-9a-fA-F-]{16,}$ ]] || return 1
+    [[ "$start" =~ ^[0-9]+$ && "$start" -gt 0 ]] || return 1
+    printf '%s\t%s\t%s\n' "$restarts" "$invocation" "$start"
 }
 
 port_has_blocking_state() {
@@ -280,6 +317,9 @@ previous_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"
 expected_agent_version="$(read_agent_version "$source_dir/agent")"
 restart_count_before="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
 [[ "$restart_count_before" =~ ^[0-9]+$ ]] || die "systemd-Restartzähler ist nicht lesbar; kein Update ausgeführt."
+lifecycle_before="$(read_lifecycle_snapshot)" || die "systemd-Lebenszyklusdaten sind vor dem Update nicht lesbar; kein Update ausgeführt."
+IFS=$'\t' read -r lifecycle_restarts_before lifecycle_invocation_before lifecycle_start_before <<<"$lifecycle_before"
+[[ "$lifecycle_restarts_before" == "$restart_count_before" ]] || die "NRestarts-Baseline ist inkonsistent; kein Update ausgeführt."
 update_started=1
 trap finish EXIT
 
@@ -307,7 +347,18 @@ if ! wait_for_port_free; then
 fi
 systemctl start "$SERVICE_NAME"
 port_forensics "nach-start"
-wait_for_health "$expected_agent_version" "$restart_count_before" || exit "$READINESS_FAILURE_EXIT"
+lifecycle_after="$(read_lifecycle_snapshot)" || die "systemd-Lebenszyklusdaten nach dem Start sind nicht lesbar; Rollback wird ausgeführt."
+IFS=$'\t' read -r lifecycle_restarts_after lifecycle_invocation_after lifecycle_start_after <<<"$lifecycle_after"
+if (( lifecycle_restarts_after > restart_count_before )); then
+    die "NRestarts stieg bereits beim neuen Start ($restart_count_before -> $lifecycle_restarts_after); Rollback wird ausgeführt."
+fi
+if [[ "$lifecycle_invocation_after" == "$lifecycle_invocation_before" \
+    || "$lifecycle_start_after" == "$lifecycle_start_before" ]]; then
+    die "Neuer systemd-Lebenszyklus ist nicht eindeutig nachgewiesen; Rollback wird ausgeführt."
+fi
+wait_for_health "$expected_agent_version" "$restart_count_before" \
+    "$lifecycle_restarts_after" "$lifecycle_invocation_after" "$lifecycle_start_after" \
+    || exit "$READINESS_FAILURE_EXIT"
 
 trap - EXIT
 info "Agent aktualisiert, Readiness/TLS-Healthcheck erfolgreich, Dienst läuft. Rollback-Staging bleibt erhalten: $rollback_dir"
