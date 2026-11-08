@@ -40,8 +40,11 @@ Die Produktiv-Allowlist bleibt unverändert deaktiviert.
 
 Die Laufzustände stammen aus der read-only Inventur vom 2026-11-08. Für die
 LXC-Ziele sind OS, Paketmanager und Allowlist im produktiven System nicht als
-Freigabe nachgewiesen. Deshalb ist die korrekte Anzeige derzeit
-`unauthorized` bzw. `not_checked`.
+Freigabe nachgewiesen. Der Helper ist produktiv ebenfalls nicht installiert
+oder aktiviert. Deshalb ist die korrekte Anzeige derzeit `unauthorized` bzw.
+`not_checked`; bei einer später autorisierten Zielkonfiguration ohne Helper
+meldet das Backend ausdrücklich `helper-unavailable` statt eines generischen
+Simulationsfehlers.
 
 ## VM-Matrix
 
@@ -61,6 +64,11 @@ eine frische passive Planprüfung, eine erfolgreiche Simulation, Timeout- und
 Fehlerfälle sowie ein Nachweis ohne Installationspfad erforderlich. Für VMs
 gibt es in Beta.31 keine Aktivierungsfreigabe; ein neuer Gasttransport wäre ein
 separates Architekturprojekt.
+
+Die vollständige Produktivfreigabe muss alle Kandidaten einzeln bewerten. Ein
+geeigneter laufender LXC darf erst nach passivem Debian-/Ubuntu-/APT-Nachweis
+und expliziter CTID-Freigabe aufgenommen werden. CT 112 bleibt trotz seiner
+Inventur sichtbar, aber gestoppt und nicht prüfbar.
 
 The English contract is identical: host simulation remains read-only, LXC
 simulation is opt-in per target and fixed-command only, VM package checks and

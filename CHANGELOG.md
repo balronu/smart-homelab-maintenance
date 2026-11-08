@@ -1,5 +1,102 @@
 # Changelog
 
+## 0.1.0-beta.32 – sichere Orchestrierungsanzeige (Prerelease)
+
+### Deutsch
+
+- Ergänzt den read-only Orchestrierungsstatus für Helper, Discovery-Socket,
+  Integrität und `discover_only` in der Agent-API.
+- Home Assistant fragt den optionalen Status rückwärtskompatibel ab und zeigt
+  einen Helper-Status als `ready`, `not_installed` oder `unavailable`.
+- Die Integration aktiviert keine Helper-, Socket-, Allowlist- oder
+  Gastzugriffsrechte automatisch; echte Paketaktionen bleiben deaktiviert.
+
+### English
+
+- Adds the read-only orchestration status for helper, discovery socket,
+  integrity, and `discover_only` to the agent API.
+- Home Assistant polls the optional status backward-compatibly and exposes a
+  helper status of `ready`, `not_installed`, or `unavailable`.
+- The integration never activates helper, socket, allowlist, or guest access
+  automatically; real package actions remain disabled.
+
+## Unreleased – weitere Entwicklung
+
+### Deutsch
+
+- Ergänzt die isolierte Phase-35-Orchestrierung mit versionierter,
+  fail-closed Policy (`discover_only` als Standard und ausdrücklich wählbares
+  `auto_eligible`), fester Discovery-Probe und deterministischem Allowlist-Plan.
+- Neue, gestoppte, entfernte, unbekannte oder veraltete Ziele erzeugen keine
+  neue Berechtigung; VMs und ungültige IDs bleiben ausgeschlossen. Die Policy
+  wird atomar und mit sicheren Dateirechten gespeichert.
+- Ergänzt Phase 36 als isolierte automatische Einrichtung: peer-authentifizierter
+  Discovery-Socket, serialisierter expliziter Allowlist-Apply-Controller,
+  maschinenlesbarer Orchestrierungsstatus und HA-Auswahl des Policy-Modus.
+  Produktive Aktivierung bleibt separat freigabepflichtig.
+- Ergänzt Phase 37 als isolierte End-to-End-Abnahme für Inventar, Probe, Policy,
+  Plan, expliziten Apply, Audit, Recovery und Status; Proxmox, systemd, HA und
+  produktive Gäste bleiben unberührt.
+- Ergänzt Phase 39 als separaten Root-/systemd-Installer-Test auf einem
+  kurzlebigen GitHub-Runner; Apply, Wiederholung, Socket-Health, Rechte und
+  fail-closed Quellintegrität werden geprüft, ohne pve-home zu verändern.
+- Ergänzt Phase 41 um einen JSON-Preflight mit eindeutiger GO/NO-GO-Entscheidung
+  sowie den read-only Prüf-, Upgrade- und Rückfallvertrag für Beta.31.
+- Ergänzt Phase 45 um eine read-only Orchestrierungs-Statusverdrahtung für
+  Helper, Discovery-Socket, Integrität und `discover_only`; der Status wird in
+  API und Home Assistant angezeigt, ohne produktive Aktivierung.
+
+- Präzisiert den Backend-Status für einen fehlenden oder ungültigen LXC-Helper
+  als `helper-unavailable`, getrennt von `unauthorized`, `unsupported` und
+  `not_checked`.
+- Ergänzt verständliche deutsche und englische Dashboard-Meldungen sowie eine
+  nicht autorisierende Allowlist-Vorlage.
+- Helper, Allowlist und Produktivpfade bleiben deaktiviert; keine Gastbefehle
+  oder Simulationen wurden ausgeführt.
+- Ergänzt die passive Phase-29-Matrix für alle zehn LXCs mit Ressourcen,
+  Proxmox-OS-Metadaten, unbekannten APT-Nachweisen, Betriebsrisiken und den
+  späteren Einzel-Freigabegates.
+- Ergänzt die Phase-30-Nachweise: CT101–109 Debian 13 mit apt 3.0.4 und
+  CT110–111 Debian 12 mit apt 2.6.2; die geplante Allowlist bleibt inaktiv.
+- Ergänzt den Phase-31-Gesamtplan für alle neun laufenden LXCs mit
+  Einzelabnahme, Negativtests, Abbruchkonzept und gemeinsamer Sicherheitsgrenze;
+  produktive Aktivierung bleibt separat freigabepflichtig.
+
+### English
+
+- Adds the isolated Phase 35 orchestration layer with a versioned fail-closed
+  policy (`discover_only` by default and explicitly selectable
+  `auto_eligible`), a fixed discovery probe, and a deterministic allowlist plan.
+- New, stopped, removed, unknown, or stale targets never create new access;
+  VMs and invalid IDs remain excluded. Policy persistence is atomic and uses
+  secure file permissions.
+- Adds the isolated Phase 36 setup/orchestration layer: peer-authenticated
+  discovery socket, serialized explicit allowlist apply controller,
+  machine-readable orchestration status, and an HA policy-mode selector.
+  Production activation still requires separate approval.
+- Adds the isolated Phase 37 end-to-end acceptance harness for inventory,
+  probe, policy, plan, explicit apply, audit, recovery, and status; Proxmox,
+  systemd, HA, and production guests remain untouched.
+
+- Reports a missing or invalid LXC helper as `helper-unavailable`, distinct
+  from `unauthorized`, `unsupported`, and `not_checked`.
+- Adds clear German and English dashboard messages and a non-authorizing
+  allowlist template.
+- The helper, allowlist, and production execution paths remain disabled; no
+  guest command or simulation was run.
+- Adds the passive Phase 29 matrix for all ten LXCs, including resources,
+  Proxmox OS metadata, unknown APT evidence, operating risks, and later
+  per-target authorization gates.
+- Adds the Phase 30 evidence: CT101–109 are Debian 13 with apt 3.0.4 and
+  CT110–111 are Debian 12 with apt 2.6.2; the planned allowlist remains
+  inactive.
+- Adds the Phase 31 joint plan for all nine running LXCs with per-target
+  acceptance, negative tests, abort handling, and a shared security boundary;
+  production activation still requires separate approval.
+- Adds Phase 45 read-only orchestration status wiring for helper, discovery
+  socket, integrity, and `discover_only`; API and Home Assistant expose the
+  status without activating production components.
+
 ## 0.1.0-beta.31 – Mobile Aktionszeile und Simulationsgrenzen (Prerelease)
 
 ### Deutsch

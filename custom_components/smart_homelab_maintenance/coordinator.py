@@ -25,6 +25,7 @@ class CoordinatorData:
     error: str | None = None
     update_error: str | None = None
     compatibility: Compatibility = field(default_factory=lambda: evaluate_agent(None, None))
+    orchestration: Mapping[str, Any] | None = None
 
 
 class SmartHomelabCoordinator:
@@ -56,6 +57,14 @@ class SmartHomelabCoordinator:
                     self.transport.host(), self.transport.virtual_machines(), self.transport.containers(),
                     self.transport.jobs(), self.transport.capabilities()
                 )
+                orchestration_method = getattr(self.transport, "orchestration", None)
+                if callable(orchestration_method):
+                    try:
+                        orchestration = await orchestration_method()
+                    except TransportError as exc:
+                        orchestration = {"data": {"status": "unavailable", "error": exc.code, "policy_mode": "discover_only"}}
+                else:
+                    orchestration = {"data": {"status": "unavailable", "policy_mode": "discover_only"}}
                 update_error = None
                 compatibility = evaluate_agent(None, None)
                 try:
@@ -87,9 +96,17 @@ class SmartHomelabCoordinator:
                 container_items = [dict(item, update=dict(item.get("update") or {}, dry_run=dry_runs.get(f"container:{item.get('container_id')}")) if item.get("update") else None) for item in container_items]
                 vm_items = [dict(item, update=dict(item.get("update") or {}, dry_run=dry_runs.get(f"vm:{item.get('vmid')}")) if item.get("update") else None) for item in vm_items]
                 self.data = CoordinatorData(
-                    True, host_data, tuple(vm_items), tuple(container_items),
-                    tuple(jdata.get("items", [])), capabilities.get("data"), update_items, dry_runs, None,
-                    update_error, compatibility
+                    connected=True,
+                    host=host_data,
+                    virtual_machines=tuple(vm_items),
+                    containers=tuple(container_items),
+                    jobs=tuple(jdata.get("items", [])),
+                    capabilities=capabilities.get("data"),
+                    updates=update_items,
+                    dry_runs=dry_runs,
+                    update_error=update_error,
+                    compatibility=compatibility,
+                    orchestration=orchestration,
                 )
                 self.last_error = None
                 self._failure_count = 0

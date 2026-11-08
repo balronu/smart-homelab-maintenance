@@ -43,6 +43,11 @@ enthält keinen Installations-, Entfernungs-, `apt update`- oder Neustartpfad.
 
 ## Allowlist-Format (nur Vorschlag, nicht aktiv)
 
+Eine nicht autorisierende Vorlage liegt unter
+`deploy/lxc-apt-allowlist.example.toml`. Sie enthält absichtlich keine
+aktiven Einträge. Die produktive Allowlist darf niemals aus dem Inventar
+automatisch erzeugt oder pauschal für alle LXCs freigeschaltet werden.
+
 ```toml
 [containers."101"]
 authorized = true
@@ -55,6 +60,12 @@ Die Datei muss root-owned und für den Agenten nicht beschreibbar sein. Ein
 Eintrag autorisiert nur die festgelegten Prüfoperationen; er autorisiert keine
 Anwendungsupdates. Der Agent übernimmt die Beta.20-Allowlist erst, wenn der
 Helper ausdrücklich aktiviert ist. Standard bleibt deaktiviert.
+
+Fehlt der Helper trotz einer validierten Zielautorisierung, meldet die API
+`simulation_reason=helper-unavailable` und den Status `unknown`. Das ist
+diagnostisch verschieden von `unauthorized`, `unsupported` und
+`target-not-running-or-not-checked`; die Oberfläche zeigt den jeweiligen
+Sperrgrund an, ohne einen Button freizugeben.
 
 ## systemd-/Socket-Grenze
 

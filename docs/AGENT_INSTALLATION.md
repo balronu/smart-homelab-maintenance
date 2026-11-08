@@ -12,6 +12,12 @@ Die zugehörige Abnahme ist in
 beschrieben. Diese Anleitung erklärt den Ablauf; sie ersetzt weder den
 Preflight-Nachweis noch die Freigabe für Apply oder Neustart.
 
+Der read-only Endpunkt `/api/v1/orchestration` meldet den Installationsstatus
+von Helper und Discovery-Socket, die Integritätsprüfung und den Policy-Modus.
+Fehlen Helper oder Socket, lautet der Status `unavailable`; daraus werden keine
+Gastberechtigungen abgeleitet. Home Assistant zeigt denselben Zustand über die
+Helper-Status-Entity. `discover_only` bleibt der sichere Standard.
+
 ## Stable-Vorbereitung: Komponenten und Grenzen
 
 Die Home-Assistant-Integration wird über HACS installiert und aktualisiert;
@@ -237,6 +243,20 @@ ein Dienstneustart bleiben getrennte, freizugebende Schritte.
 
 Die Vorprüfung verändert nichts:
 
+Für eine maschinenlesbare, nicht mutierende Helper-Prüfung steht zusätzlich
+der JSON-Vertrag bereit:
+
+```bash
+sudo scripts/lxc-helper-preflight.py \
+  --source-dir /pfad/zum/geprüften-checkout \
+  --expected-commit <40-stellige-sha>
+```
+
+Die Ausgabe enthält `decision` (`GO`/`NO-GO`), Einzelprüfungen,
+`failed_checks`, `apply_authorization_required` und
+`mutations_performed=false`. Auch bei `GO` ist eine separate Apply-Freigabe
+erforderlich; der Befehl installiert, startet oder autorisiert nichts.
+
 ```bash
 sudo scripts/install-agent.sh \
   --source-dir /tmp/smart-homelab-maintenance \
@@ -403,4 +423,8 @@ sudo scripts/uninstall-agent.sh \
 Der dokumentierte Weg ist technisch vorbereitet, aber für eine kontrollierte
 Installation derzeit **NO-GO**. Erforderlich sind die isolierte HA-2026.11-
 Abnahme, private TLS-/DNS-/Netzwerkstrecke und eine gesonderte Freigabe für
-Installations- und Starttest.
+Installations- und Starttest. Der reproduzierbare Root-/systemd-Installer-
+Nachweis läuft separat über den GitHub-Actions-Job
+`installer-systemd.yml` auf einem kurzlebigen Runner; ein übersprungener oder
+nicht systemd-fähiger Runner gilt als NOT RUN und nicht als PASS. Auch ein
+grüner CI-Job autorisiert keine Installation auf `pve-home`.

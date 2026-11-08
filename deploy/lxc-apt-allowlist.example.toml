@@ -1,0 +1,14 @@
+# Example only. This file does not authorize any container.
+#
+# Copying this file into /etc/smart-homelab-maintenance/lxc-apt-allowlist.toml
+# is an operational action and requires a separate approval. Add one exact
+# container only after its OS, version, package manager and risk review have
+# been recorded. Never use a wildcard or a generated inventory as an allowlist.
+
+# Example of one reviewed entry:
+# [containers."111"]
+# authorized = true
+# os_name = "Debian"
+# os_version = "13"
+# package_manager = "apt"
+

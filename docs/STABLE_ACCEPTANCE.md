@@ -1,5 +1,29 @@
 # Stable-Abnahme / Stable acceptance
 
+## Phase 35 automation boundary
+
+- [ ] The versioned policy is deployed with `discover_only` as its default.
+- [ ] `auto_eligible` is enabled only through an explicit onboarding action.
+- [ ] Discovery evidence is fresh, bounded, and obtained through the fixed
+      read-only transport; no free shell or VM transport is present.
+- [ ] The serialized allowlist plan is reviewed before any production apply.
+- [ ] Helper/socket deployment, HA onboarding, health reporting, migration,
+      and rollback are tested end-to-end. These remain open for Phase 36.
+- [ ] Phase-36 discovery service is installed only through the official
+      installer and passes peer-UID, fixed-command, timeout, output-limit,
+      recovery, and idempotency tests in an isolated environment.
+- [ ] The orchestration status API and HA policy selector preserve
+      `discover_only` on migration and never enable real package actions.
+- [ ] The orchestration API and HA helper-status entity report missing helper,
+      discovery socket, integrity, and policy state without granting access.
+- [ ] Isolated Phase-37 end-to-end acceptance passes for first install,
+      repeat install, upgrade/recovery, dynamic container events, VM blocking,
+      audit, rollback, API status, and HA options migration.
+- [ ] Phase-39 real installer acceptance passes on an ephemeral root/systemd
+      CI runner; a skipped or unsupported runner is NOT RUN, not PASS.
+- [ ] Productive Proxmox/HA live wiring remains separately approved and tested;
+      CI does not authorize helper or allowlist activation on `pve-home`.
+
 Diese Checkliste ist ein Prüfvertrag für eine spätere Stable-Freigabe. Sie
 ist keine Installations- oder Aktivierungsfreigabe. Jede Zeile benötigt einen
 nachvollziehbaren PASS, BLOCKED oder NOT RUN-Nachweis; ein fehlender Nachweis
@@ -30,6 +54,9 @@ ist kein PASS.
 - [ ] LXC-Eignung weist laufenden Zustand, unterstütztes OS/Paketmanager und
       explizite Zielautorisierung nach; keine automatische Allowlist/Helper-
       Aktivierung.
+- [ ] Für alle neun laufenden Debian-/APT-LXCs existiert eine geprüfte
+      Einzel-Abnahme mit Read-/Simulations-, Negativ- und Abbruchnachweis;
+      CT112 bleibt gestoppt und ausgeschlossen.
 
 ### Simulation und Sicherheit
 
@@ -65,6 +92,8 @@ unsupported.
 
 - Stable needs a separately approved release and production rollout window.
 - LXC helper/allowlist enablement remains a separate security decision.
+- The Phase 31 joint activation plan is documented in
+  `docs/phase31-lxc-activation-plan.md`; it is not an activation approval.
 - VM package checks and simulations are permanently out of scope.
 - A GitHub prerelease does not authorize installation in Home Assistant or on
   the Proxmox host.

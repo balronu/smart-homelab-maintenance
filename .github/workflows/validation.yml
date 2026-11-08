@@ -19,6 +19,7 @@ jobs:
         run: |
           python -m pip install "pytest==9.0.3" "pytest-asyncio==1.4.0"
           PYTHONPATH=. python -m pytest -q tests/test_core.py
+          PYTHONPATH=. python -m pytest -q tests/test_lxc_helper_preflight.py
           python -m compileall -q agent custom_components tests
       - name: Frontend state tests
         run: node frontend/card-state.test.js

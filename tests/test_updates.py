@@ -9,7 +9,7 @@ import pytest
 from agent.smart_homelab_maintenance.api import ApiApplication
 from agent.smart_homelab_maintenance.discovery import DiscoveryService, FixtureProxmoxBackend, phase1_fixture
 from agent.smart_homelab_maintenance.jobs import JobRepository
-from agent.smart_homelab_maintenance.updates import AptCommandRunner, AptUpdateReader, ProbeTarget, UpdateService, _parse_apt, _parse_apt_upgradable, make_targets
+from agent.smart_homelab_maintenance.updates import AptCommandRunner, AptUpdateReader, GuestHelperUnavailableError, ProbeTarget, RootHelperTransport, UpdateService, _parse_apt, _parse_apt_upgradable, make_targets
 
 
 def target(os_name="Debian"):
@@ -129,6 +129,27 @@ def test_update_check_distinguishes_unauthorized_target_and_explicit_guest_allow
     result = service(Runner(), (vm,)).check("vm:104")
     assert result.status == "not_checked"
     assert result.simulation_reason == "vm-guest-transport-unavailable"
+
+
+def test_update_check_distinguishes_missing_lxc_helper_from_authorization():
+    def unavailable(_payload):
+        raise OSError("socket missing")
+
+    transport = RootHelperTransport(exchange=unavailable)
+    reader = AptUpdateReader(guest_transport=transport)
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True)
+    checked = UpdateService(lambda: (authorized,), reader=reader)
+    result = checked.check("container:107")
+    assert result.status == "unknown"
+    assert result.supported is True
+    assert result.error == "LXC simulation helper is unavailable"
+    assert result.simulation_reason == "helper-unavailable"
+
+
+def test_helper_unavailable_error_is_not_a_generic_os_error():
+    transport = RootHelperTransport(exchange=lambda _payload: (_ for _ in ()).throw(OSError("missing")))
+    with pytest.raises(GuestHelperUnavailableError, match="helper is unavailable"):
+        transport.read(107)
 
 
 def test_update_api_preserves_explicit_statuses_instead_of_unknown_fallbacks():

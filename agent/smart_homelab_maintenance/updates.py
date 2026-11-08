@@ -29,6 +29,10 @@ _REMV = re.compile(r"^Remv\s+(\S+)")
 LXC_HELPER_SOCKET = "/run/smart-homelab-maintenance/lxc-apt-helper.sock"
 
 
+class GuestHelperUnavailableError(OSError):
+    """The opt-in LXC helper is absent or returned an invalid response."""
+
+
 @dataclass(frozen=True, slots=True)
 class PackageChange:
     name: str
@@ -258,7 +262,9 @@ class RootHelperTransport:
         except (socket.timeout, asyncio.TimeoutError):
             raise asyncio.TimeoutError from None
         except (OSError, json.JSONDecodeError, IndexError) as exc:
-            raise OSError("guest helper socket is unavailable or returned invalid data") from exc
+            raise GuestHelperUnavailableError(
+                "LXC simulation helper is unavailable or returned an invalid response"
+            ) from exc
         if response.get("ok") is True:
             return 0, str(response.get("stdout", "")), str(response.get("stderr", ""))
         error = response.get("error", {})
@@ -366,6 +372,13 @@ class UpdateService:
                 code, stdout, stderr = self._runner.simulate(target.vmid)
                 packages, held, conflicts, removals = _parse_apt(stdout, stderr)
                 digest = hashlib.sha256((stdout + "\n" + stderr).encode("utf-8", "replace")).hexdigest()
+        except GuestHelperUnavailableError as exc:
+            return UpdateResult(
+                target.target, target.name, False, True, target.os_name, target.os_version,
+                target.package_manager, "unknown", None, None,
+                error="LXC simulation helper is unavailable",
+                simulation_method="lxc-apt-helper", simulation_reason="helper-unavailable",
+            )
         except (FileNotFoundError, PermissionError) as exc:
             return UpdateResult(target.target, target.name, False, True, target.os_name, target.os_version, target.package_manager, "unknown", None, None, error=str(exc))
         except (OSError, asyncio.TimeoutError) as exc:
