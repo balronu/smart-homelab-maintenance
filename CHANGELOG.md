@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.0-beta.40 – Release-Kandidat für die kontrollierte Migration
+
+### Deutsch
+
+- Synchronisiert Agent, Home-Assistant-Integration und Lovelace-Karte auf die
+  eindeutige Kandidatenversion Beta.40; Beta.39 bleibt unverändert.
+- Bereitet die Migration von HA Beta.39/Agent Beta.37 auf den geprüften PR-65-
+  Stand vor, ohne produktive Berechtigungen, Paketaktionen oder Neustarts.
+- Der echte `helper → pct → nichtproduktiver LXC`-Nachweis bleibt offen; dieser
+  Kandidat ist nicht als vollständige E2E-Abnahme oder Stable freigegeben.
+
+### English
+
+- Synchronizes the agent, Home Assistant integration and Lovelace card on the
+  unique Beta.40 candidate version; Beta.39 remains unchanged.
+- Prepares migration from HA Beta.39/Agent Beta.37 to the reviewed PR-65 state
+  without productive permission changes, package actions or restarts.
+- The real `helper → pct → non-production LXC` proof remains open; this
+  candidate is not fully E2E-accepted and is not Stable.
+
 ## Unreleased – Issue #63 E2E-Abschluss offen
 
 ### Deutsch

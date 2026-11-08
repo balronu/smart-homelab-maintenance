@@ -2,6 +2,14 @@
 
 ## Issue #63 · LXC update management (E2E completion status)
 
+Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.40` versioniert.
+Beta.39 bleibt der bestehende Produktivstand, bis eine separate
+Installationsfreigabe erteilt wird.
+
+The reviewed release candidate is uniquely versioned as `0.1.0-beta.40`.
+Beta.39 remains the installed productive state until a separate installation
+approval is granted.
+
 Die vollständige LXC-Update-E2E-Abnahme ist noch offen. CI prüft den festen
 Helper-Vertrag und eine echte Paketinstallation in einem Wegwerf-Gastroot;
 für die finale Abnahme ist weiterhin ein echter, nichtproduktiver Proxmox-
