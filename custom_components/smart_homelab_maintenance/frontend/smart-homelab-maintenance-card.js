@@ -38,7 +38,7 @@ function resourceLines(item, labels) { return [bar(labels.memory, item.memory_us
 const css = `:host{display:block;color:var(--primary-text-color);box-sizing:border-box;container-type:inline-size}.card{background:var(--ha-card-background,var(--card-background-color));border-radius:var(--ha-card-border-radius,12px);padding:16px;box-shadow:var(--ha-card-box-shadow);overflow:visible;box-sizing:border-box}.header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}.header h2{margin:0;font-size:1.25rem;min-width:0;overflow-wrap:anywhere}.status{display:inline-flex;align-items:center;gap:6px;font-size:.9em;flex:none}.dot{width:9px;height:9px;border-radius:50%;background:var(--success-color,#43a047)}.offline .dot{background:var(--error-color,#db4437)}.summary,.grid{display:grid;grid-template-columns:1fr;gap:8px}.metric,.item{border:1px solid var(--divider-color,#ddd);border-radius:8px;padding:10px;min-width:0}.metric strong{display:block;font-size:1.2em;overflow-wrap:anywhere}.muted{color:var(--secondary-text-color);font-size:.86em;overflow-wrap:anywhere}.section{margin-top:14px}.section h3{margin:0 0 8px;font-size:1rem}.item-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.item-head strong{min-width:0;overflow-wrap:anywhere}.bar-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:8px}.bar-row progress{width:100%;min-width:0}.pill{border-radius:12px;padding:2px 7px;font-size:.78em;background:var(--secondary-background-color);white-space:nowrap;flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis}.warning{color:var(--error-color,#db4437);overflow-wrap:anywhere}.readonly{color:var(--secondary-text-color);font-size:.82em;margin-top:10px}.action-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.action-row button{flex:1 1 12rem;min-width:0}button.simulate,button.install{padding:7px 10px;border:1px solid var(--primary-color,#03a9f4);border-radius:7px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;cursor:pointer}button.simulate:disabled,button.install:disabled{opacity:.55;cursor:not-allowed;border-color:var(--divider-color,#777)}details{margin-top:8px}summary{cursor:pointer;list-style-position:inside;overflow-wrap:anywhere}@container (min-width:600px){.summary,.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@container (min-width:1000px){.summary,.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:420px){.card{padding:12px}.header{align-items:flex-start;flex-direction:column}.action-row{flex-direction:column}.action-row button{flex-basis:auto;width:100%}}`;
 const editorCss = `:host{display:block;box-sizing:border-box;color:var(--primary-text-color)}.editor{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:4px 0;box-sizing:border-box;max-width:100%}.field{display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr);align-items:center;gap:12px;min-width:0;line-height:1.35}.field.checkbox{grid-template-columns:auto minmax(0,1fr);justify-content:start;gap:10px;cursor:pointer}.field span{overflow-wrap:anywhere}.field input[type=text]{box-sizing:border-box;min-width:0;width:100%;max-width:100%;padding:8px 10px;border:1px solid var(--divider-color,#777);border-radius:6px;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);font:inherit}.field input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:var(--primary-color,#03a9f4)}@media(max-width:600px){.editor{gap:10px}.field,.field.checkbox{grid-template-columns:minmax(0,1fr);gap:6px}.field.checkbox{grid-template-columns:auto minmax(0,1fr);align-items:start}.field input[type=text]{font-size:16px;min-height:40px}}`;
 const premiumCss = `.card{background:linear-gradient(145deg,var(--ha-card-background,var(--card-background-color)),color-mix(in srgb,var(--ha-card-background,var(--card-background-color)) 86%,var(--primary-color,#03a9f4)));border:1px solid color-mix(in srgb,var(--divider-color,#ddd) 70%,transparent);}.header{padding-bottom:4px}.status{padding:5px 9px;border-radius:999px;background:var(--secondary-background-color);}.status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--success-color,#43a047) 18%,transparent)}.offline .status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--error-color,#db4437) 18%,transparent)}.section{border-top:1px solid color-mix(in srgb,var(--divider-color,#ddd) 55%,transparent);padding-top:14px}.item{background:color-mix(in srgb,var(--card-background-color,#fff) 76%,transparent);transition:border-color .18s ease,background .18s ease}.item[open]{border-color:color-mix(in srgb,var(--primary-color,#03a9f4) 55%,var(--divider-color,#ddd));background:color-mix(in srgb,var(--primary-color,#03a9f4) 5%,var(--card-background-color,#fff))}.item>summary{list-style:none}.item>summary::-webkit-details-marker{display:none}.item-head{cursor:pointer;padding:0}.item-head::after{content:"+";color:var(--secondary-text-color);font-weight:700}.item[open]>.item-head::after{content:"−"}.item-body{padding-top:10px}.metric strong{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){.item{transition:none}}`;
-const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch}.action-row button{width:100%;min-width:0}@media(max-width:600px){.action-row{grid-template-columns:1fr}}`;
+const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch}.action-row button{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere}.simulation-result{margin-top:8px;min-width:0;overflow-wrap:anywhere}.simulation-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.simulation-summary strong{font-size:1.05em}.package-list{margin-top:8px}.package-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:5px 0;border-top:1px solid var(--divider-color,#ddd);min-width:0}.package-name,.package-version{min-width:0;overflow-wrap:anywhere;word-break:break-word}@media(max-width:600px){.action-row{grid-template-columns:repeat(2,minmax(0,1fr))}.simulation-summary{grid-template-columns:1fr}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
   constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._lastSize = null; this._resizeObserver = null; }
   connectedCallback() { this._ensureShell(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
@@ -154,6 +154,49 @@ function dryRunSummary(response, german = true) {
   const status = data.success === false ? `${german ? "Simulation fehlgeschlagen" : "Simulation failed"}: ${localizedDryRunError(data.error, german)}` : `${german ? "Simulation erfolgreich" : "Simulation successful"} · ${packages.length} ${german ? "Paketänderung(en)" : "package change(s)"}`;
   return `${status}. ${safety}. ${german ? "Pakete" : "Packages"}: ${packageText}.${warnings.length ? ` ${german ? "Warnungen" : "Warnings"}: ${warnings.join("; ")}.` : ""}`;
 }
+function renderDryRunResult(result, response, german) {
+  const data = dryRunData(response);
+  result.replaceChildren();
+  const summary = document.createElement("div");
+  summary.className = "simulation-summary";
+  const status = document.createElement("strong");
+  status.textContent = data?.success === false ? (german ? "Simulation fehlgeschlagen" : "Simulation failed") : (german ? "Simulation erfolgreich" : "Simulation successful");
+  const safety = document.createElement("span");
+  safety.textContent = data?.safe === true ? (german ? "Sicherheitsprüfung: bestanden" : "Safety: passed") : (german ? "Sicherheitsprüfung: Warnung" : "Safety: warning");
+  summary.append(status, safety);
+  const count = document.createElement("span");
+  const packages = Array.isArray(data?.packages) ? data.packages : [];
+  count.textContent = `${packages.length} ${german ? "Paketänderung(en)" : "package change(s)"}`;
+  summary.append(count);
+  result.append(summary);
+  if (data?.success === false) {
+    const error = document.createElement("div");
+    error.className = "warning";
+    error.textContent = localizedDryRunError(data.error, german);
+    result.append(error);
+  }
+  if (packages.length) {
+    const details = document.createElement("details");
+    details.className = "package-list";
+    const heading = document.createElement("summary");
+    heading.textContent = german ? "Paketdetails anzeigen" : "Show package details";
+    details.append(heading);
+    for (const item of packages) {
+      const row = document.createElement("div");
+      row.className = "package-row";
+      const name = document.createElement("span");
+      name.className = "package-name";
+      name.textContent = String(item.name || "?");
+      const version = document.createElement("span");
+      version.className = "package-version";
+      version.textContent = `${item.installed_version || "?"} → ${item.available_version || "?"}`;
+      row.append(name, version);
+      details.append(row);
+    }
+    result.append(details);
+  }
+  if (data?.safe !== true && data?.success !== false) result.classList.add("warning");
+}
 const originalItem = SmartHomelabMaintenanceCard.prototype._item;
 SmartHomelabMaintenanceCard.prototype._item = function (kind, id) {
   const refs = originalItem.call(this, kind, id);
@@ -177,12 +220,14 @@ SmartHomelabMaintenanceCard.prototype._dryRunButton = function (target) {
   button.addEventListener("click", async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const result = document.createElement("div");
+    const result = button._simulationResult || document.createElement("div");
     result.className = "muted simulation-result";
     result.setAttribute("role", "status");
-    result.textContent = "Simulation läuft …";
-    button.after(result);
+    if (!button._simulationResult) { button._simulationResult = result; button.after(result); }
+    result.replaceChildren();
+    result.textContent = resolveLanguage(this._hass) === "de" ? "Simulation läuft …" : "Simulation running …";
     button.disabled = true;
+    button.setAttribute("aria-busy", "true");
     let timer;
     try {
       const call = this._hass?.callService?.("smart_homelab_maintenance", "dry_run", { target, confirm: true }, undefined, true, true);
@@ -191,7 +236,7 @@ SmartHomelabMaintenanceCard.prototype._dryRunButton = function (target) {
         call,
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Zeitüberschreitung bei der Simulation.")), Number(globalThis.__SMART_HOMELAB_DRY_RUN_TIMEOUT_MS__) || DRY_RUN_TIMEOUT_MS); }),
       ]);
-      result.textContent = dryRunSummary(response, resolveLanguage(this._hass) === "de");
+      renderDryRunResult(result, response, resolveLanguage(this._hass) === "de");
       result.classList.toggle("warning", Boolean(dryRunData(response)?.success === false || dryRunData(response)?.safe === false));
     } catch (error) {
       result.textContent = `Simulation fehlgeschlagen: ${localizedDryRunError(error?.message || "unbekannter Servicefehler", resolveLanguage(this._hass) === "de")}`;
@@ -199,6 +244,7 @@ SmartHomelabMaintenanceCard.prototype._dryRunButton = function (target) {
     } finally {
       clearTimeout(timer);
       button.disabled = false;
+      button.removeAttribute("aria-busy");
     }
   });
   return button;
