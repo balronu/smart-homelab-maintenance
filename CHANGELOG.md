@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased – Beta.31-Kandidat: mobile Aktionszeile und Simulationsgrenzen
+
+### Deutsch
+
+- Trennt Aktionszeile und Simulationsergebnis: beide Schaltflächen behalten
+  gleiche, touch-taugliche Abmessungen; Ergebnis, Paketanzahl,
+  Sicherheitsstatus und Details erscheinen darunter.
+- Prüft die stabile Geometrie, Paketdetail-Interaktion, lange Versionen,
+  Dark Mode, iPhone/iPad/Desktop-Ansichten und Scrollstabilität im Browser-
+  Harness.
+- Dokumentiert die read-only Eignungsmatrix für alle zehn LXCs. Der optionale
+  Helper bleibt deaktiviert; keine produktive Allowlist wird verändert.
+- Dokumentiert VM 104 (HAOS) und VM 106 (PBS) dauerhaft als Monitoring-only.
+  Keine VM-Paketprüfung, Simulation, `pct exec`-Weiterleitung oder echte
+  Installation wird hinzugefügt.
+
+### English
+
+- Separates the action row from simulation results so both buttons keep equal,
+  touch-friendly dimensions while results, package counts, safety, and details
+  render below.
+- Covers stable geometry, package details, long versions, dark mode,
+  iPhone/iPad/desktop viewports, and scroll stability in the browser harness.
+- Documents the read-only readiness matrix for all ten LXCs; the optional
+  helper remains disabled and no production allowlist is changed.
+- Documents VM 104 (HAOS) and VM 106 (PBS) as permanently monitoring-only.
+  No VM package check, simulation, `pct exec` forwarding, or real install is
+  added.
+
 ## 0.1.0-beta.30 – Mobile UI und dauerhafter VM-Ausschluss (Prerelease)
 
 ### Deutsch

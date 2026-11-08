@@ -1,5 +1,29 @@
 # Smart Homelab Maintenance
 
+## Beta.31-Kandidat: stabile mobile Simulationsergebnisse und sichere Gastgrenzen
+
+Der Beta.31-Kandidat hält die beiden Aktionsschaltflächen in einer festen,
+touch-tauglichen Zeile; Ergebnis, Paketanzahl, Sicherheitsstatus und
+aufklappbare Paketdetails stehen darunter. Lange Paketnamen und Versionen
+brechen ohne horizontalen Überlauf um. **Updates installieren** bleibt
+dauerhaft deaktiviert.
+
+Die Host-Simulation bleibt unverändert read-only. LXC-Simulationen verwenden
+später nur den festen, optionalen Helper-Pfad nach expliziter Ziel-Allowlist;
+im Kandidaten ist kein produktiver Helper aktiviert. VMs bleiben dauerhaft
+Monitoring-only: Es gibt keine VM-Paketprüfung, keine VM-Simulation und keinen
+Aufruf von `pct exec` oder einem anderen VM-Update-Runner. VM-Karten zeigen
+weiterhin Name, Laufstatus und Ressourcen sowie den Hinweis zur Updatefunktion
+des Gastbetriebssystems. Die vollständige Matrix steht in
+[`docs/beta31-simulation-readiness.md`](docs/beta31-simulation-readiness.md).
+
+The Beta.31 candidate keeps the two action buttons in a stable touch-friendly
+row and renders simulation results below it. Host simulation remains
+read-only. LXC simulation is opt-in per explicitly authorized target and is
+not enabled in production. VMs are permanently monitoring-only: no VM package
+check, simulation, `pct exec`, or other VM update runner is used. Real package
+installation remains unsupported.
+
 ## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 
 Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen
