@@ -2,6 +2,16 @@
 
 ## Issue #63 · LXC update management (next beta)
 
+Die vollständige LXC-Update-E2E-Abnahme ist noch offen. CI prüft den festen
+Helper-Vertrag und eine echte Paketinstallation in einem Wegwerf-Gastroot;
+für die finale Abnahme ist weiterhin ein echter, nichtproduktiver Proxmox-
+LXC-Testgast erforderlich. Produktive Paketaktionen bleiben deaktiviert.
+
+The complete LXC update E2E acceptance is still open. CI checks the fixed
+helper contract and a real package installation in a disposable guest root;
+final acceptance still requires a real non-production Proxmox LXC test guest.
+Productive package actions remain disabled.
+
 Die nächste Beta erweitert den opt-in Updatepfad für ausdrücklich
 autorisierte laufende Debian-/Ubuntu-LXCs. Simulation und echte Updates haben
 getrennte Berechtigungen und können pro LXC über den geschützten Agent-Endpunkt
