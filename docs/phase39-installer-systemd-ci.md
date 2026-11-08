@@ -27,6 +27,12 @@ Zugriffe und keine Änderungen an `pve-home` aus. Die neun bestehenden
 Repository-Gates bleiben unverändert; dieser Job liefert den zusätzlichen
 realen Installer-Nachweis.
 
+Der read-only Vorabvertrag `scripts/lxc-helper-preflight.py` liefert außerdem
+JSON mit `decision` (`GO` oder `NO-GO`), einzelnen Checkstatuswerten,
+`failed_checks`, `apply_authorization_required` und
+`mutations_performed=false`. Ein `GO` ist nur eine Preflight-Aussage und
+aktiviert keine Installation.
+
 ## Noch offene Abnahme
 
 Der CI-Job ersetzt keine echte Proxmox-/HA-Liveintegration. Discovery,

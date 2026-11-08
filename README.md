@@ -76,6 +76,10 @@ installation, permissions, socket health and fail-closed source validation.
 It does not touch Proxmox or Home Assistant production and does not replace
 the separately required Proxmox/HA live acceptance.
 
+Phase 41 documents the read-only Beta.31 rollout gate, the machine-readable
+helper preflight, the single official upgrade path and the fail-closed
+rollback contract. It does not authorize a production upgrade.
+
 ## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 
 Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen

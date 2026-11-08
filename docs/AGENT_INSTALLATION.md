@@ -237,6 +237,20 @@ ein Dienstneustart bleiben getrennte, freizugebende Schritte.
 
 Die Vorprüfung verändert nichts:
 
+Für eine maschinenlesbare, nicht mutierende Helper-Prüfung steht zusätzlich
+der JSON-Vertrag bereit:
+
+```bash
+sudo scripts/lxc-helper-preflight.py \
+  --source-dir /pfad/zum/geprüften-checkout \
+  --expected-commit <40-stellige-sha>
+```
+
+Die Ausgabe enthält `decision` (`GO`/`NO-GO`), Einzelprüfungen,
+`failed_checks`, `apply_authorization_required` und
+`mutations_performed=false`. Auch bei `GO` ist eine separate Apply-Freigabe
+erforderlich; der Befehl installiert, startet oder autorisiert nichts.
+
 ```bash
 sudo scripts/install-agent.sh \
   --source-dir /tmp/smart-homelab-maintenance \

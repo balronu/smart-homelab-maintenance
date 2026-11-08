@@ -21,6 +21,7 @@ CREATED_USER=0
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 cleanup() {
   set +e
+  rm -f "${PREFLIGHT_JSON:-}"
   systemctl stop "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >/dev/null 2>&1 || true
   systemctl disable "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >/dev/null 2>&1 || true
   systemctl disable "${AGENT_NAME}-agent.service" >/dev/null 2>&1 || true
@@ -68,6 +69,9 @@ systemctl enable "$AGENT_NAME-agent.service" >/dev/null
 
 python3 -m py_compile "$ROOT_DIR/scripts/smh-lxc-apt-helper.py" "$ROOT_DIR/scripts/smh-lxc-discovery.py"
 bash -n "$INSTALLER"
+PREFLIGHT_JSON="$(mktemp /tmp/smh-lxc-helper-preflight.XXXXXX.json)"
+python3 "$ROOT_DIR/scripts/lxc-helper-preflight.py" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" >"$PREFLIGHT_JSON"
+grep -q '"decision":"GO"' "$PREFLIGHT_JSON"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --apply
 [[ "$(stat -c '%u:%a' "$HELPER_PATH")" == "0:755" ]]

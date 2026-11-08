@@ -20,6 +20,8 @@
 - Ergänzt Phase 39 als separaten Root-/systemd-Installer-Test auf einem
   kurzlebigen GitHub-Runner; Apply, Wiederholung, Socket-Health, Rechte und
   fail-closed Quellintegrität werden geprüft, ohne pve-home zu verändern.
+- Ergänzt Phase 41 um einen JSON-Preflight mit eindeutiger GO/NO-GO-Entscheidung
+  sowie den read-only Prüf-, Upgrade- und Rückfallvertrag für Beta.31.
 
 - Präzisiert den Backend-Status für einen fehlenden oder ungültigen LXC-Helper
   als `helper-unavailable`, getrennt von `unauthorized`, `unsupported` und
