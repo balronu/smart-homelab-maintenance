@@ -121,8 +121,9 @@ install -m 0600 -o root -g root "$stage/allowlist" "$HELPER_ETC"
 systemctl daemon-reload
 
 if [[ "$start" -eq 1 ]]; then
-    systemctl start "${AGENT_NAME}-lxc-helper.service"
+    systemctl start "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"
     systemctl is-active --quiet "${AGENT_NAME}-lxc-helper.service" || die "Helper-Healthcheck fehlgeschlagen; Rollback-Staging: $rollback"
+    systemctl is-active --quiet "${AGENT_NAME}-lxc-discovery.service" || die "Discovery-Healthcheck fehlgeschlagen; Rollback-Staging: $rollback"
 fi
 
 info "LXC-Helper installiert; Allowlist bleibt ohne automatische Gastfreigaben."

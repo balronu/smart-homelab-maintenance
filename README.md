@@ -65,6 +65,11 @@ allowlist apply controller, machine-readable orchestration status, and the
 preflight-only by default; this does not authorize production activation or
 real package installation.
 
+Phase 37 adds an isolated end-to-end harness for the complete inventory,
+probe, policy, plan, explicit apply, audit, recovery and status flow. It uses
+temporary files and mocked transports only; it is not a productive installer
+run and does not authorize helper or allowlist activation.
+
 ## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 
 Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen

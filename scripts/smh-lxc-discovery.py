@@ -15,6 +15,7 @@ import socket
 import socketserver
 import struct
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ MAX_REQUEST_BYTES = 16 * 1024
 
 TIMEOUT = 10
 MAX_OUTPUT = 64 * 1024
+PROBE_LOCK = threading.Lock()
 
 
 def _run(container_id: int, command: tuple[str, ...]) -> tuple[int, str]:
@@ -88,7 +90,8 @@ class _Handler(socketserver.StreamRequestHandler):
             container_id = request["container_id"]
             if request["operation"] != "probe" or not isinstance(container_id, int) or isinstance(container_id, bool) or not 1 <= container_id <= 999_999:
                 raise ValueError("operation or container id not allowed")
-            result = {"ok": True, "container_id": container_id, "operation": "probe", "result": fixed_probe(container_id)}
+            with PROBE_LOCK:
+                result = {"ok": True, "container_id": container_id, "operation": "probe", "result": fixed_probe(container_id)}
         except (OSError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError, RuntimeError, subprocess.TimeoutExpired):
             result = {"ok": False, "error": {"code": "probe_failed"}}
         self.wfile.write((json.dumps(result, separators=(",", ":")) + "\n").encode("utf-8"))

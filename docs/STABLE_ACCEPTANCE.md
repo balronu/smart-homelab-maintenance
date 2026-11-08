@@ -14,6 +14,9 @@
       recovery, and idempotency tests in an isolated environment.
 - [ ] The orchestration status API and HA policy selector preserve
       `discover_only` on migration and never enable real package actions.
+- [ ] Isolated Phase-37 end-to-end acceptance passes for first install,
+      repeat install, upgrade/recovery, dynamic container events, VM blocking,
+      audit, rollback, API status, and HA options migration.
 
 Diese Checkliste ist ein Prüfvertrag für eine spätere Stable-Freigabe. Sie
 ist keine Installations- oder Aktivierungsfreigabe. Jede Zeile benötigt einen

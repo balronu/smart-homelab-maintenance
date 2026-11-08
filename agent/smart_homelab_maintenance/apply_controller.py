@@ -8,6 +8,7 @@ not wired to the production agent in this phase.
 from __future__ import annotations
 
 import os
+import json
 import tempfile
 import threading
 from dataclasses import dataclass
@@ -29,8 +30,9 @@ class ApplyResult:
 
 
 class AllowlistApplyController:
-    def __init__(self, path: Path, *, require_root: bool = True) -> None:
+    def __init__(self, path: Path, *, audit_path: Path | None = None, require_root: bool = True) -> None:
         self.path = path
+        self.audit_path = audit_path
         self.require_root = require_root
         self._lock = threading.Lock()
 
@@ -64,6 +66,11 @@ class AllowlistApplyController:
                     except FileNotFoundError:
                         pass
                     raise
+                try:
+                    self._audit("apply", plan)
+                except OSError:
+                    self._replace_content(old)
+                    return ApplyResult(False, False, tuple(sorted(plan.authorized_ids)), "audit_write_failed")
                 return ApplyResult(True, True, tuple(sorted(plan.authorized_ids)))
             except OSError as exc:
                 return ApplyResult(False, False, tuple(sorted(plan.authorized_ids)), "allowlist_apply_failed")
@@ -76,3 +83,34 @@ class AllowlistApplyController:
             return self.path.read_text(encoding="utf-8")
         except FileNotFoundError:
             return ""
+
+    def _replace_content(self, content: str) -> None:
+        if not content:
+            try:
+                self.path.unlink()
+            except FileNotFoundError:
+                pass
+            return
+        fd, temporary = tempfile.mkstemp(prefix=f".{self.path.name}.rollback.", dir=self.path.parent)
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, self.path)
+            os.chmod(self.path, 0o600)
+        finally:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+
+    def _audit(self, action: str, plan: AllowlistPlan) -> None:
+        if self.audit_path is None:
+            return
+        self.audit_path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+        with self.audit_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"action": action, "authorized_ids": sorted(plan.authorized_ids)}, separators=(",", ":")) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())

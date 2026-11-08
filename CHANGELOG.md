@@ -14,6 +14,9 @@
   Discovery-Socket, serialisierter expliziter Allowlist-Apply-Controller,
   maschinenlesbarer Orchestrierungsstatus und HA-Auswahl des Policy-Modus.
   Produktive Aktivierung bleibt separat freigabepflichtig.
+- Ergänzt Phase 37 als isolierte End-to-End-Abnahme für Inventar, Probe, Policy,
+  Plan, expliziten Apply, Audit, Recovery und Status; Proxmox, systemd, HA und
+  produktive Gäste bleiben unberührt.
 
 - Präzisiert den Backend-Status für einen fehlenden oder ungültigen LXC-Helper
   als `helper-unavailable`, getrennt von `unauthorized`, `unsupported` und
@@ -43,6 +46,9 @@
   discovery socket, serialized explicit allowlist apply controller,
   machine-readable orchestration status, and an HA policy-mode selector.
   Production activation still requires separate approval.
+- Adds the isolated Phase 37 end-to-end acceptance harness for inventory,
+  probe, policy, plan, explicit apply, audit, recovery, and status; Proxmox,
+  systemd, HA, and production guests remain untouched.
 
 - Reports a missing or invalid LXC helper as `helper-unavailable`, distinct
   from `unauthorized`, `unsupported`, and `not_checked`.

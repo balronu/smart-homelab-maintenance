@@ -123,13 +123,14 @@ def plan_allowlist(
             authorized=allowed,
             reason=reason,
         ))
-    current_ids = {entry.container_id for entry in normalized}
     authorized = frozenset(entry.container_id for entry in normalized if entry.authorized)
     return AllowlistPlan(
         mode=mode,
         entries=tuple(sorted(normalized, key=lambda entry: entry.container_id)),
         authorized_ids=authorized,
-        removed_ids=frozenset(existing - current_ids),
+        # A present-but-stopped/unsupported target must be removed just like
+        # a missing target; retaining it would leave stale guest access.
+        removed_ids=frozenset(existing - authorized),
     )
 
 
