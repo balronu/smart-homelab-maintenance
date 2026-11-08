@@ -1,5 +1,34 @@
 # Changelog
 
+## Next beta candidate – Mobile UI und Gast-Simulationsvorbereitung
+
+### Deutsch
+
+- Kompakte, mobile Simulationskarten mit sichtbarer Paketanzahl,
+  Sicherheitsstatus und standardmäßig eingeklappten Paketdetails.
+- Paketname sowie installierte und verfügbare Version werden sicher und ohne
+  HTML-Injection dargestellt; lange Versionen umbrechen und die Scrollposition
+  bleibt stabil.
+- LXC-Eignung bleibt an laufenden Zustand, Debian/Ubuntu-APT-Nachweis und
+  explizite Zielautorisierung gebunden. VMs sind dauerhaft von Paketprüfung
+  und Simulation ausgeschlossen; ihre Karten zeigen weiterhin Name, Status und
+  Ressourcen sowie einen Hinweis auf die Updatefunktion des Gastbetriebssystems.
+- Gleichzeitige Simulationen desselben Ziels werden abgewiesen;
+  Installationspfade bleiben deaktiviert.
+
+### English
+
+- Compact mobile simulation cards show package counts, safety status, and
+  collapsed package details by default.
+- Package names and installed/available versions are rendered safely without
+  HTML injection; long versions wrap and scroll position remains stable.
+- LXC eligibility remains bound to running state, proven Debian/Ubuntu APT,
+  and explicit target authorization. VMs are permanently excluded from
+  package checks and simulations; their cards still show name, state, and
+  resources and direct users to the guest operating system's update function.
+- Concurrent simulations for one target are rejected; installation paths
+  remain disabled.
+
 ## 0.1.0-beta.29 – Sichere systemd-Lebenszyklusprüfung (Prerelease)
 
 ### Deutsch

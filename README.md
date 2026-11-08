@@ -1,5 +1,20 @@
 # Smart Homelab Maintenance
 
+## Next beta candidate: mobile simulation and guest eligibility
+
+Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen
+und liefert eine explizite Eignungsanzeige für Host, LXC und VM. LXC-Ziele
+bleiben bis zu einer ausdrücklichen, geprüften Allowlist-Freigabe gesperrt;
+VMs werden niemals über `pct exec` angesprochen, solange kein unterstützter
+Gasttransport vorhanden ist. Der Installationsbutton bleibt dauerhaft
+deaktiviert.
+
+This development candidate improves mobile simulation rendering and exposes
+explicit eligibility for hosts, LXCs, and VMs. LXC targets remain blocked
+until an explicitly reviewed allowlist is enabled; VMs are never sent through
+`pct exec` without a supported guest transport. The install button remains
+permanently disabled.
+
 ## Beta.29: Sichere systemd-Lebenszyklusprüfung
 
 Beta.29 erweitert die Beta.28-Restart-Erkennung um `InvocationID` und den
@@ -296,6 +311,42 @@ Karteneditor angeboten; eine manuelle YAML-Ressource ist dafür nicht nötig.
 Der spätere Proxmox-Installationsweg ist in
 [`docs/AGENT_INSTALLATION.md`](docs/AGENT_INSTALLATION.md) beschrieben. Die
 Skripte arbeiten standardmäßig nur im Prüfmodus und starten keinen Dienst.
+
+### Komponenten und Stable-Vorbereitung
+
+HACS installiert die Home-Assistant-Integration und die Lovelace-Karte. Der
+Proxmox-Agent ist ein getrennt laufender Dienst und muss aus demselben
+geprüften Commit separat aktualisiert werden. Integration, Agent und API-
+Vertrag werden deshalb vor jeder Freigabe getrennt geprüft. TLS, private
+Netzwerkadressierung und die vertrauenswürdige Zertifikatskette sind
+Voraussetzungen; HTTP-Fallback oder deaktivierte Zertifikatsprüfung sind nicht
+zulässig. Installation, Upgrade und Rollback sind drei getrennte Vorgänge.
+
+Für Stable werden zusätzlich der exakte Release-Tag, der offizielle Updater-
+Preflight, Readiness, Dienstlebenszyklus, Rollback-Staging und die HACS-/HA-
+Nachkontrolle dokumentiert. Der Agent-Updater arbeitet zunächst ohne Apply;
+ein produktiver Apply und ein Dienstneustart benötigen eine eigene Freigabe.
+Die aktuelle Funktion ist bewusst read-only: Host-Simulationen können nach
+frischem Check freigegeben sein, LXC-Simulationen benötigen eine explizite
+Allowlist/Helper-Einrichtung. VMs sind als dauerhafte Produktentscheidung von
+Paketprüfung und Simulation ausgeschlossen; ihre Karten bleiben mit Name,
+Laufstatus und Ressourcen sichtbar, zeigen aber den Hinweis „Updates dieser
+virtuellen Maschine werden nicht über Smart Homelab Maintenance durchgeführt.
+Bitte die Updatefunktion des jeweiligen Gastbetriebssystems verwenden.“ und
+erreichen niemals einen Update-Runner. Echte Installationen bleiben deaktiviert.
+
+The HACS package contains the Home Assistant integration and Lovelace card.
+The Proxmox agent is a separate service and must be updated independently
+from the same verified commit. Stable preparation therefore verifies the
+integration, agent, API contract, TLS trust, updater preflight, readiness,
+rollback staging, and post-update HA state separately. Installation, upgrade,
+and rollback remain distinct operations. Host simulation is read-only; LXC
+simulation requires explicit helper/allowlist authorization. VMs are
+permanently excluded from package checks and simulations by product decision:
+their cards still show name, runtime state, and resources, while the card
+explains that updates must be performed by the guest operating system. VM
+identifiers never reach `pct exec` or another update runner. Real installation
+remains disabled.
 
 Für eine spätere Veröffentlichung müssen die Marketplace-Struktur, die
 Release-Artefakte und der Installationsweg erneut gegen die Zielversion von
