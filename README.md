@@ -14,7 +14,7 @@ keinen automatischen Neustart. Siehe
 Berechtigungsverwaltung ist in
 [`docs/update-permissions.md`](docs/update-permissions.md) beschrieben.
 
-Beta.38 provides an opt-in update path for explicitly authorized
+The next beta provides an opt-in update path for explicitly authorized
 running Debian/Ubuntu LXCs. Simulation and real updates use separate
 permissions and can be managed per LXC through the protected agent endpoint. A
 fresh plan digest and explicit confirmation are required. A dry run is also
