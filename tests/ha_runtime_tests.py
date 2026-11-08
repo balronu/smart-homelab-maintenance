@@ -179,7 +179,9 @@ async def test_inventory_entities_are_added_after_initial_inventory_failure(hass
     containers = [{"container_id": 200 + index, "name": f"lxc-{index}", "running": True} for index in range(10)]
 
     async def inventory(self, items):
-        return {"schema_version": "1", "data": {"items": items if phase["value"] else []}}
+        if not phase["value"]:
+            raise TransportError("connection", "agent temporarily unavailable")
+        return {"schema_version": "1", "data": {"items": items}}
 
     async def fake_host(self): return {"schema_version": "1", "data": {"name": "pve-home", "online": True}}
     async def fake_vms(self): return await inventory(self, vms)
@@ -205,6 +207,7 @@ async def test_inventory_entities_are_added_after_initial_inventory_failure(hass
     await hass.async_block_till_done()
     registry = er.async_get(hass)
     initial = {item.unique_id for item in er.async_entries_for_config_entry(registry, entry.entry_id)}
+    assert not hass.data[DOMAIN][entry.entry_id].data.connected
     assert not any(item.startswith("vm_") for item in initial)
     assert not any(item.startswith("container_") for item in initial)
 
@@ -219,6 +222,13 @@ async def test_inventory_entities_are_added_after_initial_inventory_failure(hass
     recovered = {item.unique_id for item in er.async_entries_for_config_entry(registry, entry.entry_id)}
     assert {f"vm_{100 + index}" for index in range(2)} <= recovered
     assert {f"container_{200 + index}_status" for index in range(10)} <= recovered
+
+    await coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+    assert {item.unique_id for item in er.async_entries_for_config_entry(registry, entry.entry_id)} == recovered
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert not hasattr(coordinator, "_inventory_entity_manager") or coordinator._inventory_entity_manager is None
 
 
 async def test_actions_return_read_only_data_and_diagnostics_are_secret_free(hass, patched_transport):

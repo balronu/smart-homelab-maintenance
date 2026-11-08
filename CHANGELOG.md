@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased – 0.1.0-beta.45 inventory recovery candidate
+
+### Deutsch
+
+- Behebt die fehlende dynamische Erzeugung von VM- und LXC-Entitäten nach
+  einem fehlgeschlagenen ersten Coordinator-Poll.
+- Prüft den Recovery-Ablauf mit 2 VMs und 10 LXCs, deduplizierte Folge-Polls,
+  Entity-Registry sowie Unload/Reload-Lifecycle.
+- Ergänzt die Browser-Vertragsprüfung für die Anzeige von 2 VMs und 10 LXCs.
+- Enthält nur einen Vorschlag für kompaktere mobile Host-Kennzahlen; eine
+  größere UI-Umgestaltung ist nicht Bestandteil dieses Bugfixes.
+
+### English
+
+- Fixes missing dynamic VM and LXC entity creation after a failed first
+  coordinator poll.
+- Covers recovery with 2 VMs and 10 LXCs, duplicate-free follow-up polls, the
+  entity registry, and unload/reload lifecycle behavior.
+- Adds a browser contract check for rendering 2 VMs and 10 LXCs.
+- Includes only a proposal for more compact mobile host metrics; no larger UI
+  redesign is part of this bug fix.
+
+This is an unreleased candidate. Merge, publication and productive installation
+require separate approval.
+
 ## 0.1.0-beta.44 – Policy-Transport-Hotfix-Kandidat
 
 ### Deutsch
