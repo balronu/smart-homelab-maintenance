@@ -313,6 +313,9 @@ Karteneditor angeboten; eine manuelle YAML-Ressource ist dafür nicht nötig.
 Der spätere Proxmox-Installationsweg ist in
 [`docs/AGENT_INSTALLATION.md`](docs/AGENT_INSTALLATION.md) beschrieben. Die
 Skripte arbeiten standardmäßig nur im Prüfmodus und starten keinen Dienst.
+Die vollständige Stable-Abnahme steht in
+[`docs/STABLE_ACCEPTANCE.md`](docs/STABLE_ACCEPTANCE.md); sie ist eine
+Prüfcheckliste und keine Installationsfreigabe.
 
 ### Komponenten und Stable-Vorbereitung
 
@@ -352,7 +355,8 @@ remains disabled.
 
 Für eine spätere Veröffentlichung müssen die Marketplace-Struktur, die
 Release-Artefakte und der Installationsweg erneut gegen die Zielversion von
-Home Assistant geprüft werden.
+Home Assistant geprüft werden. Jede Stable-Zeile muss mit PASS, BLOCKED oder
+NOT RUN belegt sein; fehlende Nachweise werden nicht als Erfolg gewertet.
 
 ## Sicherheit
 
