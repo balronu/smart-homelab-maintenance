@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0-beta.37 – LXC-Namespace-Ausführung
+
+### Deutsch
+
+- Erlaubt dem root-eigenen, streng begrenzten Helper den notwendigen Namespace-Aufbau für unprivilegierte LXCs.
+- Alle festen Operationen, Zeitlimits, Socket-/Peer-UID- und Allowlist-Grenzen bleiben erhalten.
+- Keine Paketaktion wird automatisch aktiviert; `execution_enabled` bleibt deaktiviert.
+
+### English
+
+- Allows the root-owned, tightly scoped helper to perform the namespace setup required by unprivileged LXCs.
+- Fixed operations, timeouts, socket/peer-UID and allowlist boundaries remain enforced.
+- No package action is enabled automatically; `execution_enabled` remains disabled.
+
+## 0.1.0-beta.36 – Proxmox-ACL-kompatibler LXC-Helper
 ## 0.1.0-beta.36 – Proxmox-ACL-kompatibler LXC-Helper
 
 ### Deutsch
