@@ -157,7 +157,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         updates=updates,
         read_token=agent_token,
         max_bytes=config.max_response_bytes,
-        orchestration_status=read_installation_status(),
+        orchestration_status=read_installation_status,
     )
     return application, repository
 

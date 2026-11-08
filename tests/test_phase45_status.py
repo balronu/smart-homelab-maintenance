@@ -41,3 +41,16 @@ def test_orchestration_api_exposes_safe_status_without_ready_helper():
     assert response["data"]["policy_mode"] == "discover_only"
     assert response["data"]["helper_installed"] is False
     assert response["data"]["integrity_ok"] is False
+
+
+def test_orchestration_api_accepts_dynamic_installation_status():
+    calls = []
+
+    def status():
+        calls.append(True)
+        return OrchestrationStatus()
+
+    application = ApiApplication(_Discovery(), _Jobs(), read_token="fixture", orchestration_status=status)
+    code, response = application.handle("GET", "/api/v1/orchestration", headers={"Authorization": "Bearer fixture"})
+    assert code == 200 and response["data"]["status"] == "unavailable"
+    assert calls == [True]

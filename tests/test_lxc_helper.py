@@ -281,8 +281,32 @@ def test_helper_service_is_root_scoped_and_not_a_general_pct_service() -> None:
     assert "ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve" in unit
     assert "ExecStart=/usr/sbin/pct" not in unit
     assert "NOPASSWD" not in unit
-    assert "ReadWritePaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml" in unit
+    assert "ReadWritePaths=/etc/smart-homelab-maintenance\n" in unit
     assert "ReadOnlyPaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml" not in unit
+
+
+def test_policy_write_requires_private_directory_and_cleans_temp_file(tmp_path: Path) -> None:
+    policy_dir = tmp_path / "policy"
+    policy_dir.mkdir(mode=0o700)
+    allowlist = policy_dir / "allowlist.toml"
+    helper._write_policy_entries(allowlist, {"101": {"simulation_authorized": True}})
+    assert allowlist.read_text(encoding="utf-8").startswith("# Managed by")
+    assert allowlist.stat().st_mode & 0o077 == 0
+    assert not list(policy_dir.glob(".allowlist.toml.*"))
+
+
+def test_policy_write_rejects_insecure_or_symlinked_directory(tmp_path: Path) -> None:
+    insecure = tmp_path / "insecure"
+    insecure.mkdir(mode=0o755)
+    insecure.chmod(0o755)
+    with pytest.raises(helper.HelperError, match="directory"):
+        helper._write_policy_entries(insecure / "allowlist.toml", {})
+    real = tmp_path / "real"
+    real.mkdir(mode=0o700)
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(helper.HelperError, match="symlink"):
+        helper._write_policy_entries(link / "allowlist.toml", {})
 
 
 def test_discovery_unit_shares_helper_runtime_group() -> None:

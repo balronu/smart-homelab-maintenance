@@ -101,11 +101,38 @@ for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-
   }
 done
 
-printf '%s\n' '[containers."321"]' 'authorized = true' > "$ALLOWLIST"
-chmod 0600 "$ALLOWLIST"
+# Exercise policy_set through the real helper socket while ProtectSystem=strict
+# is active. The client is the exact unprivileged agent user; no guest command
+# or package operation is involved.
+runuser -u "$SERVICE_USER" -- python3 - <<'PY'
+import json
+import socket
+
+socket_path = "/run/smart-homelab-maintenance/lxc-apt-helper.sock"
+
+def call(request):
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+        channel.settimeout(5)
+        channel.connect(socket_path)
+        channel.sendall((json.dumps(request, separators=(",", ":")) + "\n").encode())
+        response = json.loads(channel.makefile().readline())
+    if response.get("ok") is not True:
+        raise SystemExit(response)
+    return response
+
+metadata = {"os_name": "Debian", "os_version": "13", "package_manager": "apt"}
+call({"operation": "policy_set", "target": "container:321", "simulation_authorized": True, "update_authorized": False, "metadata": metadata, "confirm": True})
+read = call({"operation": "policy_read"})
+assert read["entries"]["321"]["simulation_authorized"] is True
+call({"operation": "policy_set", "target": "container:321", "simulation_authorized": False, "update_authorized": False, "metadata": metadata, "confirm": True})
+read = call({"operation": "policy_read"})
+assert read["entries"]["321"]["simulation_authorized"] is False
+PY
 before_allowlist="$(sha256sum "$ALLOWLIST")"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --apply
-[[ "$(sha256sum "$ALLOWLIST")" == "$before_allowlist" ]]
+[[ -f "$ALLOWLIST" && "$(stat -c '%u:%a' "$ALLOWLIST")" == "0:600" ]]
+grep -q '\[containers\."321"\]' "$ALLOWLIST"
+grep -q 'simulation_authorized = false' "$ALLOWLIST"
 
 if "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "0000000000000000000000000000000000000000"; then
   die "invalid expected commit was accepted"

@@ -57,8 +57,8 @@ def _require_agent_peer(sock: socket.socket) -> None:
 def _load_permissions(path: Path = DEFAULT_ALLOWLIST) -> tuple[set[int], set[int]]:
     try:
         stat = path.stat()
-        if stat.st_uid != 0 or stat.st_mode & 0o022:
-            raise HelperError("allowlist_permissions", "LXC allowlist must be root-owned and not writable by group/others")
+        if stat.st_uid != 0 or stat.st_mode & 0o777 != 0o600:
+            raise HelperError("allowlist_permissions", "LXC allowlist must be root-owned with mode 0600")
         with path.open("rb") as handle:
             raw = tomllib.load(handle)
     except (OSError, tomllib.TOMLDecodeError) as exc:
@@ -90,8 +90,8 @@ def _load_permissions(path: Path = DEFAULT_ALLOWLIST) -> tuple[set[int], set[int
 def _load_policy_entries(path: Path = DEFAULT_ALLOWLIST) -> dict[str, dict[str, Any]]:
     try:
         stat = path.stat()
-        if stat.st_uid != 0 or stat.st_mode & 0o022:
-            raise HelperError("allowlist_permissions", "LXC allowlist must be root-owned and not writable by group/others")
+        if stat.st_uid != 0 or stat.st_mode & 0o777 != 0o600:
+            raise HelperError("allowlist_permissions", "LXC allowlist must be root-owned with mode 0600")
         with path.open("rb") as handle:
             raw = tomllib.load(handle)
     except (OSError, tomllib.TOMLDecodeError) as exc:
@@ -118,14 +118,44 @@ def _toml_value(value: Any) -> str:
     raise HelperError("allowlist_invalid", "LXC allowlist contains an unsupported value")
 
 
+def _validate_policy_directory(path: Path) -> None:
+    directory = path.parent
+    try:
+        info = directory.stat()
+    except OSError as exc:
+        raise HelperError("allowlist_unavailable", "root-owned LXC allowlist directory is unavailable") from exc
+    if not directory.is_dir() or directory.is_symlink() or info.st_uid != 0 or info.st_mode & 0o077:
+        raise HelperError("allowlist_permissions", "LXC allowlist directory must be root-owned and private")
+
+
+def _validate_policy_entries(entries: dict[str, dict[str, Any]]) -> None:
+    allowed = {"authorized", "simulation_authorized", "update_authorized", "os_name", "os_version", "package_manager"}
+    for raw_id, values in entries.items():
+        if not isinstance(raw_id, str) or not re.fullmatch(r"[1-9][0-9]{0,5}", raw_id) or not isinstance(values, dict):
+            raise HelperError("allowlist_invalid", "LXC allowlist contains an invalid entry")
+        if set(values) - allowed:
+            raise HelperError("allowlist_invalid", "LXC allowlist contains an unsupported field")
+        for key, value in values.items():
+            if key in {"authorized", "simulation_authorized", "update_authorized"} and not isinstance(value, bool):
+                raise HelperError("allowlist_invalid", "LXC allowlist authorization fields must be boolean")
+            if key in {"os_name", "os_version", "package_manager"} and not isinstance(value, str):
+                raise HelperError("allowlist_invalid", "LXC allowlist metadata fields must be strings")
+
+
 def _write_policy_entries(path: Path, entries: dict[str, dict[str, Any]]) -> None:
     if path.is_symlink() or path.parent.is_symlink():
         raise HelperError("allowlist_permissions", "LXC allowlist path must not be a symlink")
-    path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent), text=True)
+    _validate_policy_directory(path)
+    _validate_policy_entries(entries)
+    fd = -1
+    temporary = ""
     try:
+        fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent), text=True)
+        if os.fstat(fd).st_dev != os.stat(path.parent, follow_symlinks=False).st_dev:
+            raise HelperError("allowlist_unavailable", "temporary policy file is not on the policy filesystem")
         os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            fd = -1
             handle.write("# Managed by Smart Homelab Maintenance; empty means no guest access.\n\n")
             for raw_id in sorted(entries, key=int):
                 handle.write(f'[containers."{raw_id}"]\n')
@@ -135,12 +165,20 @@ def _write_policy_entries(path: Path, entries: dict[str, dict[str, Any]]) -> Non
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
         if os.geteuid() == 0:
             os.chown(path, 0, 0)
         os.chmod(path, 0o600)
     finally:
+        if fd >= 0:
+            os.close(fd)
         try:
-            os.unlink(temporary)
+            if temporary:
+                os.unlink(temporary)
         except FileNotFoundError:
             pass
 

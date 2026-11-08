@@ -2,13 +2,31 @@
 
 ## Issue #63 · LXC update management (E2E completion status)
 
-Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.42` versioniert.
-Beta.41 bleibt der bestehende Produktivstand, bis eine separate
+Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.43` versioniert.
+Beta.42 bleibt der bestehende Produktivstand, bis eine separate
 Installationsfreigabe erteilt wird.
 
-The reviewed release candidate is uniquely versioned as `0.1.0-beta.42`.
-Beta.41 remains the installed productive state until a separate installation
+The reviewed release candidate is uniquely versioned as `0.1.0-beta.43`.
+Beta.42 remains the installed productive state until a separate installation
 approval is granted.
+
+## Beta.43 systemd policy-write fix / systemd-Policy-Write-Fix
+
+Der root-eigene Helper schreibt die Policy weiterhin atomar in eine temporäre
+Datei im selben Verzeichnis und ersetzt sie mit `os.replace()`. Die systemd-
+Unit gibt dafür ausschließlich `/etc/smart-homelab-maintenance` frei, behält
+`ProtectSystem=strict` und erteilt keine pauschale `/etc`-Schreibfreigabe.
+Verzeichnis, Symlinks, Besitzer, Modi und Policy-Daten werden geprüft; Datei
+und Verzeichnis werden synchronisiert. Der offizielle Installer legt das
+Verzeichnis root-owned mit Modus `0700` an und erhält bestehende Grants.
+
+The root-owned helper still writes atomically through a same-directory
+temporary file and `os.replace()`. The systemd unit now grants write access
+only to `/etc/smart-homelab-maintenance`, while retaining
+`ProtectSystem=strict` and avoiding broad `/etc` write access. Directory,
+symlink, ownership, mode and policy data are validated; both file and
+directory are synchronized. The official installer creates the directory
+root-owned with mode `0700` and preserves existing grants.
 
 Die vollständige LXC-Update-E2E-Abnahme ist noch offen. CI prüft den festen
 Helper-Vertrag und eine echte Paketinstallation in einem Wegwerf-Gastroot;

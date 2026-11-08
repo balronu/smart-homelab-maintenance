@@ -102,8 +102,8 @@ class PermissionStore:
         info = self.path.stat()
         if info.st_uid != 0 and self.require_root:
             raise ValidationError("permission store is not root-owned")
-        if info.st_mode & 0o022:
-            raise ValidationError("permission store is writable by group or others")
+        if info.st_mode & 0o777 != 0o600:
+            raise ValidationError("permission store is writable or has an unsafe mode")
 
     def read(self) -> dict[str, dict[str, Any]]:
         self._check_file()
