@@ -63,6 +63,7 @@ def _payloads():
 def patched_transport(monkeypatch):
     host, virtual_machines, containers, jobs, capabilities, health = _payloads()
     updates = {"schema_version": "1", "data": {"items": []}}
+    orchestration = {"schema_version": "1", "data": {"status": "unavailable", "policy_mode": "discover_only", "helper_installed": False, "discovery_socket_active": False, "integrity_ok": False}}
 
     async def fake_host(self): return host
     async def fake_virtual_machines(self): return virtual_machines
@@ -71,6 +72,7 @@ def patched_transport(monkeypatch):
     async def fake_capabilities(self): return capabilities
     async def fake_updates(self): return updates
     async def fake_health(self): return health
+    async def fake_orchestration(self): return orchestration
     async def fake_dry_run(self, target):
         return {"schema_version": "1", "data": {"target": target, "status": "simulated", "packages": []}}
 
@@ -81,6 +83,7 @@ def patched_transport(monkeypatch):
     monkeypatch.setattr(AgentHttpTransport, "capabilities", fake_capabilities)
     monkeypatch.setattr(AgentHttpTransport, "updates", fake_updates)
     monkeypatch.setattr(AgentHttpTransport, "health", fake_health)
+    monkeypatch.setattr(AgentHttpTransport, "orchestration", fake_orchestration)
     monkeypatch.setattr(AgentHttpTransport, "dry_run", fake_dry_run)
 
 

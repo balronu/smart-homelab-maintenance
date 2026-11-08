@@ -181,3 +181,20 @@ def test_helper_service_is_root_scoped_and_not_a_general_pct_service() -> None:
     assert "ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve" in unit
     assert "ExecStart=/usr/sbin/pct" not in unit
     assert "NOPASSWD" not in unit
+
+
+def test_official_helper_installer_is_preflight_only_by_default_and_never_wildcards() -> None:
+    installer = (Path(__file__).parents[1] / "scripts" / "install-lxc-helper.sh").read_text(encoding="utf-8")
+    assert "--apply" in installer
+    assert "--start" in installer
+    assert 'if [[ "$apply" -ne 1 ]]' in installer
+    assert "Empty by default" in installer
+    assert "wildcards" in installer
+    assert "systemctl daemon-reload" in installer
+
+
+def test_installer_preserves_existing_allowlist_and_stages_rollback() -> None:
+    installer = (Path(__file__).parents[1] / "scripts" / "install-lxc-helper.sh").read_text(encoding="utf-8")
+    assert 'install -m 0600 -o root -g root "$HELPER_ETC" "$stage/allowlist"' in installer
+    assert 'rollback="$ROLLBACK_ROOT/' in installer
+    assert 'install -m 0600 -o root -g root "$1" "$rollback/$2"' in installer

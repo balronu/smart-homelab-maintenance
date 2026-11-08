@@ -1,6 +1,20 @@
 # Smart Homelab Maintenance
 
-## Beta.31: stabile mobile Simulationsergebnisse und sichere Gastgrenzen
+## Beta.32: sichere Orchestrierungsanzeige und Helper-Bereitschaft
+
+Beta.32 ergänzt den read-only Orchestrierungsstatus für Helper, Discovery-Socket,
+Integrität und `discover_only`. Home Assistant zeigt fehlende Helper sicher als
+nicht verfügbar an; die Integration aktiviert weder Helper, Socket, Allowlist
+noch Gastzugriffe automatisch. Der externe Agent bleibt ein separat versionierter
+Dienst. Die Beta.31-UI- und VM-Grenzen bleiben unverändert.
+
+## Beta.32: safe orchestration status and helper readiness
+
+Beta.32 adds the read-only orchestration status for helper, discovery socket,
+integrity, and `discover_only`. Home Assistant reports a missing helper as
+unavailable; the integration never activates a helper, socket, allowlist, or
+guest access automatically. The external agent remains separately versioned.
+The Beta.31 UI and VM boundaries remain unchanged.
 
 Beta.31 hält die beiden Aktionsschaltflächen in einer festen,
 touch-tauglichen Zeile; Ergebnis, Paketanzahl, Sicherheitsstatus und
@@ -37,6 +51,60 @@ read-only. LXC simulation is opt-in per explicitly authorized target and is
 not enabled in production. VMs are permanently monitoring-only: no VM package
 check, simulation, `pct exec`, or other VM update runner is used. Real package
 installation remains unsupported.
+
+## Phase 35: automatische LXC-Discovery (Draft, kein Release)
+
+Die Entwicklungsarchitektur kennt keine fest eingetragenen CTIDs. Eine
+versionierte Policy verwendet standardmäßig `discover_only`; nur eine
+ausdrücklich gewählte `auto_eligible`-Policy darf nach einer festen,
+lesenden Probe laufende Debian-/Ubuntu-LXCs mit APT als Kandidaten planen.
+Gestoppte Gäste, VMs, fehlende oder veraltete Nachweise und unbekannte Systeme
+bleiben gesperrt. Die Orchestrierung erzeugt zunächst nur einen atomar
+prüfbaren Allowlist-Plan; Helper-Installation, Socket, HA-Onboarding und die
+produktive Anwendung sind noch nicht Bestandteil dieses Draft-Stands.
+
+## Phase 35: automatic LXC discovery (draft, not a release)
+
+The development architecture does not contain hard-coded CTIDs. A versioned
+policy defaults to `discover_only`; only an explicitly selected
+`auto_eligible` policy may plan running Debian/Ubuntu LXCs with APT after a
+fixed read-only probe. Stopped guests, VMs, missing or stale evidence, and
+unknown systems remain blocked. The orchestration first produces an atomic,
+reviewable allowlist plan; helper installation, socket deployment, HA
+onboarding, and production application are not included in this draft.
+
+Phase 36 adds a separately testable discovery-socket contract, serialized
+allowlist apply controller, machine-readable orchestration status, and the
+`discover_only`/`auto_eligible` HA options-flow. The official installer stays
+preflight-only by default; this does not authorize production activation or
+real package installation.
+
+Phase 37 adds an isolated end-to-end harness for the complete inventory,
+probe, policy, plan, explicit apply, audit, recovery and status flow. It uses
+temporary files and mocked transports only; it is not a productive installer
+run and does not authorize helper or allowlist activation.
+
+Phase 39 adds a separate GitHub Actions acceptance job on an ephemeral
+root/systemd runner. It exercises the real helper installer, repeat
+installation, permissions, socket health and fail-closed source validation.
+It does not touch Proxmox or Home Assistant production and does not replace
+the separately required Proxmox/HA live acceptance.
+
+Phase 41 documents the read-only Beta.31 rollout gate, the machine-readable
+helper preflight, the single official upgrade path and the fail-closed
+rollback contract. It does not authorize a production upgrade.
+
+Phase 45 exposes the non-secret helper/discovery installation status through
+`/api/v1/orchestration` and the Home Assistant helper-status entity. A missing
+helper is reported as unavailable, not as authorization; `discover_only`
+remains the safe default and no helper, socket or allowlist is activated by
+the integration.
+
+Phase 45 exposes the non-secret helper/discovery installation status through
+`/api/v1/orchestration` and the Home Assistant helper-status entity. A missing
+helper is reported as unavailable rather than authorized; `discover_only`
+remains the safe default and the integration never activates a helper, socket,
+or allowlist by itself.
 
 ## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 

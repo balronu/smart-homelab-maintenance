@@ -21,12 +21,13 @@ from . import API_CONTRACT_VERSION, __version__
 
 
 class ApiApplication:
-    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, max_bytes: int = 256_000) -> None:
+    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None) -> None:
         self.discovery = discovery
         self.jobs = jobs
         self.updates = updates
         self.read_token = read_token
         self.max_bytes = max_bytes
+        self.orchestration_status = orchestration_status
 
     def handle(self, method: str, path: str, *, headers: Mapping[str, str] | None = None, body: bytes | None = None) -> tuple[int, dict[str, Any]]:
         request_id = secrets.token_hex(8)
@@ -66,6 +67,12 @@ class ApiApplication:
             return {"status": "ok", "mode": "offline", "agent_version": __version__, "api_contract": API_CONTRACT_VERSION}
         if path == "/api/v1/capabilities":
             return {"execution_enabled": False, "dry_run_enabled": self.updates is not None, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
+        if path == "/api/v1/orchestration":
+            if self.orchestration_status is None:
+                return {"status": "unavailable", "policy_mode": "discover_only"}
+            value = self.orchestration_status.as_dict() if hasattr(self.orchestration_status, "as_dict") else dict(self.orchestration_status)
+            ready = value.get("helper_installed") is True and value.get("discovery_socket_active") is True and value.get("integrity_ok") is True
+            return {"status": "ok" if ready else "unavailable", **value}
         if path == "/api/v1/host":
             return self.discovery.host()
         if path == "/api/v1/virtual-machines":
