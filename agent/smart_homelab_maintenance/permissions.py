@@ -106,9 +106,11 @@ class PermissionStore:
             raise ValidationError("permission store is writable or has an unsafe mode")
 
     def read(self) -> dict[str, dict[str, Any]]:
-        self._check_file()
         if self.privileged_transport is not None:
             return self.privileged_transport.read()
+        if self.require_root:
+            raise ValidationError("privileged policy helper is required")
+        self._check_file()
         if not self.path.exists():
             return {}
         try:
@@ -151,9 +153,11 @@ class PermissionStore:
     def set_permissions(self, target: str, *, simulation_authorized: bool, update_authorized: bool, metadata: Mapping[str, Any]) -> dict[str, Any]:
         if not _TARGET.fullmatch(target):
             raise ValidationError("only numeric LXC targets may be authorized")
-        self._check_file()
         if self.privileged_transport is not None:
             return self.privileged_transport.set_permissions(target, simulation_authorized=simulation_authorized, update_authorized=update_authorized, metadata=metadata)
+        if self.require_root:
+            raise ValidationError("privileged policy helper is required")
+        self._check_file()
         entries = self.read()
         raw_id = target.split(":", 1)[1]
         entry = dict(entries.get(raw_id, {}))

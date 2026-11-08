@@ -1,7 +1,7 @@
 """Constants for the offline-testable Home Assistant adapter."""
 
 DOMAIN = "smart_homelab_maintenance"
-VERSION = "0.1.0-beta.43"
+VERSION = "0.1.0-beta.44"
 CARD_VERSION = VERSION
 AGENT_API_CONTRACT = "1.1"
 DEFAULT_SCAN_INTERVAL = 60

@@ -53,3 +53,27 @@ def test_permission_store_uses_privileged_helper_for_root_only_policy():
     assert result["simulation_authorized"] is False
     assert len(calls) == 2
     assert b'"policy_set"' in calls[1]
+
+
+def test_root_only_store_never_touches_policy_path_when_helper_is_configured():
+    calls = []
+
+    def exchange(payload: bytes) -> bytes:
+        calls.append(payload)
+        return b'{"ok":true,"entries":{"110":{"authorized":true}}}\n'
+
+    store = PermissionStore(
+        "/root-only/0700/lxc-apt-allowlist.toml",
+        require_root=True,
+        privileged_transport=PolicyHelperTransport(exchange=exchange),
+    )
+    store._check_file = lambda: (_ for _ in ()).throw(AssertionError("direct policy access"))
+    assert store.read()["110"]["authorized"] is True
+    assert calls == [b'{"operation":"policy_read"}\n']
+
+
+def test_root_only_store_fails_closed_without_privileged_transport(tmp_path: Path):
+    path = tmp_path / "allowlist.toml"
+    path.write_text('[containers."110"]\nauthorized = true\n', encoding="utf-8")
+    with pytest.raises(Exception, match="privileged policy helper is required"):
+        PermissionStore(path, require_root=True).read()

@@ -2,11 +2,11 @@
 
 ## Issue #63 · LXC update management (E2E completion status)
 
-Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.43` versioniert.
+Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.44` versioniert.
 Beta.42 bleibt der bestehende Produktivstand, bis eine separate
 Installationsfreigabe erteilt wird.
 
-The reviewed release candidate is uniquely versioned as `0.1.0-beta.43`.
+The reviewed release candidate is uniquely versioned as `0.1.0-beta.44`.
 Beta.42 remains the installed productive state until a separate installation
 approval is granted.
 

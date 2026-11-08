@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.0-beta.44 – Policy-Transport-Hotfix-Kandidat
+
+### Deutsch
+
+- Behebt den Beta.43-HTTP-500-Fehler bei `GET /api/v1/orchestration` unter
+  `root:root 0700`-Policy-Verzeichnissen.
+- Der unprivilegierte Agent greift nicht mehr direkt auf die Allowlist-Datei
+  zu; Lesen und Schreiben laufen ausschließlich über den authentifizierten
+  root-owned Helper-Socket.
+- Der Orchestrierungsstatus prüft die Policy-Verfügbarkeit pro Anfrage über
+  den Helper und meldet bei Helper-Ausfall sicher `policy_unavailable`.
+- `ProtectSystem=strict`, `root:root 0600`, getrennte Berechtigungen und
+  `execution_enabled=false` bleiben unverändert.
+
+### English
+
+- Fixes the Beta.43 HTTP 500 from `GET /api/v1/orchestration` with
+  `root:root 0700` policy directories.
+- The unprivileged agent no longer accesses the allowlist file directly;
+  reads and writes use only the authenticated root-owned helper socket.
+- Orchestration status checks policy availability per request through the
+  helper and reports `policy_unavailable` safely when the helper is unavailable.
+- `ProtectSystem=strict`, `root:root 0600`, separate permissions and
+  `execution_enabled=false` remain unchanged.
+
+This is a release candidate only. Merge, publication and productive
+installation require separate approval.
+
 ## 0.1.0-beta.43 – systemd-Policy-Write-Fix-Kandidat
 
 ### Deutsch
