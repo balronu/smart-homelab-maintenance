@@ -1,5 +1,19 @@
 # Smart Homelab Maintenance
 
+## Post-Beta.45 permission-feedback fix candidate / Berechtigungs-Feedback-Kandidat
+
+Der Arbeitsstand nach Beta.45 macht Fehler und Erfolge der LXC-Berechtigungsänderung
+direkt in der Lovelace-Karte sichtbar. Der Button setzt seinen Ladezustand auch bei
+HTTP-400/403/500-Fehlern und Timeouts zuverlässig zurück; ein erfolgreicher Aufruf
+fordert anschließend einen Coordinator-Refresh an. Es werden keine produktiven
+Freigaben automatisch ausgelöst. Dieser Stand ist noch nicht gemergt oder veröffentlicht.
+
+The post-Beta.45 work-in-progress displays LXC permission-change success and
+failure directly in the Lovelace card. Loading state is reset for HTTP 400/403/500
+responses and timeouts, and successful calls request a coordinator refresh. No
+productive permission grant is triggered automatically. This branch is not merged
+or released.
+
 ## Beta.45 inventory-recovery fix candidate / Beta.45-Inventar-Recovery-Kandidat
 
 Der lokale Beta.45-Kandidat behebt die fehlende dynamische Erzeugung von VM-
