@@ -1,4 +1,4 @@
-"""Bounded, authenticated, read-only API surface for offline tests.
+"""Bounded, authenticated API surface for offline tests.
 
 The application exposes an in-process handler and an optional localhost-only
 stdlib server.  It has no production listener configuration.
@@ -66,7 +66,7 @@ class ApiApplication:
         if path == "/api/v1/health":
             return {"status": "ok", "mode": "offline", "agent_version": __version__, "api_contract": API_CONTRACT_VERSION}
         if path == "/api/v1/capabilities":
-            return {"execution_enabled": False, "dry_run_enabled": self.updates is not None, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
+            return {"execution_enabled": bool(getattr(self.updates, "execution_enabled", False)), "dry_run_enabled": self.updates is not None, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
         if path == "/api/v1/orchestration":
             if self.orchestration_status is None:
                 return {"status": "unavailable", "policy_mode": "discover_only"}
@@ -101,10 +101,18 @@ class ApiApplication:
             if not isinstance(request, dict) or set(request) - {"confirm"}:
                 raise ValidationError("dry-run accepts only confirm")
             return self.updates.dry_run(parts[3], confirmed=request.get("confirm") is True)
-        if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] in {"execute", "update"}:
-            raise ValidationError("update execution is disabled in Beta.15")
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] in {"execute", "update"} and method == "POST":
+            if self.updates is None:
+                return {"target": parts[3], "success": False, "safe": False, "error": "update execution is unavailable"}
+            try:
+                request = json.loads(body.decode("utf-8")) if body else {}
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValidationError("update body must be valid JSON") from exc
+            if not isinstance(request, dict) or set(request) - {"confirm", "plan_digest"}:
+                raise ValidationError("update accepts only confirm and plan_digest")
+            return self.updates.execute_update(parts[3], confirmed=request.get("confirm") is True, plan_digest=request.get("plan_digest"))
         if path in {"/api/v1/update", "/api/v1/execute"}:
-            raise ValidationError("update execution is disabled in Beta.15")
+            raise ValidationError("use the target-scoped, confirmed update endpoint")
         if len(parts) == 4 and parts[:3] == ["api", "v1", "apps"]:
             return self.discovery.app(parts[3]).as_dict()
         if len(parts) == 4 and parts[:3] == ["api", "v1", "jobs"]:

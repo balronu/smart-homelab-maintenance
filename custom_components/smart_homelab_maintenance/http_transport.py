@@ -188,6 +188,23 @@ class AgentHttpTransport:
         except (ConnectionError, OSError) as exc:
             raise TransportError("connection", "agent connection failed") from exc
 
+    async def execute_update(self, target: str, *, plan_digest: str | None) -> dict[str, Any]:
+        if not isinstance(target, str) or not re.fullmatch(r"container:[1-9][0-9]{0,5}", target):
+            raise TransportError("invalid_target", "only numeric LXC targets may be updated")
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._post_json_sync, f"/api/v1/updates/{target}/execute", {"confirm": True, "plan_digest": plan_digest}),
+                self.config.timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            raise TransportError("timeout", "agent request timed out") from exc
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, ssl.SSLError):
+                raise TransportError("tls_error", "agent TLS verification failed") from exc
+            raise TransportError("connection", "agent connection failed") from exc
+        except (ConnectionError, OSError) as exc:
+            raise TransportError("connection", "agent connection failed") from exc
+
     def _post_json_sync(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = urllib.request.Request(
             self.config.base_url.rstrip("/") + path,

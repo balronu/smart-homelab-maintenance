@@ -1,7 +1,8 @@
 """Home Assistant adapter boundary.
 
 The domain logic stays in ``agent.smart_homelab_maintenance``. This module
-only coordinates transport data and never exposes update execution.
+only coordinates transport data and exposes only the separately authorized
+target-scoped update service.
 """
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ def _find_coordinator(hass: HomeAssistant, entry_id: str | None):
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Register the domain without starting any update execution."""
+    """Register the domain without enabling update execution by itself."""
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN]["actions"] = ACTIONS
     if vol is not None and hasattr(hass, "http") and not hass.data[DOMAIN].get("card_registered"):
@@ -76,6 +77,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 cursor=int(call.data.get("after", 0)),
                 target=call.data.get("target"),
                 confirm=call.data.get("confirm", False),
+                plan_digest=call.data.get("plan_digest"),
             )
             if call.service == "dry_run":
                 coordinator.record_dry_run(str(call.data.get("target")), result.get("data", result))
@@ -87,10 +89,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             vol.Optional("entry_id"): str,
             vol.Optional("job_id"): str,
             vol.Optional("target"): str,
+            vol.Optional("plan_digest"): str,
             vol.Optional("confirm", default=False): cv.boolean,
             vol.Optional("after", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=1000000)),
         })
-        for action in ("check", "get_job", "get_job_events", "dry_run"):
+        for action in ("check", "get_job", "get_job_events", "dry_run", "execute"):
             kwargs = {"schema": schema}
             if SupportsResponse is not None:
                 kwargs["supports_response"] = SupportsResponse.ONLY

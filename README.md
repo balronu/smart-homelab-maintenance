@@ -1,19 +1,21 @@
 # Smart Homelab Maintenance
 
-## Beta.33
+## Beta.34 candidate
 
-Die aktuelle Entwicklungs-Beta synchronisiert Agent, Home-Assistant-
-Integration, Lovelace-Karte und Manifest auf `0.1.0-beta.33`. Der sichere
-Betriebsvertrag bleibt unverändert: gezielte APT-Simulationen sind nur für
-explizit autorisierte Ziele vorgesehen; echte Paketinstallation, Entfernung
-und `apt update` bleiben deaktiviert. VMs bleiben Monitoring-only und
-gestoppte LXCs werden nie automatisch gestartet.
+Die nächste Entwicklungs-Beta ergänzt einen opt-in Updatepfad für ausdrücklich
+autorisierte laufende Debian-/Ubuntu-LXCs. Simulation und echte Updates haben
+getrennte Berechtigungen; ein frischer Plan-Digest und eine Bestätigung sind
+Pflicht. Der sichere Standard `execution_enabled = false` bleibt unverändert.
+Es gibt kein Dist-Upgrade, keine Paketentfernung, keine VM-/Host-Aktion und
+keinen automatischen Neustart. Siehe
+[`docs/update-execution-beta34.md`](docs/update-execution-beta34.md).
 
-The current development beta synchronizes the agent, Home Assistant
-integration, Lovelace card, and manifest at `0.1.0-beta.33`. The safety
-contract is unchanged: targeted APT simulations are limited to explicitly
-authorized targets; real package installation, removal, and `apt update`
-remain disabled. VMs stay monitoring-only and stopped LXCs are never started.
+The next development beta adds an opt-in update path for explicitly authorized
+running Debian/Ubuntu LXCs. Simulation and real updates use separate
+permissions; a fresh plan digest and explicit confirmation are required. The
+safe default `execution_enabled = false` remains unchanged. There is no
+dist-upgrade, package removal, VM/host action, or automatic reboot. See
+[`docs/update-execution-beta34.md`](docs/update-execution-beta34.md).
 
 ## Beta.32: sichere Orchestrierungsanzeige und Helper-Bereitschaft
 

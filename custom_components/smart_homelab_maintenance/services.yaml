@@ -65,3 +65,30 @@ dry_run:
       required: true
       selector:
         boolean:
+execute:
+  name: Install authorized updates
+  description: Run apt update and a no-remove apt upgrade for one explicitly authorized running LXC.
+  fields:
+    entry_id:
+      name: Config entry
+      required: false
+      selector:
+        text:
+    target:
+      name: Update target
+      description: Numeric LXC target, for example container:107. VMs and the host are rejected.
+      required: true
+      selector:
+        text:
+    confirm:
+      name: Explicit confirmation
+      description: Required acknowledgement before the real package update.
+      required: true
+      selector:
+        boolean:
+    plan_digest:
+      name: Update plan digest
+      description: Fresh plan identifier returned by the update check.
+      required: true
+      selector:
+        text:

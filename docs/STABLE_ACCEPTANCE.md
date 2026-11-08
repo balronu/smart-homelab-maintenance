@@ -65,8 +65,13 @@ ist kein PASS.
 - [ ] Autorisierte LXC-Simulation nutzt ausschließlich feste, geprüfte
       Operationen mit Zielvalidierung, Timeout und Concurrency-Schutz.
 - [ ] VM-IDs erreichen weder `pct exec` noch einen anderen Update-Runner.
-- [ ] Installationsbutton und allgemeiner Ausführungspfad bleiben deaktiviert;
-      Paketinstallationen sind nicht unterstützt.
+- [ ] Installationsbutton und allgemeiner Ausführungspfad bleiben standardmäßig
+      deaktiviert; echte Updates benötigen getrennte Zielberechtigung, frischen
+      Digest und explizite Bestätigung.
+- [ ] Der Beta.34-Updatepfad ist isoliert für `apt-get update` plus
+      `apt-get --yes --no-remove upgrade` geprüft; Dist-Upgrade, Entfernung,
+      VM-/Host-Ziele, automatische Neustarts und unbeaufsichtigte Updates sind
+      ausgeschlossen.
 - [ ] Fehler, stale-Pläne, fehlende Berechtigungen, Rollback und Diagnose-
       informationen sind isoliert getestet.
 
@@ -85,8 +90,8 @@ ist kein PASS.
 Use the same checklist for the English release review. Stable readiness is
 not established by documentation alone: every item needs PASS, BLOCKED, or NOT
 RUN evidence. VMs are permanently monitoring-only, LXC simulation requires
-explicit reviewed authorization, and real package installation remains
-unsupported.
+explicit reviewed authorization; real updates remain disabled by default and
+require a fresh digest and explicit confirmation.
 
 ## Offene Stable-Entscheidungen / Open Stable decisions
 
