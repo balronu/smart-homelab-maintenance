@@ -34,7 +34,13 @@ trap cleanup EXIT
 
 [[ "$EUID" -eq 0 ]] || die "root is required"
 [[ "$(readlink /proc/1/exe)" == */systemd ]] || { printf '%s\n' 'SKIP: PID1 is not systemd; no real installer test claimed.'; exit 0; }
-[[ "$(systemctl is-system-running 2>/dev/null || true)" =~ ^(running|degraded)$ ]] || die "systemd is not usable"
+systemd_state="$(systemctl is-system-running 2>/dev/null || true)"
+if [[ ! "$systemd_state" =~ ^(running|degraded)$ ]]; then
+  message="NOT RUN: PID1 is systemd, but systemctl is-system-running returned '$systemd_state'; no installer result is claimed."
+  printf '%s\n' "$message"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then printf '## Installer systemd acceptance\n\n- **NOT RUN:** `%s`\n' "$message" >> "$GITHUB_STEP_SUMMARY"; fi
+  exit 0
+fi
 
 for path in "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST" "$STATE_ROOT"; do
   [[ ! -e "$path" ]] || die "pre-existing target refuses test: $path"
