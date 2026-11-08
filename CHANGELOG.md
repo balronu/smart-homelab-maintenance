@@ -17,6 +17,9 @@
 - Ergänzt Phase 37 als isolierte End-to-End-Abnahme für Inventar, Probe, Policy,
   Plan, expliziten Apply, Audit, Recovery und Status; Proxmox, systemd, HA und
   produktive Gäste bleiben unberührt.
+- Ergänzt Phase 39 als separaten Root-/systemd-Installer-Test auf einem
+  kurzlebigen GitHub-Runner; Apply, Wiederholung, Socket-Health, Rechte und
+  fail-closed Quellintegrität werden geprüft, ohne pve-home zu verändern.
 
 - Präzisiert den Backend-Status für einen fehlenden oder ungültigen LXC-Helper
   als `helper-unavailable`, getrennt von `unauthorized`, `unsupported` und

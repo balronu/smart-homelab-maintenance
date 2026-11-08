@@ -70,6 +70,12 @@ probe, policy, plan, explicit apply, audit, recovery and status flow. It uses
 temporary files and mocked transports only; it is not a productive installer
 run and does not authorize helper or allowlist activation.
 
+Phase 39 adds a separate GitHub Actions acceptance job on an ephemeral
+root/systemd runner. It exercises the real helper installer, repeat
+installation, permissions, socket health and fail-closed source validation.
+It does not touch Proxmox or Home Assistant production and does not replace
+the separately required Proxmox/HA live acceptance.
+
 ## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 
 Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen

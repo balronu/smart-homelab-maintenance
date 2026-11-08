@@ -17,6 +17,10 @@
 - [ ] Isolated Phase-37 end-to-end acceptance passes for first install,
       repeat install, upgrade/recovery, dynamic container events, VM blocking,
       audit, rollback, API status, and HA options migration.
+- [ ] Phase-39 real installer acceptance passes on an ephemeral root/systemd
+      CI runner; a skipped or unsupported runner is NOT RUN, not PASS.
+- [ ] Productive Proxmox/HA live wiring remains separately approved and tested;
+      CI does not authorize helper or allowlist activation on `pve-home`.
 
 Diese Checkliste ist ein Prüfvertrag für eine spätere Stable-Freigabe. Sie
 ist keine Installations- oder Aktivierungsfreigabe. Jede Zeile benötigt einen

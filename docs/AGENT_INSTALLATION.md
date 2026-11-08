@@ -403,4 +403,8 @@ sudo scripts/uninstall-agent.sh \
 Der dokumentierte Weg ist technisch vorbereitet, aber für eine kontrollierte
 Installation derzeit **NO-GO**. Erforderlich sind die isolierte HA-2026.11-
 Abnahme, private TLS-/DNS-/Netzwerkstrecke und eine gesonderte Freigabe für
-Installations- und Starttest.
+Installations- und Starttest. Der reproduzierbare Root-/systemd-Installer-
+Nachweis läuft separat über den GitHub-Actions-Job
+`installer-systemd.yml` auf einem kurzlebigen Runner; ein übersprungener oder
+nicht systemd-fähiger Runner gilt als NOT RUN und nicht als PASS. Auch ein
+grüner CI-Job autorisiert keine Installation auf `pve-home`.
