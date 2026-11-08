@@ -159,7 +159,7 @@ def test_peer_credentials_reject_wrong_uid(monkeypatch) -> None:
     class FakeSocket:
         def getsockopt(self, *_args):
             import struct
-            return struct.pack("3i", 424242, 1, 1)
+            return struct.pack("3i", 1, 424242, 1)
 
     monkeypatch.setattr(helper.pwd, "getpwnam", lambda _name: type("Pw", (), {"pw_uid": 1234})())
     with pytest.raises(helper.HelperError, match="not authorized"):
@@ -170,7 +170,7 @@ def test_peer_credentials_accept_exact_uid(monkeypatch) -> None:
     class FakeSocket:
         def getsockopt(self, *_args):
             import struct
-            return struct.pack("3i", 1234, 1, 1)
+            return struct.pack("3i", 1, 1234, 1)
 
     monkeypatch.setattr(helper.pwd, "getpwnam", lambda _name: type("Pw", (), {"pw_uid": 1234})())
     helper._require_agent_peer(FakeSocket())
@@ -200,6 +200,14 @@ def test_helper_service_is_root_scoped_and_not_a_general_pct_service() -> None:
     assert "ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve" in unit
     assert "ExecStart=/usr/sbin/pct" not in unit
     assert "NOPASSWD" not in unit
+
+
+def test_discovery_unit_shares_helper_runtime_group() -> None:
+    unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-discovery.service").read_text(encoding="utf-8")
+    assert "User=root" in unit
+    assert "Group=smart-homelab-maintenance" in unit
+    assert "RuntimeDirectory=smart-homelab-maintenance" in unit
+    assert "RuntimeDirectoryMode=0750" in unit
 
 
 def test_official_helper_installer_is_preflight_only_by_default_and_never_wildcards() -> None:

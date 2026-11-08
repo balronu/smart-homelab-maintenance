@@ -6,6 +6,7 @@ ConditionPathExists=/usr/libexec/smart-homelab-maintenance/lxc-discovery.py
 [Service]
 Type=simple
 User=root
+Group=smart-homelab-maintenance
 ExecStart=/usr/bin/python3 /usr/libexec/smart-homelab-maintenance/lxc-discovery.py
 RuntimeDirectory=smart-homelab-maintenance
 RuntimeDirectoryMode=0750
