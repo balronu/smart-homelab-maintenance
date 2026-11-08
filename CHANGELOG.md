@@ -14,6 +14,8 @@
 - Ergänzt die passive Phase-29-Matrix für alle zehn LXCs mit Ressourcen,
   Proxmox-OS-Metadaten, unbekannten APT-Nachweisen, Betriebsrisiken und den
   späteren Einzel-Freigabegates.
+- Ergänzt die Phase-30-Nachweise: CT101–109 Debian 13 mit apt 3.0.4 und
+  CT110–111 Debian 12 mit apt 2.6.2; die geplante Allowlist bleibt inaktiv.
 
 ### English
 
@@ -26,6 +28,9 @@
 - Adds the passive Phase 29 matrix for all ten LXCs, including resources,
   Proxmox OS metadata, unknown APT evidence, operating risks, and later
   per-target authorization gates.
+- Adds the Phase 30 evidence: CT101–109 are Debian 13 with apt 3.0.4 and
+  CT110–111 are Debian 12 with apt 2.6.2; the planned allowlist remains
+  inactive.
 
 ## 0.1.0-beta.31 – Mobile Aktionszeile und Simulationsgrenzen (Prerelease)
 

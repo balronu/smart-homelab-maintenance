@@ -6,34 +6,50 @@ Allowlist-Änderungen oder Helper-Aktivierungen durchgeführt.
 
 ## Passive Befunde
 
-Proxmox meldet für alle zehn Container `ostype=debian`. Eine Debian-Version,
-`apt`/`dpkg`-Verfügbarkeit und der Paketplan konnten aus den vorhandenen
-Proxmox-Metadaten nicht nachgewiesen werden, weil die LXC-Rootfs nicht passiv
-gemountet vorlagen. Diese Werte bleiben daher **UNKNOWN** und werden nicht als
-Eignungsnachweis verwendet.
+Proxmox meldet für alle zehn Container `ostype=debian`. Die neun laufenden
+Container wurden danach im ausdrücklich freigegebenen, sequenziellen
+Lesepfad geprüft. CT101–109 melden Debian 13 (trixie), `apt 3.0.4` und
+`dpkg-query 1.22.22`; CT110–111 melden Debian 12 (bookworm), `apt 2.6.2`
+und `dpkg-query 1.21.23`. Es wurden keine Paketlisten aktualisiert und keine
+Pakete verändert.
 
 | CTID | Name | Zustand | Proxmox-OS | Version/APT | Risiko-/Besonderheit | Aktueller Status |
 |---:|---|---|---|---|---|---|
-| 101 | cloudflared | laufend | Debian konfiguriert | UNKNOWN | Netzwerk-/Edge-Dienst | nicht autorisiert |
-| 102 | zigbee2mqtt-haus | laufend | Debian konfiguriert | UNKNOWN | Hausautomatisierung | nicht autorisiert |
-| 103 | mariadb | laufend | Debian konfiguriert | UNKNOWN | Datenbank, migrationssensitiv | nicht autorisiert |
-| 105 | OpenClaw | laufend | Debian konfiguriert | UNKNOWN | Steuerungs-/Agent-Dienst | nicht autorisiert |
-| 107 | paperless-ngx | laufend | Debian konfiguriert | UNKNOWN | Daten-/Anwendungsdienst | nicht autorisiert |
-| 108 | zigbee2mqtt-womo | laufend | Debian konfiguriert | UNKNOWN | Hausautomatisierung | nicht autorisiert |
-| 109 | mqtt | laufend | Debian konfiguriert | UNKNOWN | Infrastruktur-/Broker-Dienst | nicht autorisiert |
-| 110 | npm | laufend | Debian konfiguriert | UNKNOWN | Reverse-Proxy-Dienst | nicht autorisiert |
-| 111 | pve-touch-dashboard | laufend | Debian konfiguriert | UNKNOWN | Bedien-/Dashboard-Dienst | nicht autorisiert |
-| 112 | stellantis-oauth-worker | gestoppt | Debian konfiguriert | UNKNOWN | gestoppt; nicht starten | nicht geprüft |
+| 101 | cloudflared | laufend | Debian 13 (trixie) | apt 3.0.4, dpkg-query 1.22.22 | Netzwerk-/Edge-Dienst | nicht autorisiert |
+| 102 | zigbee2mqtt-haus | laufend | Debian 13 (trixie) | apt 3.0.4, dpkg-query 1.22.22 | Hausautomatisierung | nicht autorisiert |
+| 103 | mariadb | laufend | Debian 13 (trixie) | apt 3.0.4, dpkg-query 1.22.22 | Datenbank, migrationssensitiv | nicht autorisiert |
+| 105 | OpenClaw | laufend | Debian 13 (trixie) | apt 3.0.4, dpkg-query 1.22.22 | Steuerungs-/Agent-Dienst | nicht autorisiert |
+| 107 | paperless-ngx | laufend | Debian 13 (trixie) | apt 3.0.4, dpkg-query 1.22.22 | Daten-/Anwendungsdienst | nicht autorisiert |
+| 108 | zigbee2mqtt-womo | laufend | Debian 13 (trixie) | apt 3.0.4, dpkg-query 1.22.22 | Hausautomatisierung | nicht autorisiert |
+| 109 | mqtt | laufend | Debian 13 (trixie) | apt 3.0.4, dpkg-query 1.22.22 | Infrastruktur-/Broker-Dienst | nicht autorisiert |
+| 110 | npm | laufend | Debian 12 (bookworm) | apt 2.6.2, dpkg-query 1.21.23 | Reverse-Proxy-Dienst | nicht autorisiert |
+| 111 | pve-touch-dashboard | laufend | Debian 12 (bookworm) | apt 2.6.2, dpkg-query 1.21.23 | Bedien-/Dashboard-Dienst | nicht autorisiert |
+| 112 | stellantis-oauth-worker | gestoppt | Debian konfiguriert | nicht geprüft | gestoppt; nicht starten | nicht geprüft |
 
-Damit ist derzeit kein Container als produktiv geeigneter Simulationskandidat
-nachgewiesen. Die neun laufenden Debian-konfigurierten LXCs sind technische
-Kandidaten für eine spätere Einzelprüfung, aber nicht automatisch autorisiert.
+Damit sind alle neun laufenden Container technisch als Debian-/APT-Kandidaten
+nachgewiesen. Das ist noch keine Simulationsfreigabe: alle bleiben bis zur
+separaten Risikoabnahme und Allowlist-Aktivierung `unauthorized`.
 
 ## Geplante Freigabematrix
 
-Die geplante Allowlist bleibt leer, bis je CTID die offenen Nachweise und die
-Risikoabnahme vorliegen. Es gibt keine Wildcard und keine automatisch aus dem
-Inventar erzeugte Allowlist.
+Die geplante, noch nicht aktive Allowlist umfasst nach erfolgreicher
+Einzel-Risikoabnahme exakt die laufenden CTIDs 101, 102, 103, 105, 107, 108,
+109, 110 und 111. Es gibt keine Wildcard und keine automatisch aktivierte
+Allowlist.
+
+Vorgesehene Einträge (Plan, nicht produktive Konfiguration):
+
+```text
+101 Debian 13 apt
+102 Debian 13 apt
+103 Debian 13 apt
+105 Debian 13 apt
+107 Debian 13 apt
+108 Debian 13 apt
+109 Debian 13 apt
+110 Debian 12 apt
+111 Debian 12 apt
+```
 
 Für jeden später freizugebenden laufenden Kandidaten gilt derselbe Vertrag:
 
@@ -78,7 +94,8 @@ Socket und Allowlist.
 
 ## Ergebnis
 
-Die Entwicklungs- und Dokumentationsvorbereitung ist zulässig. Die
-produktive Gesamtaktivierung ist **NO-GO**, solange OS/APT für die neun
-laufenden Kandidaten nicht nachgewiesen und Helper/Allowlist nicht in einem
-separat freigegebenen Sicherheitsfenster geprüft sind.
+Die OS-/APT-Nachweise für alle neun laufenden Kandidaten sind PASS. Die
+Entwicklungs- und Dokumentationsvorbereitung ist abgeschlossen; die
+produktive Gesamtaktivierung bleibt **NO-GO**, solange Helper/Allowlist nicht
+in einem separat freigegebenen Sicherheitsfenster installiert, geprüft und
+je CTID abgenommen sind.
