@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const BROWSER_TIMEOUT = 15000;
+const BROWSER_TIMEOUT = 30000;
 const NAVIGATION_TIMEOUT = 15000;
 const ACTION_TIMEOUT = 10000;
 const TEST_TIMEOUT = 150000;
