@@ -38,7 +38,7 @@ await new Promise((resolve) => setTimeout(resolve, 0));
 const dryRunResponseShown = card.shadowRoot.textContent.includes("Simulation successful") && card.shadowRoot.textContent.includes("curl 1 → 2");
 const packageDetailsCollapsed = [...card.shadowRoot.querySelectorAll("details.package-list")].every((details) => !details.open);
 const packageDetailsStructured = Boolean(card.shadowRoot.querySelector("details.package-list .package-row .package-version"));
-const installButtonDisabled = [...card.shadowRoot.querySelectorAll("button.install")].length >= 2 && [...card.shadowRoot.querySelectorAll("button.install")].every((button) => button.disabled && button.getAttribute("aria-disabled") === "true");
+const installButtonDisabled = [...card.shadowRoot.querySelectorAll(".container-grid button.install")].length >= 1 && [...card.shadowRoot.querySelectorAll(".container-grid button.install")].every((button) => button.disabled && button.getAttribute("aria-disabled") === "true");
 let executeCall = null;
 card.hass = { locale: "en", callService: (...args) => { executeCall = args; return Promise.resolve({ response: { data: { success: true, safe: true, steps: [{ name: "apt-update" }, { name: "apt-upgrade" }] } } }); }, states: {
   "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
