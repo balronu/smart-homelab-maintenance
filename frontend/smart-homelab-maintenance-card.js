@@ -156,7 +156,7 @@ function dryRunSummary(response, german = true) {
 }
 function renderDryRunResult(result, response, german) {
   const data = dryRunData(response);
-  if (!data || typeof data !== "object") throw new Error(german ? "Die Serviceantwort ist leer oder ungültig." : "The service response is empty or invalid.");
+  if (!data || typeof data !== "object") throw new Error("Die Serviceantwort ist leer oder ungültig.");
   result.replaceChildren();
   const summary = document.createElement("div");
   summary.className = "simulation-summary";
