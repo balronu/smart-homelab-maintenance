@@ -31,6 +31,7 @@ DEFAULT_ALLOWLIST = Path("/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml"
 MAX_OUTPUT_BYTES = 256_000
 COMMAND_TIMEOUT_SECONDS = 10
 ALLOWED_OPERATIONS = {"read", "simulate", "update"}
+PROBE_OPERATION = "probe"
 POLICY_OPERATIONS = {"policy_read", "policy_set"}
 EXPECTED_CLIENT_USER = "smart-homelab-maintenance"
 REQUEST_TIMEOUT_SECONDS = 10
@@ -209,6 +210,44 @@ def build_argv(vmid: int, operation: str) -> list[str]:
     return ["/usr/sbin/pct", "exec", str(vmid), "--", *guest_command]
 
 
+def _parse_os_release(raw: str) -> tuple[str, str]:
+    values: dict[str, str] = {}
+    for line in raw.splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key in {"ID", "ID_LIKE", "VERSION_ID"}:
+            values[key] = value.strip().strip('"').strip("'")
+    ids = {item.strip().lower() for item in (values.get("ID", "") + " " + values.get("ID_LIKE", "")).split()}
+    if not ids.intersection({"debian", "ubuntu"}) or not values.get("VERSION_ID"):
+        raise HelperError("unsupported_os", "container is not a proven Debian/Ubuntu system")
+    os_name = "Ubuntu" if "ubuntu" in ids else "Debian"
+    return os_name, values["VERSION_ID"]
+
+
+def probe_target(request: Any, *, run=None) -> dict[str, Any]:
+    """Prove a running Debian/Ubuntu APT LXC using fixed read-only commands."""
+    run = run or _run
+    if not isinstance(request, dict) or set(request) != {"container_id", "operation"}:
+        raise HelperError("invalid_request", "probe request must contain only container_id and operation")
+    vmid = request["container_id"]
+    if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
+        raise HelperError("invalid_container", "container_id must be a numeric Proxmox ID")
+    status_code, status_out, _ = run(["/usr/sbin/pct", "status", str(vmid)])
+    if status_code != 0:
+        raise HelperError("status_failed", "container status could not be read")
+    if status_out.strip() != "status: running":
+        raise HelperError("not_running", "stopped containers are never started or probed")
+    os_code, os_out, _ = run(["/usr/sbin/pct", "exec", str(vmid), "--", "/usr/bin/cat", "/etc/os-release"])
+    if os_code != 0:
+        raise HelperError("os_release_unavailable", "container operating system could not be proven")
+    os_name, os_version = _parse_os_release(os_out)
+    for executable in ("/usr/bin/apt-get", "/usr/bin/apt"):
+        apt_code, _, _ = run(["/usr/sbin/pct", "exec", str(vmid), "--", "/usr/bin/test", "-x", executable])
+        if apt_code != 0:
+            raise HelperError("apt_unavailable", "container APT support could not be proven")
+    return {"ok": True, "operation": PROBE_OPERATION, "container_id": vmid, "running": True,
+            "supported": True, "os_name": os_name, "os_version": os_version, "package_manager": "apt"}
+
+
 def _run(argv: list[str]) -> tuple[int, str, str]:
     process: subprocess.Popen[bytes] | None = None
     try:
@@ -260,6 +299,8 @@ _UPDATE_LOCK = threading.Lock()
 
 def handle(request: Any, *, allowed_ids: set[int], update_ids: set[int] | None = None, run=_run) -> dict[str, Any]:
     try:
+        if isinstance(request, dict) and request.get("operation") == PROBE_OPERATION:
+            return probe_target(request, run=run)
         vmid, operation = validate_request(request, allowed_ids, update_ids)
         lock = _UPDATE_LOCK if operation == "update" else threading.Lock()
         with lock:
@@ -318,6 +359,8 @@ class _SocketHandler(socketserver.StreamRequestHandler):
                 request = json.loads(line.decode("utf-8"))
                 if isinstance(request, dict) and request.get("operation") in POLICY_OPERATIONS:
                     response = handle_policy(request, self.server.allowlist_path)
+                elif isinstance(request, dict) and request.get("operation") == PROBE_OPERATION:
+                    response = probe_target(request)
                 else:
                     allowed, update_allowed = _load_permissions(self.server.allowlist_path)
                     response = handle(request, allowed_ids=allowed, update_ids=update_allowed)

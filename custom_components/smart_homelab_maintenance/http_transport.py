@@ -75,6 +75,37 @@ class TransportError(Exception):
         self.code = code
 
 
+_SAFE_AGENT_MESSAGES = {
+    "target is not a proven Debian/Ubuntu apt LXC",
+    "only running LXC targets may be authorized",
+    "target eligibility could not be verified",
+    "target eligibility probe is unavailable",
+    "container is not authorized",
+    "container is not in the root-owned allowlist",
+    "privileged policy helper is unavailable",
+}
+
+
+def _safe_agent_error(exc: urllib.error.HTTPError, *, fallback_code: str = "http_error") -> TransportError:
+    """Expose only bounded, explicitly safe API validation messages to HA."""
+    try:
+        raw = exc.read(8193)
+        payload = json.loads(raw.decode("utf-8"))
+        error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        message = error.get("message") if isinstance(error, dict) else None
+        code = error.get("code") if isinstance(error, dict) else None
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        message = None
+        code = None
+    if not isinstance(message, str) or message not in _SAFE_AGENT_MESSAGES:
+        message = "agent rejected the request" if 400 <= exc.code < 500 else "agent request failed"
+    safe_code = str(code) if isinstance(code, str) and re.fullmatch(r"[a-z0-9_]{1,48}", code) else fallback_code
+    if exc.code in {401, 403}:
+        safe_code = "authentication"
+        message = "agent authentication failed"
+    return TransportError(safe_code, message)
+
+
 @dataclass(frozen=True, slots=True)
 class TransportConfig:
     """Bounded configuration for the read-only agent transport."""
@@ -141,8 +172,7 @@ class AgentHttpTransport:
             ) as response:
                 raw = response.read(self.config.max_response_bytes + 1)
         except urllib.error.HTTPError as exc:
-            code = "authentication" if exc.code in {401, 403} else "http_error"
-            raise TransportError(code, "agent returned an HTTP error") from exc
+            raise _safe_agent_error(exc) from exc
         if len(raw) > self.config.max_response_bytes:
             raise TransportError("response_too_large", "agent response exceeds limit")
         try:
@@ -153,7 +183,10 @@ class AgentHttpTransport:
             raise TransportError("api_version", "unsupported agent API version")
         if "error" in result:
             error = result["error"]
-            raise TransportError(str(error.get("code", "agent_error")), "agent request failed")
+            message = error.get("message") if isinstance(error, dict) else None
+            if message not in _SAFE_AGENT_MESSAGES:
+                message = "agent request failed"
+            raise TransportError(str(error.get("code", "agent_error")), message)
         return result
 
     async def health(self) -> dict[str, Any]:
@@ -234,8 +267,7 @@ class AgentHttpTransport:
             with urllib.request.urlopen(request, timeout=self.config.timeout_seconds, context=self._ssl_context()) as response:
                 raw = response.read(self.config.max_response_bytes + 1)
         except urllib.error.HTTPError as exc:
-            code = "authentication" if exc.code in {401, 403} else "http_error"
-            raise TransportError(code, "agent returned an HTTP error") from exc
+            raise _safe_agent_error(exc) from exc
         if len(raw) > self.config.max_response_bytes:
             raise TransportError("response_too_large", "agent response exceeds limit")
         try:
@@ -246,7 +278,10 @@ class AgentHttpTransport:
             raise TransportError("api_version", "unsupported agent API version")
         if "error" in result:
             error = result["error"]
-            raise TransportError(str(error.get("code", "agent_error")), "agent request failed")
+            message = error.get("message") if isinstance(error, dict) else None
+            if message not in _SAFE_AGENT_MESSAGES:
+                message = "agent request failed"
+            raise TransportError(str(error.get("code", "agent_error")), message)
         return result
 
 

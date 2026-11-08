@@ -75,6 +75,38 @@ def test_helper_refuses_stopped_container_without_guest_command() -> None:
     assert len(calls) == 1 and calls[0] == ["/usr/sbin/pct", "status", "101"]
 
 
+def test_helper_probe_proves_running_debian_and_apt_without_allowlist() -> None:
+    calls = []
+
+    def run(argv, **_kwargs):
+        calls.append(argv)
+        if argv[1] == "status":
+            return 0, "status: running\n", ""
+        if argv[-2:] == ["/usr/bin/cat", "/etc/os-release"]:
+            return 0, 'ID=debian\nVERSION_ID="12"\n', ""
+        return 0, "", ""
+
+    result = helper.handle({"container_id": 102, "operation": "probe"}, allowed_ids=set(), run=run)
+    assert result["ok"] is True
+    assert result["os_name"] == "Debian" and result["package_manager"] == "apt"
+    assert calls == [
+        ["/usr/sbin/pct", "status", "102"],
+        ["/usr/sbin/pct", "exec", "102", "--", "/usr/bin/cat", "/etc/os-release"],
+        ["/usr/sbin/pct", "exec", "102", "--", "/usr/bin/test", "-x", "/usr/bin/apt-get"],
+        ["/usr/sbin/pct", "exec", "102", "--", "/usr/bin/test", "-x", "/usr/bin/apt"],
+    ]
+
+
+def test_helper_probe_fails_closed_for_unsupported_os() -> None:
+    def run(argv, **_kwargs):
+        if argv[1] == "status":
+            return 0, "status: running\n", ""
+        return 0, "ID=alpine\nVERSION_ID=3.20\n", ""
+
+    result = helper.handle({"container_id": 102, "operation": "probe"}, allowed_ids=set(), run=run)
+    assert result["ok"] is False and result["error"]["code"] == "unsupported_os"
+
+
 def test_helper_returns_guest_failure_without_turning_it_into_success() -> None:
     def run(argv, **_kwargs):
         if argv[1] == "status":
@@ -157,6 +189,19 @@ def test_root_transport_uses_fixed_unix_socket_and_json_protocol() -> None:
     assert transport.read(101) == (0, "Listing...\n", "")
     assert calls == [b'{"container_id":101,"operation":"read"}\n']
     assert transport.socket_path == LXC_HELPER_SOCKET
+
+
+def test_root_transport_probe_uses_only_probe_operation() -> None:
+    calls = []
+
+    def exchange(payload):
+        calls.append(payload)
+        return b'{"ok":true,"operation":"probe","container_id":102,"running":true,"supported":true,"os_name":"Debian","os_version":"12","package_manager":"apt"}\n'
+
+    transport = RootHelperTransport(exchange=exchange)
+    result = transport.probe(102)
+    assert result["supported"] is True
+    assert calls == [b'{"container_id":102,"operation":"probe"}\n']
 
 
 def test_root_transport_rejects_non_fixed_socket_path() -> None:
