@@ -10,8 +10,9 @@
   HTML-Injection dargestellt; lange Versionen umbrechen und die Scrollposition
   bleibt stabil.
 - LXC-Eignung bleibt an laufenden Zustand, Debian/Ubuntu-APT-Nachweis und
-  explizite Zielautorisierung gebunden. VMs werden klar als nicht geprüft
-  ausgewiesen, solange kein sicherer Gasttransport vorhanden ist.
+  explizite Zielautorisierung gebunden. VMs sind dauerhaft von Paketprüfung
+  und Simulation ausgeschlossen; ihre Karten zeigen weiterhin Name, Status und
+  Ressourcen sowie einen Hinweis auf die Updatefunktion des Gastbetriebssystems.
 - Gleichzeitige Simulationen desselben Ziels werden abgewiesen;
   Installationspfade bleiben deaktiviert.
 
@@ -22,8 +23,9 @@
 - Package names and installed/available versions are rendered safely without
   HTML injection; long versions wrap and scroll position remains stable.
 - LXC eligibility remains bound to running state, proven Debian/Ubuntu APT,
-  and explicit target authorization. VMs are explicitly not checked until a
-  safe guest transport exists.
+  and explicit target authorization. VMs are permanently excluded from
+  package checks and simulations; their cards still show name, state, and
+  resources and direct users to the guest operating system's update function.
 - Concurrent simulations for one target are rejected; installation paths
   remain disabled.
 

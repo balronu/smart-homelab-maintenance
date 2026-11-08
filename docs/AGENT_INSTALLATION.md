@@ -1,10 +1,56 @@
 # Agent-Installation
 
-Dieses Dokument beschreibt den späteren, kontrollierten Installationsweg des
-Smart-Homelab-Maintenance-Agenten auf Proxmox. Der Agent ist in der aktuellen
-Phase noch nicht für einen produktiven Start freigegeben. Die lesende
-Proxmox-API-Anbindung und TLS-Server-Runtime sind implementiert; die isolierte
-HA-Laufzeitabnahme und Infrastrukturfreigabe müssen noch erfolgen.
+Dieses Dokument beschreibt den kontrollierten Installationsweg des
+Smart-Homelab-Maintenance-Agenten auf Proxmox. Es ist eine Stable-
+Vorbereitungsanleitung, keine Installationsfreigabe. Die aktuelle Anwendung
+bleibt read-only und der Installationspfad serverseitig deaktiviert; jede
+produktive Installation, jedes Upgrade und jeder Dienstneustart benötigen
+eine eigene Freigabe.
+
+## Stable-Vorbereitung: Komponenten und Grenzen
+
+Die Home-Assistant-Integration wird über HACS installiert und aktualisiert;
+der Proxmox-Agent ist ein unabhängig laufender Dienst. HACS verändert niemals
+den Agenten. Vor einer Stable-Freigabe müssen Integration, Agent und API-
+Vertrag getrennt aus dem exakten Release-Commit verifiziert werden. Die
+Reihenfolge ist: Quelle/Commit prüfen, read-only Preflight ausführen,
+Readiness- und TLS-Vertrag prüfen, erst dann einen ausdrücklich genehmigten
+Apply durchführen. Rollback-Staging bleibt erhalten und wird nicht bereinigt.
+
+TLS benötigt einen privaten Hostnamen oder eine private IP mit passendem SAN,
+eine explizit vertrauenswürdige CA-Datei und aktivierte Zertifikatsprüfung.
+HTTP-Fallback, `verify=False`, öffentliche Proxypfade und die Ausgabe von
+Credentials sind nicht zulässig.
+
+Die Funktionsmatrix bleibt klar begrenzt:
+
+| Ziel | Unterstützter Zustand | Stable-Hinweis |
+|---|---|---|
+| Proxmox-Host | passiver Check und fester APT-Dry-Run | nur mit frischem Plan, TLS/API und Sicherheitsprüfung |
+| LXC | vorbereiteter fester Helper-Pfad | laufend, OS/Paketmanager nachgewiesen, pro Ziel allowlistet |
+| VM | dauerhaft ausgeschlossen | Karte zeigt Name/Status/Ressourcen und einen DE/EN-Hinweis; niemals `pct exec` oder einen anderen Update-Runner verwenden |
+| Paketinstallation | nicht unterstützt | UI und API bleiben dauerhaft deaktiviert |
+
+Installation, Update und Rollback sind getrennt zu dokumentieren. Ein
+erfolgreicher Healthcheck des neuen Agenten ist kein Ersatz für die HA-
+Nachkontrolle; umgekehrt ersetzt ein HACS-Update keinen Agent-Updatepfad.
+
+### Fehlersuche vor Stable
+
+- Bei `outdated` oder `incompatible`: Integration und Agent getrennt lesen,
+  API 1.1 vergleichen und keinen Installationspfad freigeben.
+- Bei TLS-Fehlern: SAN, CA-Pfad, Ablaufdatum und Schlüssel-Paar prüfen; nicht
+  auf HTTP ausweichen.
+- Bei Port-/Bind-Fehlern: Updater-Diagnose, systemd-Cgroup, Portzustände,
+  `NRestarts`, `InvocationID` und monotone Startzeit prüfen; keine fremden
+  Prozesse blind beenden.
+- Bei Readiness-/Rollback-Fehlern: den offiziellen Rollback abwarten,
+  Failed-/Previous-Staging erhalten und keinen zweiten Versuch starten.
+- Bei Gast-Simulationen: LXC-Ziele nur nach expliziter Eignungs- und
+  Autorisierungsprüfung betrachten; gestoppte Gäste werden nie gestartet.
+  VMs bleiben dauerhaft ausgeschlossen und zeigen den Hinweis, dass Updates
+  über das jeweilige Gastbetriebssystem durchzuführen sind. `pct exec` und
+  andere Update-Runner werden für VM-Kennungen nie aufgerufen.
 
 ## 1. Voraussetzungen
 
