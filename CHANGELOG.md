@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased – APT-Planvergleich mit Architekturspalte
+## 0.1.0-beta.28 – APT-Parser und stale-Status-Lebenszyklus (Prerelease)
 
 ### Deutsch
 
@@ -16,6 +16,21 @@
   its regular architecture column (`amd64`, `all`) before the upgradable
   marker. Identical host plans are no longer falsely rejected as stale; real
   package or version changes remain blocked.
+
+### Lebenszyklus / Lifecycle
+
+### Deutsch
+
+- Der HA-Coordinator hält das letzte Dry-Run-Ergebnis getrennt von aktuellen
+  Update-Metadaten im Arbeitsspeicher. Ein alter stale-Status wird nicht
+  automatisch gelöscht oder zurückgesetzt; eine neue Dry-Run-Antwort muss den
+  Ergebnisstand ausdrücklich ersetzen.
+
+### English
+
+- The HA coordinator keeps the last dry-run result separate from current update
+  metadata in memory. An old stale status is not automatically deleted or
+  reset; a new dry-run response must explicitly replace the result state.
 
 ## 0.1.0-beta.24 – Kanonischer Dry-Run-Planvergleich (Prerelease)
 

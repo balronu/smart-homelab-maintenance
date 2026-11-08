@@ -1,5 +1,32 @@
 # Smart Homelab Maintenance
 
+## Beta.28: APT-Architekturspalte und stale-Status-Lebenszyklus
+
+Beta.28 korrigiert das Parsen von `apt list --upgradable` für die reguläre
+Architekturspalte (`amd64`, `all`). Dadurch bleiben installierte Versionen im
+kanonischen Plan-Digest erhalten: identische Pläne werden unabhängig von ihrer
+Reihenfolge akzeptiert, echte Paket- oder Versionsabweichungen weiterhin sicher
+blockiert. Der Installationsbutton bleibt dauerhaft deaktiviert.
+
+Beta.28 fixes parsing of the regular architecture column (`amd64`, `all`) in
+`apt list --upgradable`. Installed versions therefore remain in the canonical
+plan digest: identical plans are accepted independent of order, while real
+package or version changes remain safely blocked. The install button stays
+permanently disabled.
+
+Der HA-Coordinator hält das letzte Dry-Run-Ergebnis getrennt von den aktuellen
+Update-Metadaten im Arbeitsspeicher. Ein alter stale-Status kann deshalb bis zu
+einer neuen Dry-Run-Antwort neben einem frischen Updatecheck sichtbar bleiben;
+Beta.28 löscht oder manipuliert diesen Zustand nicht automatisch.
+
+The HA coordinator keeps the last dry-run result separately from current update
+metadata in memory. An old stale result can therefore remain visible alongside
+a fresh update check until a new dry-run response; Beta.28 does not delete or
+mutate that state automatically.
+
+Die zweisprachigen Release Notes liegen unter
+[`docs/releases/v0.1.0-beta.28.md`](docs/releases/v0.1.0-beta.28.md).
+
 ## Beta.27: Restart-Race-Erkennung und sichere Rollbacks
 
 Beta.27 erkennt systemd-Restarts während des Agent-Upgrades auch dann, wenn
