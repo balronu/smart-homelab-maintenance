@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .const import CONF_AGENT_URL, CONF_CA_FILE, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL
+from .const import CONF_AGENT_URL, CONF_CA_FILE, CONF_POLICY_MODE, CONF_SCAN_INTERVAL, CONF_TOKEN, DEFAULT_SCAN_INTERVAL, MAX_SCAN_INTERVAL, MIN_SCAN_INTERVAL, POLICY_MODES
 from .http_transport import AgentHttpTransport, TransportConfig, TransportError, validate_agent_url, validate_ca_file
 
 
@@ -63,9 +63,13 @@ try:
     class SmartHomelabOptionsFlow(config_entries.OptionsFlow):
         async def async_step_init(self, user_input=None):
             if user_input is not None:
-                return self.async_create_entry(data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL])})
+                mode = str(user_input[CONF_POLICY_MODE])
+                if mode not in POLICY_MODES:
+                    return self.async_show_form(step_id="init", errors={"base": "invalid_policy_mode"})
+                return self.async_create_entry(data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]), CONF_POLICY_MODE: mode})
             return self.async_show_form(step_id="init", data_schema=vol.Schema({
                 vol.Required(CONF_SCAN_INTERVAL, default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)),
+                vol.Required(CONF_POLICY_MODE, default=self.config_entry.options.get(CONF_POLICY_MODE, "discover_only")): vol.In(POLICY_MODES),
             }))
 except ImportError:
     SmartHomelabConfigFlow = None

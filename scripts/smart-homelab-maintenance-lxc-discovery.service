@@ -1,0 +1,29 @@
+[Unit]
+Description=Smart Homelab Maintenance fixed LXC discovery (opt-in)
+After=local-fs.target
+ConditionPathExists=/usr/libexec/smart-homelab-maintenance/lxc-discovery.py
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /usr/libexec/smart-homelab-maintenance/lxc-discovery.py
+RuntimeDirectory=smart-homelab-maintenance
+RuntimeDirectoryMode=0750
+UMask=0007
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+ReadOnlyPaths=/usr/libexec/smart-homelab-maintenance/lxc-discovery.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

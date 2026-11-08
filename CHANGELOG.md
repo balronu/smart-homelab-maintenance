@@ -10,6 +10,10 @@
 - Neue, gestoppte, entfernte, unbekannte oder veraltete Ziele erzeugen keine
   neue Berechtigung; VMs und ungültige IDs bleiben ausgeschlossen. Die Policy
   wird atomar und mit sicheren Dateirechten gespeichert.
+- Ergänzt Phase 36 als isolierte automatische Einrichtung: peer-authentifizierter
+  Discovery-Socket, serialisierter expliziter Allowlist-Apply-Controller,
+  maschinenlesbarer Orchestrierungsstatus und HA-Auswahl des Policy-Modus.
+  Produktive Aktivierung bleibt separat freigabepflichtig.
 
 - Präzisiert den Backend-Status für einen fehlenden oder ungültigen LXC-Helper
   als `helper-unavailable`, getrennt von `unauthorized`, `unsupported` und
@@ -35,6 +39,10 @@
 - New, stopped, removed, unknown, or stale targets never create new access;
   VMs and invalid IDs remain excluded. Policy persistence is atomic and uses
   secure file permissions.
+- Adds the isolated Phase 36 setup/orchestration layer: peer-authenticated
+  discovery socket, serialized explicit allowlist apply controller,
+  machine-readable orchestration status, and an HA policy-mode selector.
+  Production activation still requires separate approval.
 
 - Reports a missing or invalid LXC helper as `helper-unavailable`, distinct
   from `unauthorized`, `unsupported`, and `not_checked`.

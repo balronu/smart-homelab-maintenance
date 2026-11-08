@@ -59,6 +59,12 @@ unknown systems remain blocked. The orchestration first produces an atomic,
 reviewable allowlist plan; helper installation, socket deployment, HA
 onboarding, and production application are not included in this draft.
 
+Phase 36 adds a separately testable discovery-socket contract, serialized
+allowlist apply controller, machine-readable orchestration status, and the
+`discover_only`/`auto_eligible` HA options-flow. The official installer stays
+preflight-only by default; this does not authorize production activation or
+real package installation.
+
 ## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 
 Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen

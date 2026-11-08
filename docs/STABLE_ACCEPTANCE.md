@@ -9,6 +9,11 @@
 - [ ] The serialized allowlist plan is reviewed before any production apply.
 - [ ] Helper/socket deployment, HA onboarding, health reporting, migration,
       and rollback are tested end-to-end. These remain open for Phase 36.
+- [ ] Phase-36 discovery service is installed only through the official
+      installer and passes peer-UID, fixed-command, timeout, output-limit,
+      recovery, and idempotency tests in an isolated environment.
+- [ ] The orchestration status API and HA policy selector preserve
+      `discover_only` on migration and never enable real package actions.
 
 Diese Checkliste ist ein Prüfvertrag für eine spätere Stable-Freigabe. Sie
 ist keine Installations- oder Aktivierungsfreigabe. Jede Zeile benötigt einen
