@@ -84,8 +84,18 @@ for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.serv
     die "$unit did not become active"
   }
 done
-[[ -S "/run/$AGENT_NAME/lxc-apt-helper.sock" ]]
-[[ -S "/run/$AGENT_NAME/lxc-discovery.sock" ]]
+for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+  ready=0
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [[ -S "$socket_path" ]] && { ready=1; break; }
+    sleep 0.2
+  done
+  [[ "$ready" -eq 1 ]] || {
+    systemctl status --no-pager "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >&2 || true
+    journalctl --no-pager -u "${AGENT_NAME}-lxc-helper.service" -u "${AGENT_NAME}-lxc-discovery.service" -n 40 >&2 || true
+    die "socket did not become ready: $socket_path"
+  }
+done
 
 printf '%s\n' '[containers."321"]' 'authorized = true' > "$ALLOWLIST"
 chmod 0600 "$ALLOWLIST"
