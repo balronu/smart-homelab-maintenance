@@ -63,10 +63,13 @@ try:
     class SmartHomelabOptionsFlow(config_entries.OptionsFlow):
         async def async_step_init(self, user_input=None):
             if user_input is not None:
-                mode = str(user_input[CONF_POLICY_MODE])
-                if mode not in POLICY_MODES:
-                    return self.async_show_form(step_id="init", errors={"base": "invalid_policy_mode"})
-                return self.async_create_entry(data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]), CONF_POLICY_MODE: mode})
+                data = {CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL])}
+                if CONF_POLICY_MODE in user_input:
+                    mode = str(user_input[CONF_POLICY_MODE])
+                    if mode not in POLICY_MODES:
+                        return self.async_show_form(step_id="init", errors={"base": "invalid_policy_mode"})
+                    data[CONF_POLICY_MODE] = mode
+                return self.async_create_entry(data=data)
             return self.async_show_form(step_id="init", data_schema=vol.Schema({
                 vol.Required(CONF_SCAN_INTERVAL, default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)),
                 vol.Required(CONF_POLICY_MODE, default=self.config_entry.options.get(CONF_POLICY_MODE, "discover_only")): vol.In(POLICY_MODES),
