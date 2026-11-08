@@ -140,6 +140,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
     backend = ProxmoxInventoryBackend(ProxmoxApiClient(proxmox_config))
     discovery = DiscoveryService(backend)
     guest_transport = RootHelperTransport() if config.lxc_helper_enabled else None
+    policy_transport = PolicyHelperTransport()
     updates = UpdateService(
         lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()], config.update_targets, discovery.virtual_machines()),
         runner=AptCommandRunner(guest_transport=guest_transport),
@@ -148,7 +149,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         permission_store=PermissionStore(
             "/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml",
             require_root=True,
-            privileged_transport=PolicyHelperTransport(),
+            privileged_transport=policy_transport,
         ),
     )
     application = ApiApplication(
@@ -157,7 +158,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         updates=updates,
         read_token=agent_token,
         max_bytes=config.max_response_bytes,
-        orchestration_status=read_installation_status,
+        orchestration_status=lambda: read_installation_status(policy_reader=policy_transport.read),
     )
     return application, repository
 

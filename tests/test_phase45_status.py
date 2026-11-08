@@ -22,7 +22,6 @@ def test_installation_status_is_fail_closed_without_helper(monkeypatch, tmp_path
         "HELPER_UNIT_PATH": tmp_path / "helper.service",
         "DISCOVERY_UNIT_PATH": tmp_path / "discovery.service",
         "DISCOVERY_SOCKET_PATH": tmp_path / "discovery.sock",
-        "ALLOWLIST_PATH": tmp_path / "allowlist.toml",
     }
     for name, path in paths.items():
         monkeypatch.setattr(status_module, name, path)
@@ -54,3 +53,20 @@ def test_orchestration_api_accepts_dynamic_installation_status():
     code, response = application.handle("GET", "/api/v1/orchestration", headers={"Authorization": "Bearer fixture"})
     assert code == 200 and response["data"]["status"] == "unavailable"
     assert calls == [True]
+
+
+def test_orchestration_status_uses_helper_policy_reader_and_hides_failures(monkeypatch):
+    healthy = status_module.read_installation_status(policy_reader=lambda: {"110": {"authorized": True}})
+    assert healthy.security_error is None
+
+    failed = status_module.read_installation_status(policy_reader=lambda: (_ for _ in ()).throw(PermissionError("secret path")))
+    assert failed.security_error == "policy_unavailable"
+    assert failed.integrity_ok is False
+
+
+def test_orchestration_api_returns_200_when_helper_status_is_healthy():
+    status = OrchestrationStatus(helper_installed=True, discovery_socket_active=True, integrity_ok=True)
+    application = ApiApplication(_Discovery(), _Jobs(), read_token="fixture", orchestration_status=status)
+    code, response = application.handle("GET", "/api/v1/orchestration", headers={"Authorization": "Bearer fixture"})
+    assert code == 200
+    assert response["data"]["status"] == "ok"
