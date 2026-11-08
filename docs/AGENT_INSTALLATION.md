@@ -7,6 +7,11 @@ bleibt read-only und der Installationspfad serverseitig deaktiviert; jede
 produktive Installation, jedes Upgrade und jeder Dienstneustart benötigen
 eine eigene Freigabe.
 
+Die zugehörige Abnahme ist in
+[`docs/STABLE_ACCEPTANCE.md`](STABLE_ACCEPTANCE.md) als getrennte Checkliste
+beschrieben. Diese Anleitung erklärt den Ablauf; sie ersetzt weder den
+Preflight-Nachweis noch die Freigabe für Apply oder Neustart.
+
 ## Stable-Vorbereitung: Komponenten und Grenzen
 
 Die Home-Assistant-Integration wird über HACS installiert und aktualisiert;
@@ -348,6 +353,12 @@ Abnahme und benötigt eine eigene Freigabe.
   ab.
 
 ## 9. Updates
+
+Vor einem Stable-Update müssen die Checklistenpunkte für Quelle, TLS,
+Readiness, systemd-Lebenszyklus und Rollback vollständig belegt sein. HACS
+aktualisiert nur die HA-Integration; der Agent wird ausschließlich über den
+offiziellen, separat freigegebenen Updater aktualisiert. Ein erfolgreicher
+Preflight ohne `--apply` ist noch kein produktives Update.
 
 Updates werden niemals automatisch aktiviert. Quelle, Commit und TLS werden
 erneut geprüft:
