@@ -33,18 +33,26 @@ Bei einem freigegebenen Update gilt:
    deaktiviert; zwei Agent-Instanzen können daher nicht parallel lauschen.
 7. Nach dem Start wartet der Updater höchstens 30 Sekunden mit begrenzten
    Versuchen auf einen TLS-validierten Healthcheck.
-8. Der Updater erfasst vor dem Stopp den systemd-Restartzähler. Jeder Anstieg
-   während der Readiness gilt als fehlgeschlagener Start, auch wenn ein
-   späterer automatischer `Restart=on-failure`-Versuch gesund antwortet. So
-   kann ein Upgrade nach wiederholten Bind-Fehlern nicht fälschlich mit Exit 0
-   enden.
-9. Der Healthcheck muss Schema 1, Status `ok`, API-Vertrag 1.1 und exakt die
+8. Der Updater erfasst vor dem Stopp den systemd-Restartzähler sowie die
+   vorherige `InvocationID` und `ExecMainStartTimestampMonotonic`. Nach dem
+   neuen Start muss ein anderer, eindeutig identifizierter systemd-
+   Lebenszyklus vorliegen. Der kontrollierte Zählerwechsel von der alten zur
+   neuen Unit-Instanz ist zulässig; ein Anstieg oder Rückgang von `NRestarts`
+   innerhalb des neuen Lebenszyklus, ein fehlender/ungültiger Wert oder ein
+   späterer Invocation-/Startzeitwechsel gilt als unsicher und löst den
+   Rollback aus. So kann auch ein Zählerreset einen Neustartfehler nicht
+   verdecken.
+9. Jeder Anstieg von `NRestarts` während der Readiness gilt als fehlgeschlagener
+   Start, auch wenn ein späterer automatischer `Restart=on-failure`-Versuch
+   gesund antwortet. So kann ein Upgrade nach wiederholten Bind-Fehlern nicht
+   fälschlich mit Exit 0 enden.
+10. Der Healthcheck muss Schema 1, Status `ok`, API-Vertrag 1.1 und exakt die
    erwartete Agent-Version melden.
-10. Bei einem Timeout, einer inkompatiblen Antwort, einem Dienstfehler oder
+11. Bei einem Timeout, einer inkompatiblen Antwort, einem Dienstfehler oder
    einem systemd-Restart wird
    der Dienst gestoppt, ein systemd-Fehlerzustand zurückgesetzt und der
    vorherige Agent-Code wiederhergestellt.
-11. Der Rollback-Code wird erneut mit demselben TLS-/API-Healthcheck geprüft.
+12. Der Rollback-Code wird erneut mit demselben TLS-/API-Healthcheck geprüft.
    Scheitert auch dieser Check, bleibt der Dienst gestoppt und der Updater
    liefert einen eindeutigen Rollback-Fehlercode.
 

@@ -50,6 +50,28 @@ def test_readiness_rejects_systemd_restart_during_upgrade():
     assert script.count('systemctl show --property=NRestarts --value "$SERVICE_NAME"') >= 2
 
 
+def test_readiness_models_counter_reset_and_new_unit_lifecycle():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "InvocationID" in script
+    assert "ExecMainStartTimestampMonotonic" in script
+    assert "read_lifecycle_snapshot" in script
+    assert "NRestarts-Baseline ist inkonsistent" in script
+    assert "NRestarts hat sich nach dem kontrollierten Start verändert" in script
+    assert "Neuer systemd-Lebenszyklus ist nicht eindeutig nachgewiesen" in script
+    assert "lifecycle_restarts_after" in script
+    assert "lifecycle_invocation_after" in script
+    assert "lifecycle_start_after" in script
+
+
+def test_readiness_rejects_missing_or_invalid_lifecycle_values():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert '[[ "$restarts" =~ ^[0-9]+$ ]] || return 1' in script
+    assert '[[ "$invocation" =~ ^[0-9a-fA-F-]{16,}$ ]] || return 1' in script
+    assert '[[ "$start" =~ ^[0-9]+$ && "$start" -gt 0 ]] || return 1' in script
+    assert "systemd-Lebenszyklusdaten sind während der Readiness unvollständig" in script
+    assert "systemd-Lebenszyklusdaten fehlen unmittelbar nach dem Healthcheck" in script
+
+
 def test_upgrade_does_not_delete_existing_rollback_staging():
     script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
     assert '"$AGENT_ROOT"/agent.previous.*.staging' in script

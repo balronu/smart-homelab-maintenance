@@ -14,6 +14,18 @@ plan digest: identical plans are accepted independent of order, while real
 package or version changes remain safely blocked. The install button stays
 permanently disabled.
 
+Der Updater bindet die Restart-Prüfung zusätzlich an `InvocationID` und den
+monotonen Startzeitpunkt der neuen systemd-Instanz. Fehlende, ungültige,
+gestiegene oder nach dem neuen Start veränderte `NRestarts`-Werte sowie ein
+unerwarteter Lebenszykluswechsel führen sicher zum Rollback; der erwartete
+Wechsel von der alten zur neuen Unit-Instanz bleibt zulässig.
+
+The updater also binds restart validation to the new systemd `InvocationID` and
+monotonic main-start timestamp. Missing, invalid, increased, or changed
+`NRestarts` values after the new start, as well as an unexpected lifecycle
+change, fail closed into rollback; the expected old-to-new unit transition
+remains allowed.
+
 Der HA-Coordinator hält das letzte Dry-Run-Ergebnis getrennt von den aktuellen
 Update-Metadaten im Arbeitsspeicher. Ein alter stale-Status kann deshalb bis zu
 einer neuen Dry-Run-Antwort neben einem frischen Updatecheck sichtbar bleiben;
