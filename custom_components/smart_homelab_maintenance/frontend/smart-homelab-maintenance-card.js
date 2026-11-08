@@ -156,6 +156,7 @@ function dryRunSummary(response, german = true) {
 }
 function renderDryRunResult(result, response, german) {
   const data = dryRunData(response);
+  if (!data || typeof data !== "object") throw new Error(german ? "Die Serviceantwort ist leer oder ungültig." : "The service response is empty or invalid.");
   result.replaceChildren();
   const summary = document.createElement("div");
   summary.className = "simulation-summary";
@@ -189,7 +190,7 @@ function renderDryRunResult(result, response, german) {
       name.textContent = String(item.name || "?");
       const version = document.createElement("span");
       version.className = "package-version";
-      version.textContent = `${item.installed_version || "?"} → ${item.available_version || "?"}`;
+      version.textContent = ` ${item.installed_version || "?"} → ${item.available_version || "?"}`;
       row.append(name, version);
       details.append(row);
     }
