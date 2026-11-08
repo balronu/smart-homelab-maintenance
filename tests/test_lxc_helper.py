@@ -27,6 +27,25 @@ def test_helper_builds_only_fixed_read_and_simulation_commands() -> None:
     assert all("install" not in item and item != "update" for item in read + simulate)
 
 
+def test_helper_update_is_two_fixed_phases_and_requires_separate_permission() -> None:
+    update = helper.build_argv(101, "update")
+    assert update == ["/usr/sbin/pct", "exec", "101", "--", "/usr/bin/apt-get", "update"]
+    calls = []
+
+    def run(argv, **_kwargs):
+        calls.append(argv)
+        if argv[1] == "status":
+            return 0, "status: running\n", ""
+        return 0, "ok\n", ""
+
+    denied = helper.handle({"container_id": 101, "operation": "update"}, allowed_ids={101}, update_ids=set(), run=run)
+    assert denied["error"]["code"] == "update_not_authorized" and calls == []
+    response = helper.handle({"container_id": 101, "operation": "update"}, allowed_ids={101}, update_ids={101}, run=run)
+    assert response["ok"] is True
+    assert [calls[0][1], calls[1][-1], calls[2][-1]] == ["status", "update", "upgrade"]
+    assert [step["name"] for step in response["steps"]] == ["apt-update", "apt-upgrade"]
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -132,7 +151,7 @@ def test_socket_policy_requires_exact_agent_uid_and_per_request_allowlist() -> N
     source = HELPER_PATH.read_text(encoding="utf-8")
     assert "SO_PEERCRED" in source
     assert "pwd.getpwnam(EXPECTED_CLIENT_USER)" in source
-    assert "_load_allowlist(self.server.allowlist_path)" in source
+    assert "_load_permissions(self.server.allowlist_path)" in source
     assert "self.server.allowed_ids" not in source
 
 

@@ -1,4 +1,4 @@
-"""Small HTTPS server for the read-only agent API.
+"""Small HTTPS server for the bounded agent API.
 
 The server is intentionally dependency-free and injectable.  It exposes only
 the routes implemented by :class:`ApiApplication`; there is no shell or update
@@ -56,8 +56,6 @@ class AgentServerConfig:
             raise ValueError("agent port must be an unprivileged port")
         if not self.certificate or not self.private_key:
             raise ValueError("TLS certificate and private key are required")
-        if self.execution_enabled:
-            raise ValueError("update execution is permanently disabled in this phase")
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,11 +110,14 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
             raise ValueError("update_targets entries are invalid")
         if not re.fullmatch(r"(?:host|container:[1-9][0-9]{0,5}|vm:[1-9][0-9]{0,5})", target):
             raise ValueError("update target is not allowed")
-        allowed = {"authorized", "os_name", "os_version", "package_manager"}
+        allowed = {"authorized", "simulation_authorized", "update_authorized", "os_name", "os_version", "package_manager"}
         if set(values) - allowed:
             raise ValueError("update target contains unsupported fields")
         if "authorized" in values and not isinstance(values["authorized"], bool):
             raise ValueError("update target authorization must be boolean")
+        for permission in {"simulation_authorized", "update_authorized"}:
+            if permission in values and not isinstance(values[permission], bool):
+                raise ValueError(f"update target {permission} must be boolean")
         if any(key in values and not isinstance(values[key], str) for key in {"os_name", "os_version", "package_manager"}):
             raise ValueError("update target metadata must be strings")
         update_targets[target] = dict(values)
@@ -125,7 +126,7 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
 
 
 def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:
-    """Construct the live read-only application from validated settings."""
+    """Construct the live bounded application from validated settings."""
 
     if not agent_token or not proxmox_token:
         raise ValueError("required credentials are missing")
@@ -142,6 +143,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()], config.update_targets, discovery.virtual_machines()),
         runner=AptCommandRunner(guest_transport=guest_transport),
         reader=AptUpdateReader(guest_transport=guest_transport),
+        execution_enabled=config.server.execution_enabled,
     )
     application = ApiApplication(
         discovery,

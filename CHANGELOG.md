@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.0-beta.34 – kontrollierte LXC-Updateausführung
+
+### Deutsch
+
+- getrennte Berechtigungen für Simulation und echte Updates;
+- plan-gebundenes `apt-get update` plus `apt-get --yes --no-remove upgrade` für
+  ausdrücklich autorisierte laufende Debian-/Ubuntu-LXCs;
+- fester Helper mit Timeout, exklusiver Ausführung, Phasenstatus und ohne
+  Dist-Upgrade, Entfernung, VM-/Host-Zugriff oder automatische Neustarts;
+- HA-Service und Kartenbutton bleiben bei fehlender Berechtigung deaktiviert.
+
+### English
+
+- separate simulation and real-update permissions;
+- plan-bound `apt-get update` plus `apt-get --yes --no-remove upgrade` for
+  explicitly authorized running Debian/Ubuntu LXCs;
+- fixed helper with timeout, exclusive execution, phase results, and no
+  dist-upgrade, removal, VM/host access, or automatic reboot;
+- the HA service and card button remain disabled without authorization.
+
 ## 0.1.0-beta.33 – Release-Konsistenz und sichere Updategrenzen (Prerelease)
 
 ### Deutsch

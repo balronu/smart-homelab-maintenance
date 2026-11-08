@@ -1,4 +1,4 @@
-"""Prepared read-only Home Assistant actions for the agent API."""
+"""Bounded Home Assistant actions for the agent API."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from .http_transport import AgentHttpTransport, TransportError
 from .const import ACTIONS
 
 
-async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False) -> dict[str, Any]:
+async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, plan_digest: str | None = None) -> dict[str, Any]:
     if action not in ACTIONS:
         raise ValueError("unknown action")
     if action == "check":
@@ -26,4 +26,8 @@ async def async_action(transport: AgentHttpTransport, action: str, *, job_id: st
         if not target or confirm is not True:
             raise ValueError("target and explicit confirmation are required")
         return await transport.dry_run(target)
+    if action == "execute":
+        if not target or confirm is not True:
+            raise ValueError("target and explicit confirmation are required")
+        return await transport.execute_update(target, plan_digest=plan_digest)
     raise TransportError("execution_disabled", "preflight is not available until a later gated phase")

@@ -21,6 +21,7 @@ Alle übrigen Endpunkte verlangen `Authorization: Bearer <read-token>`.
 | GET | `/api/v1/updates` | Passive Updateprüfung aller autorisierten Ziele |
 | GET | `/api/v1/updates/{target}` | Ergebnis für `host`, `container:{vmid}` oder `vm:{vmid}` |
 | POST | `/api/v1/updates/{target}/dry-run` | Bestätigte, feste Paketmanager-Simulation |
+| POST | `/api/v1/updates/container:{vmid}/execute` | Bestätigtes, plan-gebundenes `apt update` plus `apt upgrade` |
 
 Update results preserve the explicit status values `updates_available`,
 `current`, `not_checked`, `unsupported`, `unauthorized`, `error`, `stale`, and
@@ -36,8 +37,10 @@ oder ein strukturiertes `error`. Antwortgröße und Pagination sind begrenzt.
 Der öffentliche Healthcheck enthält zusätzlich `agent_version`, damit eine
 HA-Integration und der separat laufende Agent nicht unbemerkt aus
 unterschiedlichen Beta-Ständen betrieben werden.
-Die einzige Update-POST-Route ist der bestätigte, read-only Dry Run; beliebige
-Shell-Kommandos und echte Updateausführung sind ausgeschlossen.
+Die Update-POST-Routen akzeptieren nur feste, target-scoped Operationen.
+`execute` benötigt `confirm=true`, einen frischen `plan_digest`, getrennte
+Update-Berechtigung und `execution_enabled=true`; beliebige Shell-Kommandos,
+VM-Ziele, Dist-Upgrades und Paketentfernungen sind ausgeschlossen.
 Der Dry Run akzeptiert ausschließlich JSON `{\"confirm\":true}`. Es gibt keine
 Route zur echten Updateausführung: `/execute` und `/update` werden auch bei
 direktem API-Aufruf serverseitig abgewiesen. Der Server bindet standardmäßig nicht öffentlich, verlangt Zertifikat und

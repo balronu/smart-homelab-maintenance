@@ -20,13 +20,14 @@ import time
 import tomllib
 import pwd
 import struct
+import threading
 from pathlib import Path
 from typing import Any, Mapping
 
 DEFAULT_ALLOWLIST = Path("/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml")
 MAX_OUTPUT_BYTES = 256_000
 COMMAND_TIMEOUT_SECONDS = 10
-ALLOWED_OPERATIONS = {"read", "simulate"}
+ALLOWED_OPERATIONS = {"read", "simulate", "update"}
 EXPECTED_CLIENT_USER = "smart-homelab-maintenance"
 REQUEST_TIMEOUT_SECONDS = 10
 MAX_REQUEST_BYTES = 16_384
@@ -48,7 +49,7 @@ def _require_agent_peer(sock: socket.socket) -> None:
         raise HelperError("unauthorized_client", "client is not authorized")
 
 
-def _load_allowlist(path: Path = DEFAULT_ALLOWLIST) -> set[int]:
+def _load_permissions(path: Path = DEFAULT_ALLOWLIST) -> tuple[set[int], set[int]]:
     try:
         stat = path.stat()
         if stat.st_uid != 0 or stat.st_mode & 0o022:
@@ -60,24 +61,33 @@ def _load_allowlist(path: Path = DEFAULT_ALLOWLIST) -> set[int]:
     entries = raw.get("containers", {})
     if not isinstance(entries, dict):
         raise HelperError("allowlist_invalid", "LXC allowlist must contain a containers table")
-    allowed: set[int] = set()
+    simulation_allowed: set[int] = set()
+    update_allowed: set[int] = set()
     for raw_id, values in entries.items():
         if not isinstance(raw_id, str) or not raw_id.isdigit() or not isinstance(values, dict):
             raise HelperError("allowlist_invalid", "LXC allowlist contains an invalid entry")
         vmid = int(raw_id)
         if not 1 <= vmid <= 999_999:
             raise HelperError("allowlist_invalid", "LXC ID is outside the permitted range")
-        if values.get("authorized") is not True or values.get("package_manager") != "apt":
+        if values.get("package_manager") != "apt":
             continue
         if str(values.get("os_name", "")).lower() not in {"debian", "ubuntu"}:
             continue
         if not isinstance(values.get("os_version"), str) or not values["os_version"]:
             continue
-        allowed.add(vmid)
-    return allowed
+        if values.get("authorized") is True or values.get("simulation_authorized") is True:
+            simulation_allowed.add(vmid)
+        if values.get("update_authorized") is True:
+            update_allowed.add(vmid)
+    return simulation_allowed, update_allowed
 
 
-def validate_request(request: Any, allowed_ids: set[int]) -> tuple[int, str]:
+def _load_allowlist(path: Path = DEFAULT_ALLOWLIST) -> set[int]:
+    """Compatibility view: return only simulation-authorized IDs."""
+    return _load_permissions(path)[0]
+
+
+def validate_request(request: Any, allowed_ids: set[int], update_ids: set[int] | None = None) -> tuple[int, str]:
     if not isinstance(request, dict) or set(request) != {"container_id", "operation"}:
         raise HelperError("invalid_request", "request must contain only container_id and operation")
     vmid = request["container_id"]
@@ -85,8 +95,11 @@ def validate_request(request: Any, allowed_ids: set[int]) -> tuple[int, str]:
     if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
         raise HelperError("invalid_container", "container_id must be a numeric Proxmox ID")
     if operation not in ALLOWED_OPERATIONS:
-        raise HelperError("operation_not_allowed", "only read and simulate are allowed")
-    if vmid not in allowed_ids:
+        raise HelperError("operation_not_allowed", "operation is not allowed")
+    if operation == "update":
+        if vmid not in (update_ids or set()):
+            raise HelperError("update_not_authorized", "container is not authorized for real updates")
+    elif vmid not in allowed_ids:
         raise HelperError("container_not_allowed", "container is not in the root-owned allowlist")
     return vmid, operation
 
@@ -96,8 +109,10 @@ def build_argv(vmid: int, operation: str) -> list[str]:
         guest_command = ["/usr/bin/apt", "list", "--upgradable"]
     elif operation == "simulate":
         guest_command = ["/usr/bin/apt-get", "--simulate", "--no-remove", "-o", "Debug::NoLocking=true", "upgrade"]
+    elif operation == "update":
+        guest_command = ["/usr/bin/apt-get", "update"]
     else:
-        raise HelperError("operation_not_allowed", "only read and simulate are allowed")
+        raise HelperError("operation_not_allowed", "operation is not allowed")
     return ["/usr/sbin/pct", "exec", str(vmid), "--", *guest_command]
 
 
@@ -147,16 +162,30 @@ def _run(argv: list[str]) -> tuple[int, str, str]:
     return int(returncode), bytes(output["stdout"]).decode("utf-8", "replace"), bytes(output["stderr"]).decode("utf-8", "replace")
 
 
-def handle(request: Any, *, allowed_ids: set[int], run=_run) -> dict[str, Any]:
+_UPDATE_LOCK = threading.Lock()
+
+
+def handle(request: Any, *, allowed_ids: set[int], update_ids: set[int] | None = None, run=_run) -> dict[str, Any]:
     try:
-        vmid, operation = validate_request(request, allowed_ids)
-        status_code, status_out, status_err = run(["/usr/sbin/pct", "status", str(vmid)])
-        if status_code != 0:
-            raise HelperError("status_failed", "container status could not be read")
-        if status_out.strip() != "status: running":
-            raise HelperError("not_running", "stopped containers are never started or probed")
-        code, stdout, stderr = run(build_argv(vmid, operation))
-        return {"ok": code == 0, "container_id": vmid, "operation": operation, "returncode": code, "stdout": stdout, "stderr": stderr}
+        vmid, operation = validate_request(request, allowed_ids, update_ids)
+        lock = _UPDATE_LOCK if operation == "update" else threading.Lock()
+        with lock:
+            status_code, status_out, status_err = run(["/usr/sbin/pct", "status", str(vmid)])
+            if status_code != 0:
+                raise HelperError("status_failed", "container status could not be read")
+            if status_out.strip() != "status: running":
+                raise HelperError("not_running", "stopped containers are never started or probed")
+            steps = []
+            code, stdout, stderr = run(build_argv(vmid, operation))
+            steps.append({"name": "apt-update" if operation == "update" else operation, "returncode": code})
+            if operation == "update" and code == 0:
+                upgrade = ["/usr/sbin/pct", "exec", str(vmid), "--", "/usr/bin/apt-get", "--yes", "--no-remove", "upgrade"]
+                upgrade_code, upgrade_stdout, upgrade_stderr = run(upgrade)
+                steps.append({"name": "apt-upgrade", "returncode": upgrade_code})
+                code = upgrade_code
+                stdout = stdout + upgrade_stdout
+                stderr = stderr + upgrade_stderr
+        return {"ok": code == 0, "container_id": vmid, "operation": operation, "returncode": code, "stdout": stdout, "stderr": stderr, "steps": steps}
     except HelperError as exc:
         return {"ok": False, "error": {"code": exc.code, "message": str(exc)}}
 
@@ -170,8 +199,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         request = json.load(sys.stdin)
-        allowed = _load_allowlist()
-        response = handle(request, allowed_ids=allowed)
+        allowed, update_allowed = _load_permissions()
+        response = handle(request, allowed_ids=allowed, update_ids=update_allowed)
     except (json.JSONDecodeError, OSError, HelperError) as exc:
         if isinstance(exc, HelperError):
             response = {"ok": False, "error": {"code": exc.code, "message": str(exc)}}
@@ -194,8 +223,8 @@ class _SocketHandler(socketserver.StreamRequestHandler):
                 if len(line) > MAX_REQUEST_BYTES or not line.endswith(b"\n"):
                     raise HelperError("request_limit", "request exceeded the limit")
                 request = json.loads(line.decode("utf-8"))
-                allowed = _load_allowlist(self.server.allowlist_path)
-                response = handle(request, allowed_ids=allowed)
+                allowed, update_allowed = _load_permissions(self.server.allowlist_path)
+                response = handle(request, allowed_ids=allowed, update_ids=update_allowed)
             except socket.timeout:
                 response = {"ok": False, "error": {"code": "timeout", "message": "helper request timed out"}}
             except HelperError as exc:

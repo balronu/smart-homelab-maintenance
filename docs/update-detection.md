@@ -2,11 +2,13 @@
 
 ## Deutsch
 
-Die Beta.19-Updateprüfung ist passiv: Sie verwendet ausschließlich bereits
+Die Updateprüfung ist passiv: Sie verwendet ausschließlich bereits
 vorhandene Paketinformationen und führt weder `apt update` noch Installation,
 Upgrade oder einen produktiven Dry Run aus. Der einzige zugelassene
 Simulationsbefehl ist der serverseitig feste APT-Simulationspfad; echte
-Updateausführung bleibt deaktiviert.
+Updateausführung bleibt standardmäßig deaktiviert; der separate Beta.34-Pfad
+kann nur mit eigener Update-Berechtigung und expliziter Bestätigung aktiv
+werden.
 
 ### Statuswerte
 
@@ -31,7 +33,8 @@ Allowlist in seiner TOML-Konfiguration erhalten:
 
 ```toml
 [update_targets."container:107"]
-authorized = true
+simulation_authorized = true
+update_authorized = false
 os_name = "Debian"
 os_version = "12"
 package_manager = "apt"
@@ -42,9 +45,9 @@ Paketmanager. Sie akzeptiert keine Shell-Befehle, Pfade oder Credentials. Die
 Konfiguration wird in Beta.19 nicht produktiv geändert.
 
 Ein Dry-Run-Button erscheint nur bei einem frischen erfolgreichen Ergebnis mit
-`updates_available` und `dry_run_supported=true`. Er wird nie automatisch
-ausgeführt; das serverseitige Ausführungsverbot bleibt unabhängig von der UI
-aktiv.
+`updates_available` und `dry_run_supported=true`. Der Installationsbutton wird
+nur bei `update_supported=true`, frischem Plan und Digest aktiv; die UI kann
+keine Berechtigung erzeugen.
 
 ## English
 

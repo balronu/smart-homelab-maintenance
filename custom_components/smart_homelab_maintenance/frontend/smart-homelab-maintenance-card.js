@@ -67,7 +67,7 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
     if (this._shell) return;
     this.shadowRoot.innerHTML = `<style>${css}${premiumCss}</style><section class="card"><div class="header"><h2></h2><span class="status" role="status"><i class="dot"></i><span></span></span></div><p class="warning" hidden></p><p class="compatibility muted" role="status"></p><div class="section overview"><h3></h3><div class="summary"></div></div><details class="section host-details" data-section="host"><summary><strong></strong></summary><div class="host-actions action-row"></div><div class="grid host-grid"></div></details><div class="section vm-section"><h3></h3><div class="grid vm-grid"></div><p class="muted empty-vms" hidden></p></div><div class="section container-section"><h3></h3><div class="grid container-grid"></div><p class="muted empty-containers" hidden></p></div><div class="section maintenance-section"><h3></h3><div class="summary maintenance-summary"></div><div class="readonly"></div></div></section>`;
     const root = this.shadowRoot; this._shell = { card: root.querySelector(".card"), title: root.querySelector(".header h2"), status: root.querySelector(".status"), statusText: root.querySelector(".status span"), warning: root.querySelector(".warning"), compatibility: root.querySelector(".compatibility"), overview: root.querySelector(".overview"), overviewTitle: root.querySelector(".overview h3"), overviewGrid: root.querySelector(".overview .summary"), host: root.querySelector(".host-details"), hostTitle: root.querySelector(".host-details summary strong"), hostActions: root.querySelector(".host-actions"), hostGrid: root.querySelector(".host-grid"), vm: this._sectionRefs("vm"), container: this._sectionRefs("container"), maintenance: this._sectionRefs("maintenance") };
-    this._shell.hostButton = this._dryRunButton("host"); this._shell.hostActions.append(this._shell.hostButton, this._installButton()); this._shell.hostUpdate = document.createElement("div"); this._shell.hostUpdate.className = "muted update-status"; this._shell.hostUpdate.hidden = true; this._shell.hostGrid.append(this._shell.hostUpdate);
+    this._shell.hostButton = this._dryRunButton("host"); this._shell.hostActions.append(this._shell.hostButton); this._shell.hostUpdate = document.createElement("div"); this._shell.hostUpdate.className = "muted update-status"; this._shell.hostUpdate.hidden = true; this._shell.hostGrid.append(this._shell.hostUpdate);
     this._shell.overviewMetrics = ["host", "lastUpdated", "cpu", "memory", "storage"].map(() => this._metric()); this._shell.overviewMetrics.forEach((m) => this._shell.overviewGrid.append(m.node));
     this._shell.hostMetrics = ["version", "kernel", "uptime"].map(() => this._metric()); this._shell.hostMetrics.forEach((m) => this._shell.hostGrid.append(m.node)); this._shell.hostBars = [this._bar(), this._bar(), this._bar()]; this._shell.hostBars.forEach((b) => this._shell.hostGrid.append(b.node));
     this._shell.jobs = this._metric(); this._shell.maintenance.section.querySelector(".maintenance-summary").append(this._shell.jobs.node);
@@ -75,8 +75,8 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   _sectionRefs(kind) { const section = this.shadowRoot.querySelector(`.${kind}-section`); return { section, heading: section.querySelector("h3"), grid: section.querySelector(`.${kind}-grid`), empty: section.querySelector(`.empty-${kind === "vm" ? "vms" : "containers"}`) }; }
   _setMetric(metricNode, label, value, sub = "") { metricNode.label.textContent = label; metricNode.value.textContent = value ?? "–"; metricNode.sub.textContent = sub; metricNode.sub.hidden = !sub; }
   _setBar(barNode, label, used, total, free, freeLabel) { const value = pct(used, total); barNode.node.hidden = value === null; if (value !== null) { barNode.label.textContent = label; barNode.progress.value = value; barNode.value.textContent = free != null ? `${value.toFixed(0)}% · ${freeLabel}: ${bytes(free)}` : `${value.toFixed(0)}%`; } }
-  _item(kind, id) { const article = document.createElement("details"); article.className = "item"; article.dataset.itemId = String(id); const head = document.createElement("summary"); head.className = "item-head"; const strong = document.createElement("strong"); const pill = document.createElement("span"); pill.className = "pill"; head.append(strong, pill); const body = document.createElement("div"); body.className = "item-body"; article.append(head, body); const button = this._dryRunButton(`${kind}:${id}`); const actions = document.createElement("div"); actions.className = "action-row"; actions.append(button, this._installButton()); body.append(actions); const bars = [this._bar(), this._bar(), this._bar()]; const updateText = document.createElement("div"); updateText.className = "muted"; body.append(updateText); const notice = document.createElement("p"); notice.className = "vm-exclusion"; notice.hidden = true; body.append(notice); const extra = document.createElement("div"); extra.className = "muted"; body.append(extra); bars.forEach((b) => body.append(b.node)); const refs = { article, strong, pill, actions, bars, updateText, notice, button, extra }; this._items[kind].set(String(id), refs); return refs; }
-  _updateItems(kind, items, labels, prefix) { const target = kind === "vm" ? this._shell.vm.grid : this._shell.container.grid; const seen = new Set(); [...items].sort((a, b) => Number(kind === "vm" ? a.vmid : a.container_id) - Number(kind === "vm" ? b.vmid : b.container_id)).forEach((item) => { const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id); let refs = this._items[kind].get(id); const isNew = !refs; if (!refs) refs = this._item(kind, id); seen.add(id); refs.strong.textContent = `${prefix} ${id} · ${item.name}`; refs.pill.textContent = item.running ? labels.running : labels.stopped; refs.article.ariaLabel = `${prefix} ${id} · ${item.name}`; this._setBar(refs.bars[0], labels.cpu, item.cpu_percent, 100); this._setBar(refs.bars[1], labels.memory, item.memory_used_bytes, item.memory_total_bytes, item.memory_available_bytes, labels.availableMemory); this._setBar(refs.bars[2], labels.storage, item.disk_used_bytes, item.disk_total_bytes, item.free_bytes, labels.freeStorage); const update = item.update === null ? { status: "not_checked" } : (item.update || {}); refs.updateText.textContent = kind === "vm" ? "" : updateText(update, labels); refs.updateText.hidden = kind === "vm" || !refs.updateText.textContent; const enabled = kind !== "vm" && simulationEnabled(update); refs.actions.hidden = kind === "vm"; refs.button.textContent = labels.simulate; refs.button.hidden = false; refs.button.disabled = !enabled; refs.button.setAttribute("aria-disabled", String(!enabled)); refs.button.title = enabled ? "" : simulationReason(update, labels); refs.notice.textContent = labels.vmExclusion; refs.notice.hidden = kind !== "vm"; const extra = [displayValue(item.os_name), displayValue(item.os_version)].filter(Boolean).join(" "); refs.extra.textContent = extra; refs.extra.hidden = !extra; if (isNew) target.append(refs.article); }); for (const [id, refs] of this._items[kind]) if (!seen.has(id)) { refs.article.remove(); this._items[kind].delete(id); } }
+  _item(kind, id) { const article = document.createElement("details"); article.className = "item"; article.dataset.itemId = String(id); const head = document.createElement("summary"); head.className = "item-head"; const strong = document.createElement("strong"); const pill = document.createElement("span"); pill.className = "pill"; head.append(strong, pill); const body = document.createElement("div"); body.className = "item-body"; article.append(head, body); const target = `${kind}:${id}`; const button = this._dryRunButton(target); const install = kind === "vm" ? null : this._installButton(target); const actions = document.createElement("div"); actions.className = "action-row"; actions.append(button); if (install) actions.append(install); body.append(actions); const bars = [this._bar(), this._bar(), this._bar()]; const updateText = document.createElement("div"); updateText.className = "muted"; body.append(updateText); const notice = document.createElement("p"); notice.className = "vm-exclusion"; notice.hidden = true; body.append(notice); const extra = document.createElement("div"); extra.className = "muted"; body.append(extra); bars.forEach((b) => body.append(b.node)); const refs = { article, strong, pill, actions, bars, updateText, notice, button, install, extra }; this._items[kind].set(String(id), refs); return refs; }
+  _updateItems(kind, items, labels, prefix) { const target = kind === "vm" ? this._shell.vm.grid : this._shell.container.grid; const seen = new Set(); [...items].sort((a, b) => Number(kind === "vm" ? a.vmid : a.container_id) - Number(kind === "vm" ? b.vmid : b.container_id)).forEach((item) => { const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id); let refs = this._items[kind].get(id); const isNew = !refs; if (!refs) refs = this._item(kind, id); seen.add(id); refs.strong.textContent = `${prefix} ${id} · ${item.name}`; refs.pill.textContent = item.running ? labels.running : labels.stopped; refs.article.ariaLabel = `${prefix} ${id} · ${item.name}`; this._setBar(refs.bars[0], labels.cpu, item.cpu_percent, 100); this._setBar(refs.bars[1], labels.memory, item.memory_used_bytes, item.memory_total_bytes, item.memory_available_bytes, labels.availableMemory); this._setBar(refs.bars[2], labels.storage, item.disk_used_bytes, item.disk_total_bytes, item.free_bytes, labels.freeStorage); const update = item.update === null ? { status: "not_checked" } : (item.update || {}); refs.updateText.textContent = kind === "vm" ? "" : updateText(update, labels); refs.updateText.hidden = kind === "vm" || !refs.updateText.textContent; const enabled = kind !== "vm" && simulationEnabled(update); const installEnabled = kind !== "vm" && update.update_supported === true && update.status === "updates_available" && update.fresh === true && Boolean(update.plan_digest); refs.actions.hidden = kind === "vm"; refs.button.textContent = labels.simulate; refs.button.hidden = false; refs.button.disabled = !enabled; refs.button.setAttribute("aria-disabled", String(!enabled)); refs.button.title = enabled ? "" : simulationReason(update, labels); if (refs.install) { refs.install._update = update; refs.install.disabled = !installEnabled; refs.install.hidden = false; refs.install.setAttribute("aria-disabled", String(!installEnabled)); refs.install.title = installEnabled ? "" : labels.installDisabled; } refs.notice.textContent = labels.vmExclusion; refs.notice.hidden = kind !== "vm"; const extra = [displayValue(item.os_name), displayValue(item.os_version)].filter(Boolean).join(" "); refs.extra.textContent = extra; refs.extra.hidden = !extra; if (isNew) target.append(refs.article); }); for (const [id, refs] of this._items[kind]) if (!seen.has(id)) { refs.article.remove(); this._items[kind].delete(id); } }
   render() {
     queueMicrotask(() => this._ensureInstallButtons(textFor(resolveLanguage(this._hass))));
     this._ensureShell(); const labels = textFor(resolveLanguage(this._hass)); const data = model(this._hass, this.config); const host = data.host; const s = this._shell; const statusLabel = data.agentStatus === "connected" ? labels.connected : data.agentStatus === "error" ? labels.error : data.agentStatus === "offline" ? labels.offline : labels.unknown; const compatibilityLabel = data.compatibility === "current" ? labels.compatibilityCurrent : data.compatibility === "outdated" ? labels.compatibilityOutdated : data.compatibility === "incompatible" ? labels.compatibilityIncompatible : labels.compatibilityUnknown;
@@ -89,8 +89,9 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   _ensureInstallButtons(labels) {
     const add = (button) => {
       button.textContent = labels.install;
-      button.title = labels.installDisabled;
-      button.setAttribute("aria-label", `${labels.install}: ${labels.installDisabled}`);
+      const enabled = button._update?.update_supported === true;
+      button.title = enabled ? "" : labels.installDisabled;
+      button.setAttribute("aria-label", enabled ? labels.install : `${labels.install}: ${labels.installDisabled}`);
     };
     this.shadowRoot.querySelectorAll("button.install").forEach(add);
   }
@@ -193,13 +194,46 @@ function renderDryRunResult(result, response, german) {
   }
   if (data?.safe !== true && data?.success !== false) result.classList.add("warning");
 }
-SmartHomelabMaintenanceCard.prototype._installButton = function () {
+SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
   const button = document.createElement("button");
   button.className = "install";
   button.type = "button";
   button.disabled = true;
   button.textContent = "Install updates";
   button.setAttribute("aria-disabled", "true");
+  button.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const update = button._update || {};
+    const german = resolveLanguage(this._hass) === "de";
+    const result = button._updateResult || document.createElement("div");
+    result.className = "muted simulation-result";
+    result.setAttribute("role", "status");
+    if (!button._updateResult) { button._updateResult = result; (button.closest(".action-row") || button).after(result); }
+    result.textContent = german ? "Update läuft …" : "Update running …";
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    let timer;
+    try {
+      const call = this._hass?.callService?.("smart_homelab_maintenance", "execute", { target, confirm: true, plan_digest: update.plan_digest }, undefined, true, true);
+      if (!call || typeof call.then !== "function") throw new Error(german ? "Home Assistant hat keine Serviceantwort geliefert." : "Home Assistant returned no service response.");
+      const response = await Promise.race([
+        call,
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(german ? "Zeitüberschreitung beim Update." : "Update timed out.")), 30000); }),
+      ]);
+      const data = dryRunData(response);
+      if (!data || data.success !== true) throw new Error(data?.error || (german ? "Update fehlgeschlagen." : "Update failed."));
+      result.textContent = german ? "Update erfolgreich abgeschlossen." : "Update completed successfully.";
+      result.classList.remove("warning");
+    } catch (error) {
+      result.textContent = `${german ? "Update fehlgeschlagen" : "Update failed"}: ${error?.message || (german ? "unbekannter Fehler" : "unknown error")}`;
+      result.classList.add("warning");
+    } finally {
+      clearTimeout(timer);
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+    }
+  });
   return button;
 };
 SmartHomelabMaintenanceCard.prototype._dryRunButton = function (target) {
