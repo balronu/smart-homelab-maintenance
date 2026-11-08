@@ -24,7 +24,9 @@ RestrictSUIDSGID=true
 RestrictRealtime=true
 LockPersonality=true
 RestrictAddressFamilies=AF_UNIX
-ReadOnlyPaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml
+# The root helper alone performs atomic policy reads/writes. The unprivileged
+# agent never receives filesystem access to this root-owned 0600 file.
+ReadWritePaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml
 Restart=on-failure
 RestartSec=5
 

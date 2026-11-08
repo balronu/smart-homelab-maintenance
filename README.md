@@ -20,6 +20,23 @@ helper contract and a real package installation in a disposable guest root;
 final acceptance still requires a real non-production Proxmox LXC test guest.
 Productive package actions remain disabled.
 
+## Beta.40 policy migration fix / Policy-Migrationsfix
+
+Die bestehende root-owned Policy bleibt absichtlich `root:root 0600`. Der
+unprivilegierte Agent greift deshalb nicht direkt auf die Datei zu, sondern
+verwendet ausschließlich den per `SO_PEERCRED` geschützten root-eigenen
+Helper-Socket für `policy_read` und `policy_set`. Der Helper schreibt atomar
+und fail-closed; `execution_enabled = false` sowie getrennte Simulations- und
+Updateberechtigungen bleiben unverändert. Dieser Fix ist vorbereitet, aber
+nicht produktiv installiert.
+
+The existing root-owned policy intentionally remains `root:root 0600`. The
+unprivileged agent therefore never reads it directly and uses only the
+`SO_PEERCRED`-protected root helper socket for `policy_read` and `policy_set`.
+The helper writes atomically and fails closed; `execution_enabled = false` and
+separate simulation/update permissions remain unchanged. This fix is prepared
+but not installed productively.
+
 Der Entwicklungsstand erweitert den opt-in Updatepfad für ausdrücklich
 autorisierte laufende Debian-/Ubuntu-LXCs. Simulation und echte Updates haben
 getrennte Berechtigungen und können pro LXC über den geschützten Agent-Endpunkt

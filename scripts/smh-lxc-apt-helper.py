@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import argparse
+import re
 import socket
 import socketserver
 import selectors
@@ -22,6 +23,7 @@ import pwd
 import grp
 import struct
 import threading
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -29,6 +31,7 @@ DEFAULT_ALLOWLIST = Path("/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml"
 MAX_OUTPUT_BYTES = 256_000
 COMMAND_TIMEOUT_SECONDS = 10
 ALLOWED_OPERATIONS = {"read", "simulate", "update"}
+POLICY_OPERATIONS = {"policy_read", "policy_set"}
 EXPECTED_CLIENT_USER = "smart-homelab-maintenance"
 REQUEST_TIMEOUT_SECONDS = 10
 MAX_REQUEST_BYTES = 16_384
@@ -81,6 +84,95 @@ def _load_permissions(path: Path = DEFAULT_ALLOWLIST) -> tuple[set[int], set[int
         if values.get("update_authorized") is True:
             update_allowed.add(vmid)
     return simulation_allowed, update_allowed
+
+
+def _load_policy_entries(path: Path = DEFAULT_ALLOWLIST) -> dict[str, dict[str, Any]]:
+    try:
+        stat = path.stat()
+        if stat.st_uid != 0 or stat.st_mode & 0o022:
+            raise HelperError("allowlist_permissions", "LXC allowlist must be root-owned and not writable by group/others")
+        with path.open("rb") as handle:
+            raw = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise HelperError("allowlist_unavailable", "root-owned LXC allowlist is unavailable") from exc
+    entries = raw.get("containers", {})
+    if not isinstance(entries, dict):
+        raise HelperError("allowlist_invalid", "LXC allowlist must contain a containers table")
+    result: dict[str, dict[str, Any]] = {}
+    for raw_id, values in entries.items():
+        if not isinstance(raw_id, str) or not raw_id.isdigit() or not isinstance(values, dict) or not 1 <= int(raw_id) <= 999999:
+            raise HelperError("allowlist_invalid", "LXC allowlist contains an invalid entry")
+        allowed = {"authorized", "simulation_authorized", "update_authorized", "os_name", "os_version", "package_manager"}
+        if set(values) - allowed:
+            raise HelperError("allowlist_invalid", "LXC allowlist contains an unsupported field")
+        result[raw_id] = dict(values)
+    return result
+
+
+def _toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    raise HelperError("allowlist_invalid", "LXC allowlist contains an unsupported value")
+
+
+def _write_policy_entries(path: Path, entries: dict[str, dict[str, Any]]) -> None:
+    if path.is_symlink() or path.parent.is_symlink():
+        raise HelperError("allowlist_permissions", "LXC allowlist path must not be a symlink")
+    path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent), text=True)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("# Managed by Smart Homelab Maintenance; empty means no guest access.\n\n")
+            for raw_id in sorted(entries, key=int):
+                handle.write(f'[containers."{raw_id}"]\n')
+                for key in sorted(entries[raw_id]):
+                    handle.write(f"{key} = {_toml_value(entries[raw_id][key])}\n")
+                handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        if os.geteuid() == 0:
+            os.chown(path, 0, 0)
+        os.chmod(path, 0o600)
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+
+
+def handle_policy(request: Any, path: Path = DEFAULT_ALLOWLIST) -> dict[str, Any]:
+    if not isinstance(request, dict) or not isinstance(request.get("operation"), str):
+        raise HelperError("invalid_request", "policy request is invalid")
+    operation = request["operation"]
+    if operation == "policy_read":
+        if set(request) != {"operation"}:
+            raise HelperError("invalid_request", "policy_read accepts no additional fields")
+        return {"ok": True, "operation": operation, "entries": _load_policy_entries(path)}
+    if operation != "policy_set" or set(request) != {"operation", "target", "simulation_authorized", "update_authorized", "metadata", "confirm"}:
+        raise HelperError("invalid_request", "policy_set request is invalid")
+    target = request["target"]
+    if not isinstance(target, str) or not re.fullmatch(r"container:[1-9][0-9]{0,5}", target):
+        raise HelperError("invalid_container", "only numeric LXC targets may be authorized")
+    if request["confirm"] is not True or not isinstance(request["simulation_authorized"], bool) or not isinstance(request["update_authorized"], bool):
+        raise HelperError("confirmation_required", "policy changes require explicit confirmation and boolean permissions")
+    if request["update_authorized"] and not request["simulation_authorized"]:
+        raise HelperError("invalid_permissions", "update authorization requires simulation authorization")
+    metadata = request["metadata"]
+    if not isinstance(metadata, dict) or set(metadata) - {"os_name", "os_version", "package_manager"} or any(not isinstance(v, str) for v in metadata.values()):
+        raise HelperError("invalid_metadata", "policy metadata is invalid")
+    entries = _load_policy_entries(path)
+    raw_id = target.split(":", 1)[1]
+    entry = dict(entries.get(raw_id, {}))
+    simulation = request["simulation_authorized"]
+    entry.update({"authorized": simulation, "simulation_authorized": simulation, "update_authorized": request["update_authorized"]})
+    entry.update(metadata)
+    entries[raw_id] = entry
+    _write_policy_entries(path, entries)
+    return {"ok": True, "operation": operation, "data": {"target": target, "simulation_authorized": simulation, "update_authorized": request["update_authorized"]}}
 
 
 def _load_allowlist(path: Path = DEFAULT_ALLOWLIST) -> set[int]:
@@ -224,8 +316,11 @@ class _SocketHandler(socketserver.StreamRequestHandler):
                 if len(line) > MAX_REQUEST_BYTES or not line.endswith(b"\n"):
                     raise HelperError("request_limit", "request exceeded the limit")
                 request = json.loads(line.decode("utf-8"))
-                allowed, update_allowed = _load_permissions(self.server.allowlist_path)
-                response = handle(request, allowed_ids=allowed, update_ids=update_allowed)
+                if isinstance(request, dict) and request.get("operation") in POLICY_OPERATIONS:
+                    response = handle_policy(request, self.server.allowlist_path)
+                else:
+                    allowed, update_allowed = _load_permissions(self.server.allowlist_path)
+                    response = handle(request, allowed_ids=allowed, update_ids=update_allowed)
             except socket.timeout:
                 response = {"ok": False, "error": {"code": "timeout", "message": "helper request timed out"}}
             except HelperError as exc:
