@@ -11,4 +11,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Real root/systemd installer acceptance on ephemeral runner
-        run: scripts/test-lxc-helper-installer-systemd.sh
+        run: sudo scripts/test-lxc-helper-installer-systemd.sh
