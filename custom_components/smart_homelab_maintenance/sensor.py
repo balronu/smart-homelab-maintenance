@@ -70,8 +70,69 @@ try:
     class _ContainerSensor(_ProjectedSensor):
         pass
 
+    class _InventoryEntityManager:
+        """Keep per-guest entities aligned with late inventory discovery.
+
+        The first coordinator refresh happens before Home Assistant forwards
+        platform setup.  If that refresh fails, the old implementation created
+        no VM/LXC entities and never retried entity creation after a later
+        successful poll.  The card intentionally reads those entities, so the
+        inventory remained visually empty while the coordinator had valid
+        API data.
+        """
+
+        def __init__(self, coordinator, async_add_entities):
+            self.coordinator = coordinator
+            self._async_add_entities = async_add_entities
+            self._known: set[str] = set()
+            self._unsubscribe = coordinator.async_add_listener(self._on_update)
+
+        def _entities_for_current_data(self):
+            entities = []
+            data = self.coordinator.data
+            for vm in data.virtual_machines:
+                vmid = str(vm.get("vmid"))
+                unique_id = f"vm_{vmid}"
+                if unique_id in self._known:
+                    continue
+                self._known.add(unique_id)
+                entities.append(_ProjectedSensor(
+                    self.coordinator, unique_id, str(vm.get("name", vmid)),
+                    lambda d, vmid=vmid: next(("running" if item.get("running") else "stopped" for item in d.virtual_machines if str(item.get("vmid")) == vmid), "unknown"),
+                    lambda d, vmid=vmid: next((dict(item) for item in d.virtual_machines if str(item.get("vmid")) == vmid), {}),
+                    f"vm_{vmid}",
+                ))
+            for container in data.containers:
+                cid = str(container.get("container_id"))
+                unique_id = f"container_{cid}_status"
+                if unique_id in self._known:
+                    continue
+                self._known.add(unique_id)
+                entities.append(_ContainerSensor(
+                    self.coordinator, unique_id, str(container.get("name", cid)),
+                    lambda d, cid=cid: next(("running" if item.get("running") else "stopped" for item in d.containers if str(item.get("container_id")) == cid), "unknown"),
+                    lambda d, cid=cid: next((dict(item) for item in d.containers if str(item.get("container_id")) == cid), {}),
+                    f"container_{cid}",
+                ))
+            return entities
+
+        def initial_entities(self):
+            return self._entities_for_current_data()
+
+        def _on_update(self):
+            new_entities = self._entities_for_current_data()
+            if new_entities:
+                self._async_add_entities(new_entities)
+
+        def stop(self):
+            if self._unsubscribe:
+                self._unsubscribe()
+                self._unsubscribe = None
+
     async def async_setup_entry(hass, entry, async_add_entities):
         coordinator = hass.data["smart_homelab_maintenance"][entry.entry_id]
+        inventory = _InventoryEntityManager(coordinator, async_add_entities)
+        coordinator._inventory_entity_manager = inventory
         entities = [
             _ProjectedSensor(coordinator, "agent_connection", "Agent connection", lambda d: "connected" if d.connected else "offline", lambda d: {"error": d.error}),
             _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"preflight", "running", "postcheck"}])),
@@ -80,17 +141,7 @@ try:
             _ProjectedSensor(coordinator, "agent_helper_status", "LXC helper status", lambda d: _helper_status(d.orchestration), lambda d: _orchestration_attributes(d.orchestration)),
             _ProjectedSensor(coordinator, "host", "Host", lambda d: d.host.get("name", "unknown") if d.host else "unknown", lambda d: d.host or {}),
         ]
-        for vm in coordinator.data.virtual_machines:
-            vmid = str(vm.get("vmid"))
-            entities.append(_ProjectedSensor(
-                coordinator, f"vm_{vmid}", str(vm.get("name", vmid)),
-                lambda d, vmid=vmid: next(("running" if item.get("running") else "stopped" for item in d.virtual_machines if str(item.get("vmid")) == vmid), "unknown"),
-                lambda d, vmid=vmid: next((dict(item) for item in d.virtual_machines if str(item.get("vmid")) == vmid), {}),
-                f"vm_{vmid}"
-            ))
-        for container in coordinator.data.containers:
-            cid = str(container.get("container_id"))
-            entities.append(_ContainerSensor(coordinator, f"container_{cid}_status", str(container.get("name", cid)), lambda d, cid=cid: next(("running" if c.get("running") else "stopped" for c in d.containers if str(c.get("container_id")) == cid), "unknown"), lambda d, cid=cid: next((dict(c) for c in d.containers if str(c.get("container_id")) == cid), {}), f"container_{cid}"))
+        entities.extend(inventory.initial_entities())
         async_add_entities(entities)
 except ImportError:
     SensorEntity = object

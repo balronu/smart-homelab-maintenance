@@ -170,6 +170,57 @@ async def test_setup_registers_entities_devices_services_and_survives_reload(has
     assert after == before
 
 
+async def test_inventory_entities_are_added_after_initial_inventory_failure(hass, monkeypatch):
+    """A recovered poll must materialize the entities consumed by the card."""
+    from custom_components import smart_homelab_maintenance as integration
+
+    phase = {"value": 0}
+    vms = [{"vmid": 100 + index, "name": f"vm-{index}", "running": True} for index in range(2)]
+    containers = [{"container_id": 200 + index, "name": f"lxc-{index}", "running": True} for index in range(10)]
+
+    async def inventory(self, items):
+        return {"schema_version": "1", "data": {"items": items if phase["value"] else []}}
+
+    async def fake_host(self): return {"schema_version": "1", "data": {"name": "pve-home", "online": True}}
+    async def fake_vms(self): return await inventory(self, vms)
+    async def fake_containers(self): return await inventory(self, containers)
+    async def fake_jobs(self): return {"schema_version": "1", "data": {"items": []}}
+    async def fake_capabilities(self): return {"schema_version": "1", "data": {"execution_enabled": False}}
+    async def fake_updates(self): return {"schema_version": "1", "data": {"items": []}}
+    async def fake_health(self): return {"schema_version": "1", "data": {"agent_version": "0.1.0-beta.44", "api_contract": "1.1"}}
+    async def fake_orchestration(self): return {"schema_version": "1", "data": {"status": "ok", "helper_installed": True, "discovery_socket_active": True, "integrity_ok": True}}
+
+    monkeypatch.setattr(AgentHttpTransport, "host", fake_host)
+    monkeypatch.setattr(AgentHttpTransport, "virtual_machines", fake_vms)
+    monkeypatch.setattr(AgentHttpTransport, "containers", fake_containers)
+    monkeypatch.setattr(AgentHttpTransport, "jobs", fake_jobs)
+    monkeypatch.setattr(AgentHttpTransport, "capabilities", fake_capabilities)
+    monkeypatch.setattr(AgentHttpTransport, "updates", fake_updates)
+    monkeypatch.setattr(AgentHttpTransport, "health", fake_health)
+    monkeypatch.setattr(AgentHttpTransport, "orchestration", fake_orchestration)
+
+    assert await integration.async_setup(hass, {})
+    result = await _create_entry(hass)
+    entry = result["result"]
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    initial = {item.unique_id for item in er.async_entries_for_config_entry(registry, entry.entry_id)}
+    assert not any(item.startswith("vm_") for item in initial)
+    assert not any(item.startswith("container_") for item in initial)
+
+    phase["value"] = 1
+    await hass.data[DOMAIN][entry.entry_id].async_request_refresh()
+    await hass.async_block_till_done()
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert len(coordinator.data.virtual_machines) == 2
+    assert len(coordinator.data.containers) == 10
+    assert coordinator.data.virtual_machines[0]["vmid"] == 100
+    assert coordinator.data.containers[0]["container_id"] == 200
+    recovered = {item.unique_id for item in er.async_entries_for_config_entry(registry, entry.entry_id)}
+    assert {f"vm_{100 + index}" for index in range(2)} <= recovered
+    assert {f"container_{200 + index}_status" for index in range(10)} <= recovered
+
+
 async def test_actions_return_read_only_data_and_diagnostics_are_secret_free(hass, patched_transport):
     from custom_components import smart_homelab_maintenance as integration
     assert await integration.async_setup(hass, {})

@@ -135,6 +135,10 @@ class SmartHomelabCoordinator:
         self._unsub_interval = unsubscribe
 
     def async_stop(self) -> None:
+        inventory_manager = getattr(self, "_inventory_entity_manager", None)
+        if inventory_manager is not None:
+            inventory_manager.stop()
+            self._inventory_entity_manager = None
         if self._unsub_interval is not None:
             self._unsub_interval()
             self._unsub_interval = None
