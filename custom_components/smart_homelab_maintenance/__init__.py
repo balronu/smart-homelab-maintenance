@@ -66,6 +66,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     if vol is not None:
         async def handle_action(call):
             entry_id = call.data.get("entry_id")
+            if call.service == "set_permissions":
+                user_id = getattr(call.context, "user_id", None)
+                if not user_id or not hasattr(hass, "auth"):
+                    return {"error": "administrator_required"}
+                user = await hass.auth.async_get_user(user_id)
+                if user is None or not getattr(user, "is_admin", False):
+                    return {"error": "administrator_required"}
             coordinator = _find_coordinator(hass, entry_id)
             if coordinator is None:
                 return {"error": "not_configured"}
@@ -93,6 +100,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             vol.Optional("target"): str,
             vol.Optional("plan_digest"): str,
             vol.Optional("confirm", default=False): cv.boolean,
+            vol.Optional("simulation_authorized", default=False): cv.boolean,
+            vol.Optional("update_authorized", default=False): cv.boolean,
             vol.Optional("after", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=1000000)),
         })
         for action in ("check", "get_job", "get_job_events", "dry_run", "execute", "set_permissions"):
