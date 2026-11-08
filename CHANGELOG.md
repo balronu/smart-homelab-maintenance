@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased – APT-Planvergleich mit Architekturspalte
+
+### Deutsch
+
+- Behält beim Parsen von `apt list --upgradable` die installierte Version
+  auch dann bei, wenn die reguläre Architekturspalte (`amd64`, `all`) vor
+  der Upgradable-Markierung steht. Dadurch werden identische Host-Pläne nicht
+  mehr fälschlich als stale abgebrochen; echte Paket- oder
+  Versionsabweichungen bleiben blockiert.
+
+### English
+
+- Preserves the installed version when parsing `apt list --upgradable` with
+  its regular architecture column (`amd64`, `all`) before the upgradable
+  marker. Identical host plans are no longer falsely rejected as stale; real
+  package or version changes remain blocked.
+
 ## 0.1.0-beta.24 – Kanonischer Dry-Run-Planvergleich (Prerelease)
 
 ### Deutsch
