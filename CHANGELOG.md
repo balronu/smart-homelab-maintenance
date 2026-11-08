@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased – Beta.31-Kandidat: mobile Aktionszeile und Simulationsgrenzen
+## 0.1.0-beta.31 – Mobile Aktionszeile und Simulationsgrenzen (Prerelease)
 
 ### Deutsch
 
