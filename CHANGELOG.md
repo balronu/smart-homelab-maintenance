@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-beta.36 – Proxmox-ACL-kompatibler LXC-Helper
+
+### Deutsch
+
+- Helper und Discovery laufen wieder mit primärer root-Gruppe, damit Proxmox-IPC-Zugriff erhalten bleibt.
+- Runtime-Verzeichnis und Unix-Sockets werden weiterhin ausschließlich für die Agent-Gruppe freigegeben.
+- Keine Erweiterung der Allowlist; `execution_enabled` bleibt standardmäßig deaktiviert.
+
+### English
+
+- Helper and discovery retain a root primary group so Proxmox IPC access continues to work.
+- The runtime directory and Unix sockets remain accessible only to the agent group.
+- No allowlist expansion; `execution_enabled` remains disabled by default.
+
 ## 0.1.0-beta.35 – LXC-Helper-Authentifizierung und Runtime-Berechtigungen
 
 ### Deutsch

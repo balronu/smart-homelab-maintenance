@@ -7,7 +7,7 @@ ConditionPathExists=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml
 [Service]
 Type=simple
 User=root
-Group=smart-homelab-maintenance
+Group=root
 ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve
 RuntimeDirectory=smart-homelab-maintenance
 RuntimeDirectoryMode=0750

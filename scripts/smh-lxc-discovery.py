@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import json
 import pwd
+import grp
 import socket
 import socketserver
 import struct
@@ -102,9 +103,13 @@ if __name__ == "__main__":
         raise SystemExit("root required")
     path = Path(DISCOVERY_SOCKET)
     path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+    agent_gid = grp.getgrnam(EXPECTED_CLIENT_USER).gr_gid
+    os.chown(path.parent, 0, agent_gid)
+    os.chmod(path.parent, 0o750)
     if path.exists():
         raise SystemExit("discovery socket already exists")
     with socketserver.ThreadingUnixStreamServer(DISCOVERY_SOCKET, _Handler) as server:
         server.daemon_threads = False
+        os.chown(DISCOVERY_SOCKET, 0, agent_gid)
         os.chmod(DISCOVERY_SOCKET, 0o660)
         server.serve_forever()

@@ -19,6 +19,7 @@ import sys
 import time
 import tomllib
 import pwd
+import grp
 import struct
 import threading
 from pathlib import Path
@@ -253,9 +254,14 @@ def serve(socket_path: str, *, allowlist: Path = DEFAULT_ALLOWLIST) -> None:
     if socket_path != "/run/smart-homelab-maintenance/lxc-apt-helper.sock":
         raise HelperError("socket_path_invalid", "helper socket path is fixed")
     _load_allowlist(allowlist)
-    Path(socket_path).parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    runtime_dir = Path(socket_path).parent
+    runtime_dir.mkdir(mode=0o755, parents=True, exist_ok=True)
+    agent_gid = grp.getgrnam(EXPECTED_CLIENT_USER).gr_gid
+    os.chown(runtime_dir, 0, agent_gid)
+    os.chmod(runtime_dir, 0o750)
     try:
         with _UnixHelperServer(socket_path, allowlist) as server:
+            os.chown(socket_path, 0, agent_gid)
             os.chmod(socket_path, 0o660)
             server.serve_forever()
     finally:

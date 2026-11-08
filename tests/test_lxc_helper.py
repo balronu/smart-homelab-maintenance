@@ -196,6 +196,7 @@ def test_helper_documents_toc_tou_safe_failure() -> None:
 def test_helper_service_is_root_scoped_and_not_a_general_pct_service() -> None:
     unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-helper.service").read_text(encoding="utf-8")
     assert "User=root" in unit
+    assert "Group=root" in unit
     assert "NoNewPrivileges=true" in unit
     assert "ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve" in unit
     assert "ExecStart=/usr/sbin/pct" not in unit
@@ -203,9 +204,11 @@ def test_helper_service_is_root_scoped_and_not_a_general_pct_service() -> None:
 
 
 def test_discovery_unit_shares_helper_runtime_group() -> None:
+    helper_source = (Path(__file__).parents[1] / "scripts" / "smh-lxc-apt-helper.py").read_text(encoding="utf-8")
     unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-discovery.service").read_text(encoding="utf-8")
     assert "User=root" in unit
-    assert "Group=smart-homelab-maintenance" in unit
+    assert "Group=root" in unit
+    assert "os.chown(socket_path, 0, agent_gid)" in helper_source
     assert "RuntimeDirectory=smart-homelab-maintenance" in unit
     assert "RuntimeDirectoryMode=0750" in unit
 
