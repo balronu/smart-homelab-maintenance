@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from .const import AGENT_API_CONTRACT, VERSION
 
@@ -38,6 +39,8 @@ def evaluate_agent(agent_version: object, api_contract: object) -> Compatibility
         return Compatibility("incompatible", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "API contract mismatch")
     if observed_version == VERSION:
         return Compatibility("current", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "versions and contract match")
-    if observed_version.startswith("0.") and VERSION.startswith("0."):
-        return Compatibility("outdated", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "agent version is older than integration")
+    expected_beta = re.fullmatch(r"(0\.\d+\.\d+)-beta\.(\d+)", VERSION)
+    observed_beta = re.fullmatch(r"(0\.\d+\.\d+)-beta\.(\d+)", observed_version)
+    if expected_beta and observed_beta and expected_beta.group(1) == observed_beta.group(1):
+        return Compatibility("current", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "beta release line and API contract match")
     return Compatibility("incompatible", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "unsupported agent version")
