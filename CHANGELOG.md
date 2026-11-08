@@ -1,6 +1,26 @@
 # Changelog
 
-## Unreleased – LXC-Simulationsbereitschaft (kein Release)
+## 0.1.0-beta.32 – sichere Orchestrierungsanzeige (Prerelease)
+
+### Deutsch
+
+- Ergänzt den read-only Orchestrierungsstatus für Helper, Discovery-Socket,
+  Integrität und `discover_only` in der Agent-API.
+- Home Assistant fragt den optionalen Status rückwärtskompatibel ab und zeigt
+  einen Helper-Status als `ready`, `not_installed` oder `unavailable`.
+- Die Integration aktiviert keine Helper-, Socket-, Allowlist- oder
+  Gastzugriffsrechte automatisch; echte Paketaktionen bleiben deaktiviert.
+
+### English
+
+- Adds the read-only orchestration status for helper, discovery socket,
+  integrity, and `discover_only` to the agent API.
+- Home Assistant polls the optional status backward-compatibly and exposes a
+  helper status of `ready`, `not_installed`, or `unavailable`.
+- The integration never activates helper, socket, allowlist, or guest access
+  automatically; real package actions remain disabled.
+
+## Unreleased – weitere Entwicklung
 
 ### Deutsch
 

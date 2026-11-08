@@ -1,6 +1,20 @@
 # Smart Homelab Maintenance
 
-## Beta.31: stabile mobile Simulationsergebnisse und sichere Gastgrenzen
+## Beta.32: sichere Orchestrierungsanzeige und Helper-Bereitschaft
+
+Beta.32 ergänzt den read-only Orchestrierungsstatus für Helper, Discovery-Socket,
+Integrität und `discover_only`. Home Assistant zeigt fehlende Helper sicher als
+nicht verfügbar an; die Integration aktiviert weder Helper, Socket, Allowlist
+noch Gastzugriffe automatisch. Der externe Agent bleibt ein separat versionierter
+Dienst. Die Beta.31-UI- und VM-Grenzen bleiben unverändert.
+
+## Beta.32: safe orchestration status and helper readiness
+
+Beta.32 adds the read-only orchestration status for helper, discovery socket,
+integrity, and `discover_only`. Home Assistant reports a missing helper as
+unavailable; the integration never activates a helper, socket, allowlist, or
+guest access automatically. The external agent remains separately versioned.
+The Beta.31 UI and VM boundaries remain unchanged.
 
 Beta.31 hält die beiden Aktionsschaltflächen in einer festen,
 touch-tauglichen Zeile; Ergebnis, Paketanzahl, Sicherheitsstatus und
