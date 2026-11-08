@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased – LXC-Simulationsbereitschaft (kein Release)
+
+### Deutsch
+
+- Präzisiert den Backend-Status für einen fehlenden oder ungültigen LXC-Helper
+  als `helper-unavailable`, getrennt von `unauthorized`, `unsupported` und
+  `not_checked`.
+- Ergänzt verständliche deutsche und englische Dashboard-Meldungen sowie eine
+  nicht autorisierende Allowlist-Vorlage.
+- Helper, Allowlist und Produktivpfade bleiben deaktiviert; keine Gastbefehle
+  oder Simulationen wurden ausgeführt.
+
+### English
+
+- Reports a missing or invalid LXC helper as `helper-unavailable`, distinct
+  from `unauthorized`, `unsupported`, and `not_checked`.
+- Adds clear German and English dashboard messages and a non-authorizing
+  allowlist template.
+- The helper, allowlist, and production execution paths remain disabled; no
+  guest command or simulation was run.
+
 ## 0.1.0-beta.31 – Mobile Aktionszeile und Simulationsgrenzen (Prerelease)
 
 ### Deutsch

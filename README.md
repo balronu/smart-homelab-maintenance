@@ -17,6 +17,20 @@ weiterhin Name, Laufstatus und Ressourcen sowie den Hinweis zur Updatefunktion
 des Gastbetriebssystems. Die vollständige Matrix steht in
 [`docs/beta31-simulation-readiness.md`](docs/beta31-simulation-readiness.md).
 
+Phase 28 präzisiert den LXC-Gate: Ein laufender, ansonsten geeigneter
+Container bleibt gesperrt, bis OS/APT passiv geprüft, der feste Root-Helper
+separat freigegeben installiert und genau diese CTID in einer root-eigenen
+Allowlist eingetragen wurde. Fehlt der Helper bei einem geprüften Ziel, meldet
+die API `helper-unavailable`; die Karte aktiviert keine Aktion automatisch.
+Eine nicht autorisierende Vorlage liegt unter
+[`deploy/lxc-apt-allowlist.example.toml`](deploy/lxc-apt-allowlist.example.toml).
+
+Phase 28 clarifies the LXC gate: a running, otherwise suitable container
+remains blocked until its OS/APT facts are reviewed, the fixed root helper is
+separately approved and installed, and exactly that CTID is placed in a
+root-owned allowlist. A missing helper reports `helper-unavailable`; no action
+is enabled automatically.
+
 Beta.31 keeps the two action buttons in a stable touch-friendly
 row and renders simulation results below it. Host simulation remains
 read-only. LXC simulation is opt-in per explicitly authorized target and is
