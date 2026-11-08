@@ -293,7 +293,11 @@ def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tup
     return tuple(unique.values()), tuple(sorted(set(held))), tuple(sorted(set(conflicts))), tuple(sorted(set(removals)))
 
 
-_APT_UPGRADABLE = re.compile(r"^(\S+?)/\S+\s+(\S+)(?:\s+\[[^]]*upgradable from:\s*([^]]+)\])?")
+_APT_UPGRADABLE = re.compile(
+    r"^(\S+?)/\S+\s+(\S+)"
+    r"(?:\s+\S+)?"
+    r"(?:\s+\[[^]]*upgradable from:\s*([^]]+)\])?"
+)
 
 
 def _parse_apt_upgradable(stdout: str, stderr: str) -> tuple[PackageChange, ...]:

@@ -57,6 +57,21 @@ def test_passive_apt_reader_parses_existing_cache_without_simulation_flags():
     assert "simulate" not in calls[0][0] and "update" not in calls[0][0]
 
 
+def test_passive_apt_parser_keeps_installed_versions_after_architecture_column():
+    packages = _parse_apt_upgradable(
+        "Listing...\n"
+        "zlib1g/stable-security 1:1.3.1-1+deb13u1 amd64 "
+        "[upgradable from: 1:1.3.1-1+b1]\n"
+        "libpve-guest-common-perl/stable 6.0.7 all "
+        "[upgradable from: 6.0.6]\n",
+        "",
+    )
+    assert [(item.name, item.installed_version, item.available_version) for item in packages] == [
+        ("zlib1g", "1:1.3.1-1+b1", "1:1.3.1-1+deb13u1"),
+        ("libpve-guest-common-perl", "6.0.6", "6.0.7"),
+    ]
+
+
 def test_update_service_keeps_passive_reader_separate_from_button_simulation():
     class Reader:
         def list_upgradable(self, vmid=None):
