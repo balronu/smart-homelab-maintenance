@@ -31,6 +31,10 @@ class Runner:
         self.calls.append(("update", vmid))
         return self.code, self.stdout, self.stderr
 
+    def probe(self, vmid):
+        self.calls.append(("probe", vmid))
+        return {"running": True, "supported": True, "os_name": "Debian", "os_version": "12", "package_manager": "apt"}
+
 
 def service(runner, targets=(target(),), clock=None):
     return UpdateService(lambda: targets, runner=runner, clock=clock)
@@ -154,6 +158,38 @@ def test_update_check_distinguishes_missing_lxc_helper_from_authorization():
     assert result.supported is True
     assert result.error == "LXC simulation helper is unavailable"
     assert result.simulation_reason == "helper-unavailable"
+
+
+def test_permission_grant_probes_unknown_discovery_before_writing_policy(tmp_path):
+    store = PermissionStore(tmp_path / "policy.toml")
+    runner = Runner()
+    service = UpdateService(
+        lambda: (ProbeTarget("container:102", "cloudflared", 102, "unknown", "unknown", None, False, True),),
+        runner=runner,
+        permission_store=store,
+    )
+    result = service.set_permissions("container:102", simulation_authorized=True, update_authorized=False, confirmed=True)
+    assert result["simulation_authorized"] is True
+    assert ("probe", 102) in runner.calls
+    assert store.read()["102"]["os_name"] == "Debian"
+
+
+def test_permission_revoke_does_not_require_a_fresh_eligibility_probe(tmp_path):
+    store = PermissionStore(tmp_path / "policy.toml")
+    store.set_permissions("container:102", simulation_authorized=True, update_authorized=False, metadata={"os_name": "Debian", "os_version": "12", "package_manager": "apt"})
+
+    class NoProbe:
+        def probe(self, _vmid):
+            raise AssertionError("revoke must not probe")
+
+    service = UpdateService(
+        lambda: (ProbeTarget("container:102", "cloudflared", 102, "unknown", "unknown", None, True, True),),
+        runner=NoProbe(),
+        permission_store=store,
+    )
+    result = service.set_permissions("container:102", simulation_authorized=False, update_authorized=False, confirmed=True)
+    assert result["simulation_authorized"] is False
+    assert store.read()["102"]["os_name"] == "Debian"
 
 
 def test_helper_unavailable_error_is_not_a_generic_os_error():

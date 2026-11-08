@@ -2,12 +2,12 @@
 
 ## Issue #63 · LXC update management (E2E completion status)
 
-Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.41` versioniert.
-Beta.40 bleibt der bestehende Produktivstand, bis eine separate
+Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.42` versioniert.
+Beta.41 bleibt der bestehende Produktivstand, bis eine separate
 Installationsfreigabe erteilt wird.
 
-The reviewed release candidate is uniquely versioned as `0.1.0-beta.41`.
-Beta.40 remains the installed productive state until a separate installation
+The reviewed release candidate is uniquely versioned as `0.1.0-beta.42`.
+Beta.41 remains the installed productive state until a separate installation
 approval is granted.
 
 Die vollständige LXC-Update-E2E-Abnahme ist noch offen. CI prüft den festen
@@ -19,6 +19,18 @@ The complete LXC update E2E acceptance is still open. CI checks the fixed
 helper contract and a real package installation in a disposable guest root;
 final acceptance still requires a real non-production Proxmox LXC test guest.
 Productive package actions remain disabled.
+
+## Beta.42 grant eligibility fix / Freigabe-Eignungsprüfung
+
+Die erste Simulationsfreigabe nutzt nun eine strikt read-only Eignungsprüfung
+über den authentifizierten Helper: laufender LXC, Debian/Ubuntu aus
+`/etc/os-release` und vorhandene APT-Binaries. Widerruf benötigt keine erneute
+Eignungsprüfung; unbekannte oder widersprüchliche Ziele bleiben gesperrt.
+
+The first simulation grant now uses a strict read-only helper probe: running
+LXC, Debian/Ubuntu from `/etc/os-release`, and present APT binaries. Revocation
+does not require a fresh eligibility probe; unknown or contradictory targets
+remain denied. No package command is run by the probe.
 
 ## Beta.41 policy migration fix / Policy-Migrationsfix
 

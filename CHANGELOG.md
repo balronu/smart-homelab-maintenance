@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.0-beta.42 – Read-only Grant-Eignungsprüfung
+
+### Deutsch
+
+- Behebt den Grant-Deadlock für noch nicht autorisierte LXCs mit unbekanntem
+  Discovery-OS: Der Agent fordert vor einer Simulationsfreigabe eine strikt
+  read-only Prüfung über den authentifizierten root-Helper an.
+- Die Prüfung bestätigt laufenden LXC-Status, Debian/Ubuntu aus
+  `/etc/os-release` und die festen APT-Binaries; sie führt kein `apt` oder
+  `apt-get` aus und bleibt bei Unsicherheit fail-closed.
+- Widerruf funktioniert unabhängig von einer erneuten Eignungsprüfung und
+  erhält die bestehende Metadatenbasis. Simulations- und Update-Rechte bleiben
+  getrennt.
+- Die HA-Anzeige übernimmt sichere, verständliche Ablehnungsgründe statt der
+  pauschalen Meldung „agent returned an HTTP error“.
+
+### English
+
+- Fixes the first-grant deadlock for unauthorized LXCs with unknown discovery
+  OS data by performing a strictly read-only eligibility probe through the
+  authenticated root helper.
+- The probe verifies a running LXC, Debian/Ubuntu from `/etc/os-release`, and
+  fixed APT binaries; it runs no `apt` or `apt-get` command and fails closed on
+  uncertainty.
+- Revocation works without a fresh eligibility probe and preserves existing
+  metadata. Simulation and update rights remain separate.
+- HA now surfaces safe, understandable rejection reasons instead of the
+  generic “agent returned an HTTP error” message.
+
+
 ## 0.1.0-beta.41 – Beta.40-Policy-Migrationsfix-Kandidat
 
 ### Deutsch
@@ -13,8 +43,7 @@
 - Fehlende, beschädigte oder unberechtigte Policies bleiben fail-closed;
   `execution_enabled=false` und die getrennte Simulation-/Update-Freigabe
   ändern sich nicht.
-- Der produktive Fix ist noch nicht installiert; der echte Proxmox-LXC-
-  Paketlauf bleibt offen.
+- Beta.41 ist veröffentlicht; der echte Proxmox-LXC-Paketlauf bleibt offen.
 
 ### English
 
@@ -27,8 +56,7 @@
 - Missing, damaged or unauthorized policies remain fail-closed;
   `execution_enabled=false` and separate simulation/update authorization are
   unchanged.
-- The productive fix is not installed yet; the real Proxmox LXC package run
-  remains open.
+- Beta.41 is published; the real Proxmox LXC package run remains open.
 
 ## 0.1.0-beta.40 – Release-Kandidat für die kontrollierte Migration
 

@@ -178,6 +178,11 @@ class AptCommandRunner:
 
         return asyncio.run(execute())
 
+    def probe(self, vmid: int) -> dict[str, Any]:
+        if self._guest_transport is None:
+            raise GuestHelperUnavailableError("LXC eligibility helper is unavailable")
+        return self._guest_transport.probe(vmid)
+
     def update(self, vmid: int) -> tuple[int, str, str]:
         if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
             raise ValidationError("container id is invalid")
@@ -247,7 +252,7 @@ class RootHelperTransport:
     def _call_response(self, operation: str, vmid: int) -> dict[str, Any]:
         if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
             raise ValidationError("container id is invalid")
-        if operation not in {"read", "simulate", "update"}:
+        if operation not in {"read", "simulate", "update", "probe"}:
             raise ValidationError("guest operation is not allowed")
         request = json.dumps({"container_id": vmid, "operation": operation}, separators=(",", ":"))
         payload = (request + "\n").encode("utf-8")
@@ -297,6 +302,12 @@ class RootHelperTransport:
     def update(self, vmid: int) -> tuple[int, str, str, list[dict[str, Any]]]:
         response = self._call_response("update", vmid)
         return (0 if response.get("ok") is True else 1, str(response.get("stdout", "")), str(response.get("stderr", "")), list(response.get("steps", [])))
+
+    def probe(self, vmid: int) -> dict[str, Any]:
+        response = self._call_response("probe", vmid)
+        if response.get("ok") is not True:
+            raise ValidationError(str(response.get("stderr", "eligibility probe failed")))
+        return response
 
 
 def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
@@ -386,11 +397,30 @@ class UpdateService:
         target = {target.target: target for target in self._targets()}.get(target_id)
         if target is None or not target_id.startswith("container:") or not target.checkable:
             raise ValidationError("only running LXC targets may be authorized")
-        if target.package_manager != "apt" or target.os_name.lower() not in {"debian", "ubuntu"}:
-            raise ValidationError("target is not a proven Debian/Ubuntu apt LXC")
         if update_authorized and not simulation_authorized:
             raise ValidationError("real update authorization requires simulation authorization")
-        return self._permission_store.set_permissions(target_id, simulation_authorized=simulation_authorized, update_authorized=update_authorized, metadata={"os_name": target.os_name, "os_version": target.os_version, "package_manager": target.package_manager})
+        entries = self._permission_store.read()
+        raw_id = target_id.split(":", 1)[1]
+        existing = entries.get(raw_id, {})
+        # Revocation must remain possible even if discovery is temporarily
+        # incomplete; it never grants access and preserves existing metadata.
+        if not simulation_authorized and not update_authorized:
+            metadata = {key: existing.get(key) for key in ("os_name", "os_version", "package_manager")}
+            return self._permission_store.set_permissions(target_id, simulation_authorized=False, update_authorized=False, metadata=metadata)
+        try:
+            probe = self._runner.probe(target.vmid)
+        except AttributeError as exc:
+            raise ValidationError("target eligibility probe is unavailable") from exc
+        except (GuestHelperUnavailableError, FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
+            raise ValidationError("target eligibility could not be verified") from exc
+        if not isinstance(probe, dict) or probe.get("running") is not True or probe.get("supported") is not True:
+            raise ValidationError("target is not a proven Debian/Ubuntu apt LXC")
+        os_name = str(probe.get("os_name", ""))
+        os_version = str(probe.get("os_version", ""))
+        package_manager = str(probe.get("package_manager", ""))
+        if os_name.lower() not in {"debian", "ubuntu"} or not os_version or package_manager != "apt":
+            raise ValidationError("target is not a proven Debian/Ubuntu apt LXC")
+        return self._permission_store.set_permissions(target_id, simulation_authorized=simulation_authorized, update_authorized=update_authorized, metadata={"os_name": os_name, "os_version": os_version, "package_manager": package_manager})
 
     def _check_uncached(self, target: ProbeTarget) -> UpdateResult:
         if target.target.startswith("vm:"):
