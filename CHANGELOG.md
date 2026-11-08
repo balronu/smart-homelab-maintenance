@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-beta.38 – API-kompatible Agent-Weiterentwicklung
+
+### Deutsch
+
+- Bewertet neuere Beta-Agenten mit demselben API-Vertrag 1.1 als kompatibel.
+- Beta-Agenten derselben 0.1.0-Release-Linie mit API-Vertrag 1.1 bleiben kompatibel; abweichende API-Verträge und unbekannte Versionen bleiben fail-closed.
+- Die Update- und Simulationsberechtigungen werden dadurch nicht erweitert.
+
+### English
+
+- Treats newer beta agents with the same API contract 1.1 as compatible.
+- Older agents, mismatched API contracts and unknown versions remain fail-closed.
+- This change does not expand update or simulation permissions.
+
 ## 0.1.0-beta.37 – LXC-Namespace-Ausführung
 
 ### Deutsch
