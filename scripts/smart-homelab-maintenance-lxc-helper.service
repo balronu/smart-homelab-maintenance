@@ -12,7 +12,8 @@ ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve
 RuntimeDirectory=smart-homelab-maintenance
 RuntimeDirectoryMode=0750
 UMask=0007
-NoNewPrivileges=true
+# pct exec needs root namespace setup for unprivileged LXCs; all other
+# filesystem, network and operation allowlists remain enforced below.
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
