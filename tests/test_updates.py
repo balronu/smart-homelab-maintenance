@@ -193,6 +193,20 @@ def test_vm_simulation_never_calls_guest_runner():
     assert runner.calls == []
 
 
+def test_all_vm_targets_are_monitoring_only_and_never_reach_any_runner():
+    runner = Runner("Inst dangerous [1] (2)")
+    targets = (
+        ProbeTarget("vm:104", "haos", 104, "Home Assistant OS", "unknown", None, False, False),
+        ProbeTarget("vm:106", "pbs", 106, "Proxmox Backup Server", "3", "apt", False, False),
+    )
+    checked = service(runner, targets)
+    for target_id in ("vm:104", "vm:106"):
+        result = checked.dry_run(target_id, confirmed=True)
+        assert result["success"] is False
+        assert "transport is unavailable" in result["error"]
+    assert runner.calls == []
+
+
 def test_same_target_simulation_is_not_run_in_parallel():
     runner = Runner("Inst curl [1] (2)")
     checked = service(runner)
