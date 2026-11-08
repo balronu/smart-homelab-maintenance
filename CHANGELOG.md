@@ -16,6 +16,9 @@
   späteren Einzel-Freigabegates.
 - Ergänzt die Phase-30-Nachweise: CT101–109 Debian 13 mit apt 3.0.4 und
   CT110–111 Debian 12 mit apt 2.6.2; die geplante Allowlist bleibt inaktiv.
+- Ergänzt den Phase-31-Gesamtplan für alle neun laufenden LXCs mit
+  Einzelabnahme, Negativtests, Abbruchkonzept und gemeinsamer Sicherheitsgrenze;
+  produktive Aktivierung bleibt separat freigabepflichtig.
 
 ### English
 
@@ -31,6 +34,9 @@
 - Adds the Phase 30 evidence: CT101–109 are Debian 13 with apt 3.0.4 and
   CT110–111 are Debian 12 with apt 2.6.2; the planned allowlist remains
   inactive.
+- Adds the Phase 31 joint plan for all nine running LXCs with per-target
+  acceptance, negative tests, abort handling, and a shared security boundary;
+  production activation still requires separate approval.
 
 ## 0.1.0-beta.31 – Mobile Aktionszeile und Simulationsgrenzen (Prerelease)
 

@@ -30,6 +30,9 @@ ist kein PASS.
 - [ ] LXC-Eignung weist laufenden Zustand, unterstütztes OS/Paketmanager und
       explizite Zielautorisierung nach; keine automatische Allowlist/Helper-
       Aktivierung.
+- [ ] Für alle neun laufenden Debian-/APT-LXCs existiert eine geprüfte
+      Einzel-Abnahme mit Read-/Simulations-, Negativ- und Abbruchnachweis;
+      CT112 bleibt gestoppt und ausgeschlossen.
 
 ### Simulation und Sicherheit
 
@@ -65,6 +68,8 @@ unsupported.
 
 - Stable needs a separately approved release and production rollout window.
 - LXC helper/allowlist enablement remains a separate security decision.
+- The Phase 31 joint activation plan is documented in
+  `docs/phase31-lxc-activation-plan.md`; it is not an activation approval.
 - VM package checks and simulations are permanently out of scope.
 - A GitHub prerelease does not authorize installation in Home Assistant or on
   the Proxmox host.
