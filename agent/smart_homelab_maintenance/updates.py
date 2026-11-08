@@ -59,6 +59,8 @@ class UpdateResult:
     stale_after_seconds: int = 21600
     plan_digest: str | None = None
     dry_run_supported: bool = False
+    simulation_method: str | None = None
+    simulation_reason: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         result = asdict(self)
@@ -335,17 +337,20 @@ class UpdateService:
         self._reader = reader
         self._clock = clock or time.monotonic
         self._cache: dict[str, tuple[UpdateResult, float]] = {}
+        self._active_simulations: set[str] = set()
 
     def target_map(self) -> dict[str, ProbeTarget]:
         return {target.target: target for target in self._targets()}
 
     def _check_uncached(self, target: ProbeTarget) -> UpdateResult:
+        if target.target.startswith("vm:"):
+            return UpdateResult(target.target, target.name, True, False, target.os_name, target.os_version, target.package_manager, "not_checked", None, None, error="VM guest package transport is unavailable; no simulation was run", simulation_method=None, simulation_reason="vm-guest-transport-unavailable")
         if not target.checkable:
-            return UpdateResult(target.target, target.name, True, False, target.os_name, target.os_version, target.package_manager, "not_checked", None, None, error="authorized guest package access is unavailable")
+            return UpdateResult(target.target, target.name, True, False, target.os_name, target.os_version, target.package_manager, "not_checked", None, None, error="authorized guest package access is unavailable", simulation_method="lxc-apt-helper", simulation_reason="target-not-running-or-not-checked")
         if not target.authorized:
-            return UpdateResult(target.target, target.name, False, False, target.os_name, target.os_version, target.package_manager, "unauthorized", None, None, error="update target is not authorized")
+            return UpdateResult(target.target, target.name, False, False, target.os_name, target.os_version, target.package_manager, "unauthorized", None, None, error="update target is not authorized", simulation_method="lxc-apt-helper", simulation_reason="explicit-target-authorization-required")
         if target.package_manager != "apt" or target.os_name.lower() not in {"debian", "ubuntu"}:
-            return UpdateResult(target.target, target.name, False, False, target.os_name, target.os_version, target.package_manager, "unsupported", None, None, error="supported Debian/Ubuntu apt target not proven")
+            return UpdateResult(target.target, target.name, False, False, target.os_name, os_version=target.os_version, package_manager=target.package_manager, status="unsupported", available_count=None, security_count=None, error="supported Debian/Ubuntu apt target not proven", simulation_method="lxc-apt-helper", simulation_reason="debian-or-ubuntu-apt-not-proven")
         try:
             if self._reader is not None:
                 code, stdout, stderr = self._reader.list_upgradable(target.vmid)
@@ -368,7 +373,7 @@ class UpdateService:
         if code != 0:
             return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "error", None, None, error="apt simulation failed")
         security = [item.security for item in packages if item.security is not None]
-        return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item is True for item in security) if security else None, packages, held, conflicts, removals, utc_now(), None, 21600, digest, True)
+        return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item is True for item in security) if security else None, packages, held, conflicts, removals, utc_now(), None, 21600, digest, True, "local-apt" if target.target == "host" else "lxc-apt-helper", None)
 
     def check(self, target_id: str, *, force: bool = False) -> UpdateResult:
         target = self.target_map().get(target_id)
@@ -387,25 +392,36 @@ class UpdateService:
     def dry_run(self, target_id: str, *, confirmed: bool) -> dict[str, Any]:
         if confirmed is not True:
             raise ValidationError("dry run requires explicit confirmation")
+        target = self.target_map().get(target_id)
+        if target is None or not _TARGET.fullmatch(target_id):
+            raise ValidationError("target is not an authorized update target")
+        if target_id in self._active_simulations:
+            return DryRunResult(target_id, True, False, False, None, error="simulation already running for target").as_dict()
         current = self.check(target_id)
+        if target_id.startswith("vm:"):
+            return DryRunResult(target_id, True, False, False, current.plan_digest, error="VM guest package transport is unavailable; no simulation was run").as_dict()
         cached = self._cache.get(target_id)
         if not current.dry_run_supported or cached is None or self._clock() - cached[1] >= current.stale_after_seconds:
             return DryRunResult(target_id, True, False, False, current.plan_digest, error="a fresh successful update check is required").as_dict()
-        target = self.target_map()[target_id]
+        self._active_simulations.add(target_id)
         try:
             code, stdout, stderr = self._runner.simulate(target.vmid)
         except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
+            self._active_simulations.discard(target_id)
             return DryRunResult(target_id, True, False, False, current.plan_digest, error=type(exc).__name__).as_dict()
-        if code != 0:
-            return DryRunResult(target_id, True, False, False, current.plan_digest, error="apt simulation failed").as_dict()
-        packages, held, conflicts, removals = _parse_apt(stdout, stderr)
-        digest = _package_digest(packages) if self._reader is not None else hashlib.sha256((stdout + "\n" + stderr).encode("utf-8", "replace")).hexdigest()
-        latest = UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item.security is True for item in packages), packages, held, conflicts, removals, utc_now(), None, current.stale_after_seconds, digest)
-        if latest.plan_digest != current.plan_digest:
-            self._cache[target_id] = (latest, self._clock())
-            return DryRunResult(target_id, True, False, False, latest.plan_digest, error="update plan changed; dry run is stale").as_dict()
-        safe = not latest.removals and not latest.conflicts and not latest.held_packages
-        return DryRunResult(target_id, True, True, safe, latest.plan_digest, latest.packages, latest.held_packages, latest.conflicts, latest.removals, utc_now(), None if safe else "plan contains warnings").as_dict()
+        try:
+            if code != 0:
+                return DryRunResult(target_id, True, False, False, current.plan_digest, error="apt simulation failed").as_dict()
+            packages, held, conflicts, removals = _parse_apt(stdout, stderr)
+            digest = _package_digest(packages) if self._reader is not None else hashlib.sha256((stdout + "\n" + stderr).encode("utf-8", "replace")).hexdigest()
+            latest = UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item.security is True for item in packages), packages, held, conflicts, removals, utc_now(), None, current.stale_after_seconds, digest, True, "local-apt" if target_id == "host" else "lxc-apt-helper", None)
+            if latest.plan_digest != current.plan_digest:
+                self._cache[target_id] = (latest, self._clock())
+                return DryRunResult(target_id, True, False, False, latest.plan_digest, error="update plan changed; dry run is stale").as_dict()
+            safe = not latest.removals and not latest.conflicts and not latest.held_packages
+            return DryRunResult(target_id, True, True, safe, latest.plan_digest, latest.packages, latest.held_packages, latest.conflicts, latest.removals, utc_now(), None if safe else "plan contains warnings").as_dict()
+        finally:
+            self._active_simulations.discard(target_id)
 
 
 def make_targets(host: Mapping[str, Any], containers: Sequence[Mapping[str, Any]], target_overrides: Mapping[str, Mapping[str, Any]] | None = None, virtual_machines: Sequence[Mapping[str, Any]] = ()) -> list[ProbeTarget]:

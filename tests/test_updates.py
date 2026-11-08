@@ -126,7 +126,9 @@ def test_update_check_distinguishes_unauthorized_target_and_explicit_guest_allow
     })
     assert targets[1].authorized is True and targets[1].os_name == "Debian" and targets[1].package_manager == "apt"
     vm = make_targets({"name": "pve"}, [], virtual_machines=[{"vmid": 104, "name": "haos"}])[1]
-    assert service(Runner(), (vm,)).check("vm:104").status == "not_checked"
+    result = service(Runner(), (vm,)).check("vm:104")
+    assert result.status == "not_checked"
+    assert result.simulation_reason == "vm-guest-transport-unavailable"
 
 
 def test_update_api_preserves_explicit_statuses_instead_of_unknown_fallbacks():
@@ -180,6 +182,26 @@ def test_simulation_command_is_fixed_and_never_an_install_or_refresh():
     argv = calls[0][0]
     assert argv[-1] == "upgrade" and "--simulate" in argv and "--no-remove" in argv
     assert "install" not in argv and "update" not in argv
+
+
+def test_vm_simulation_never_calls_guest_runner():
+    runner = Runner("Inst dangerous [1] (2)")
+    vm = ProbeTarget("vm:104", "haos", 104, "Home Assistant OS", "unknown", None, True, True)
+    result = service(runner, (vm,)).dry_run("vm:104", confirmed=True)
+    assert result["success"] is False
+    assert "transport is unavailable" in result["error"]
+    assert runner.calls == []
+
+
+def test_same_target_simulation_is_not_run_in_parallel():
+    runner = Runner("Inst curl [1] (2)")
+    checked = service(runner)
+    checked._active_simulations.add("container:107")
+    result = checked.dry_run("container:107", confirmed=True)
+    assert result["success"] is False
+    assert "already running" in result["error"]
+    assert runner.calls == []
+    checked._active_simulations.clear()
 
 
 def test_api_exposes_dry_run_and_rejects_future_execution():
