@@ -68,3 +68,13 @@ unsupported.
 - VM package checks and simulations are permanently out of scope.
 - A GitHub prerelease does not authorize installation in Home Assistant or on
   the Proxmox host.
+
+## Beta.31 evidence status / Beta.31-Nachweisstatus
+
+- [ ] Productive Beta.31 agent preflight and rollout: **NOT RUN**; separate
+      authorization is required.
+- [ ] Productive host or authorized-LXC simulation: **NOT RUN**; no helper or
+      allowlist was enabled for this release.
+- [x] Beta.31 mobile action-row contract and VM monitoring-only boundary are
+      covered by the release CI browser and contract checks.
+- [x] VM package checks and simulations remain permanently out of scope.
