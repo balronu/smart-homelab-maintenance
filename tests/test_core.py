@@ -59,6 +59,8 @@ from custom_components.smart_homelab_maintenance.update import update_value
 from custom_components.smart_homelab_maintenance.coordinator import SmartHomelabCoordinator
 from custom_components.smart_homelab_maintenance.compatibility import evaluate_agent
 from custom_components.smart_homelab_maintenance.sensor import coordinator_sensors
+from agent.smart_homelab_maintenance import __version__ as agent_version
+from custom_components.smart_homelab_maintenance.const import VERSION as integration_version
 
 
 class CoreTests(unittest.TestCase):
@@ -70,6 +72,11 @@ class CoreTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.repo.close()
         self.tempdir.cleanup()
+
+    def test_release_versions_are_consistent_across_runtime_and_manifest(self) -> None:
+        manifest = json.loads((Path(__file__).parents[1] / "custom_components" / "smart_homelab_maintenance" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(agent_version, integration_version)
+        self.assertEqual(manifest["version"], integration_version)
 
     def request(self, *, target: str = "paperless", key: str = "request-12345678") -> JobRequest:
         return JobRequest(target, "update", "3.4.2", key, "confirm-12345678")
@@ -332,7 +339,7 @@ class CoreTests(unittest.TestCase):
             async def capabilities(self):
                 return {"data": {"execution_enabled": False}}
             async def health(self):
-                return {"data": {"agent_version": "0.1.0-beta.31", "api_contract": "1.1"}}
+                return {"data": {"agent_version": "0.1.0-beta.33", "api_contract": "1.1"}}
             async def updates(self):
                 return {"data": {"items": []}}
 
@@ -364,7 +371,7 @@ class CoreTests(unittest.TestCase):
             async def capabilities(self):
                 return {"data": {"execution_enabled": False}}
             async def health(self):
-                return {"data": {"agent_version": "0.1.0-beta.31", "api_contract": "1.1"}}
+                return {"data": {"agent_version": "0.1.0-beta.33", "api_contract": "1.1"}}
             async def updates(self):
                 raise IntegrationTransportError("http_error", "fixture update endpoint returned HTTP 500")
 
@@ -395,7 +402,7 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(service.app("paperless").update_supported)
 
     def test_agent_compatibility_is_conservative(self) -> None:
-        self.assertEqual(evaluate_agent("0.1.0-beta.31", "1.1").status, "current")
+        self.assertEqual(evaluate_agent("0.1.0-beta.33", "1.1").status, "current")
         self.assertEqual(evaluate_agent("0.1.0-beta.17", "1.1").status, "outdated")
         self.assertEqual(evaluate_agent("0.1.0-beta.23", "1.0").status, "incompatible")
         self.assertEqual(evaluate_agent(None, "1.1").status, "unknown")
@@ -409,7 +416,7 @@ class CoreTests(unittest.TestCase):
         api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), self.repo, read_token="test-token")
         status, body = api.handle("GET", "/api/v1/health")
         self.assertEqual(status, 200)
-        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.31")
+        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.33")
         self.assertEqual(body["data"]["api_contract"], "1.1")
         self.assertEqual(api.handle("GET", "/api/v1/containers")[0], 401)
         status, body = api.handle("GET", "/api/v1/containers?limit=2", headers={"Authorization": "Bearer test-token"})

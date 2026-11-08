@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-beta.33 – Release-Konsistenz und sichere Updategrenzen (Prerelease)
+
+### Deutsch
+
+- Synchronisiert Manifest, Agent-Version, HA-Integration und Karten-Cache auf
+  denselben Beta.33-Releasezustand.
+- Ergänzt eine Regression gegen auseinanderlaufende Versionsangaben.
+- Bestätigt den unveränderten Sicherheitsvertrag: gezielte APT-Simulationen
+  bleiben möglich, echte Installationen, Entfernungen und `apt update` bleiben
+  deaktiviert.
+
+### English
+
+- Synchronizes the manifest, agent version, Home Assistant integration, and
+  card cache to the same Beta.33 release state.
+- Adds a regression guard against diverging version declarations.
+- Confirms the unchanged safety contract: targeted APT simulations remain
+  available, while real installs, removals, and `apt update` remain disabled.
+
 ## 0.1.0-beta.32 – sichere Orchestrierungsanzeige (Prerelease)
 
 ### Deutsch
