@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.1.0-beta.40 – Release-Kandidat für die kontrollierte Migration
+
+### Deutsch
+
+- Synchronisiert Agent, Home-Assistant-Integration und Lovelace-Karte auf die
+  eindeutige Kandidatenversion Beta.40; Beta.39 bleibt unverändert.
+- Bereitet die Migration von HA Beta.39/Agent Beta.37 auf den geprüften PR-65-
+  Stand vor, ohne produktive Berechtigungen, Paketaktionen oder Neustarts.
+- Der echte `helper → pct → nichtproduktiver LXC`-Nachweis bleibt offen; dieser
+  Kandidat ist nicht als vollständige E2E-Abnahme oder Stable freigegeben.
+
+### English
+
+- Synchronizes the agent, Home Assistant integration and Lovelace card on the
+  unique Beta.40 candidate version; Beta.39 remains unchanged.
+- Prepares migration from HA Beta.39/Agent Beta.37 to the reviewed PR-65 state
+  without productive permission changes, package actions or restarts.
+- The real `helper → pct → non-production LXC` proof remains open; this
+  candidate is not fully E2E-accepted and is not Stable.
+
+## Unreleased – Issue #63 E2E-Abschluss offen
+
+### Deutsch
+
+- Die Dokumentation stellt klar, dass Beta.39 keine vollständige LXC-E2E-Abnahme ist.
+- PR #65 ergänzt einen festen Helper-Transporttest bis zu einem Wegwerf-Gastroot
+  mit echter dpkg-Installation und Upgrade; der Test ist ausdrücklich kein
+  Ersatz für einen echten Proxmox-LXC.
+- Read-only auf `pve-home` wurde bestätigt: alle vorhandenen LXCs sind
+  produktive Dienste, CT112 bleibt gestoppt, und es gibt keinen ausgewiesenen
+  Testgast. Es wurden keine produktiven Paketaktionen ausgeführt.
+- Kein Merge, kein Release und kein Issue-Abschluss, solange der echte
+  `pct`-Transport mit einem nichtproduktiven LXC nicht nachgewiesen ist.
+
+### English
+
+- Documentation clarifies that Beta.39 is not complete LXC E2E acceptance.
+- PR #65 adds a fixed helper transport test to a disposable guest root with a
+  real dpkg install and upgrade; it is explicitly not a real Proxmox LXC test.
+- Read-only inspection of `pve-home` confirmed that all existing LXCs are
+  productive services, CT112 remains stopped, and no designated test guest
+  exists. No productive package action was executed.
+- No merge, release, or issue closure is allowed until the real `pct` transport
+  is proven with a non-production LXC.
+
 ## 0.1.0-beta.39 – LXC-Updateberechtigungen und isolierte E2E-Abnahme
 
 ### Deutsch

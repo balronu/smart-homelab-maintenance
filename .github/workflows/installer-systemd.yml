@@ -14,3 +14,5 @@ jobs:
         run: sudo scripts/test-lxc-helper-installer-systemd.sh
       - name: Real isolated package install acceptance
         run: sudo scripts/test-isolated-package-install.sh
+      - name: Fixed helper transport to disposable guest fixture
+        run: sudo python3 scripts/test-lxc-helper-transport-e2e.py

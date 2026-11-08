@@ -419,7 +419,7 @@ class CoreTests(unittest.TestCase):
         api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), self.repo, read_token="test-token")
         status, body = api.handle("GET", "/api/v1/health")
         self.assertEqual(status, 200)
-        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.39")
+        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.40")
         self.assertEqual(body["data"]["api_contract"], "1.1")
         self.assertEqual(api.handle("GET", "/api/v1/containers")[0], 401)
         status, body = api.handle("GET", "/api/v1/containers?limit=2", headers={"Authorization": "Bearer test-token"})
