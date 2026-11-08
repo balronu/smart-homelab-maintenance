@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.0-beta.35 – LXC-Helper-Authentifizierung und Runtime-Berechtigungen
+
+### Deutsch
+
+- Korrigiert die `SO_PEERCRED`-Auswertung des root-eigenen Helpers, damit der
+  Agent anhand der tatsächlichen Peer-UID autorisiert wird.
+- Stellt die gemeinsame systemd-Runtime-Gruppe für Discovery-Socket und
+  Helper-Socket sicher.
+
+### English
+
+- Corrects `SO_PEERCRED` parsing so the root-owned helper authorizes the actual
+  agent peer UID.
+- Aligns the shared systemd runtime group for discovery and helper sockets.
+
+Die Updateausführung bleibt opt-in und standardmäßig deaktiviert. / Update
+execution remains opt-in and disabled by default.
+
 ## 0.1.0-beta.34 – kontrollierte LXC-Updateausführung
 
 ### Deutsch

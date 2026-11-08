@@ -1,6 +1,6 @@
 # Smart Homelab Maintenance
 
-## Beta.34 candidate
+## Beta.35 candidate
 
 Die nächste Entwicklungs-Beta ergänzt einen opt-in Updatepfad für ausdrücklich
 autorisierte laufende Debian-/Ubuntu-LXCs. Simulation und echte Updates haben

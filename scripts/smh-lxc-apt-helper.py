@@ -41,7 +41,7 @@ class HelperError(Exception):
 
 def _require_agent_peer(sock: socket.socket) -> None:
     try:
-        uid, _, _ = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+        _, uid, _ = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
         expected_uid = pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
     except (OSError, KeyError, struct.error) as exc:
         raise HelperError("unauthorized_client", "client credentials could not be verified") from exc

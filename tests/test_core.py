@@ -339,7 +339,7 @@ class CoreTests(unittest.TestCase):
             async def capabilities(self):
                 return {"data": {"execution_enabled": False}}
             async def health(self):
-                return {"data": {"agent_version": "0.1.0-beta.34", "api_contract": "1.1"}}
+                return {"data": {"agent_version": "0.1.0-beta.35", "api_contract": "1.1"}}
             async def updates(self):
                 return {"data": {"items": []}}
 
@@ -371,7 +371,7 @@ class CoreTests(unittest.TestCase):
             async def capabilities(self):
                 return {"data": {"execution_enabled": False}}
             async def health(self):
-                return {"data": {"agent_version": "0.1.0-beta.34", "api_contract": "1.1"}}
+                return {"data": {"agent_version": "0.1.0-beta.35", "api_contract": "1.1"}}
             async def updates(self):
                 raise IntegrationTransportError("http_error", "fixture update endpoint returned HTTP 500")
 
@@ -402,7 +402,7 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(service.app("paperless").update_supported)
 
     def test_agent_compatibility_is_conservative(self) -> None:
-        self.assertEqual(evaluate_agent("0.1.0-beta.34", "1.1").status, "current")
+        self.assertEqual(evaluate_agent("0.1.0-beta.35", "1.1").status, "current")
         self.assertEqual(evaluate_agent("0.1.0-beta.17", "1.1").status, "outdated")
         self.assertEqual(evaluate_agent("0.1.0-beta.23", "1.0").status, "incompatible")
         self.assertEqual(evaluate_agent(None, "1.1").status, "unknown")
@@ -416,7 +416,7 @@ class CoreTests(unittest.TestCase):
         api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), self.repo, read_token="test-token")
         status, body = api.handle("GET", "/api/v1/health")
         self.assertEqual(status, 200)
-        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.34")
+        self.assertEqual(body["data"]["agent_version"], "0.1.0-beta.35")
         self.assertEqual(body["data"]["api_contract"], "1.1")
         self.assertEqual(api.handle("GET", "/api/v1/containers")[0], 401)
         status, body = api.handle("GET", "/api/v1/containers?limit=2", headers={"Authorization": "Bearer test-token"})
