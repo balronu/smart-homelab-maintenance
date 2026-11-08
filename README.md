@@ -1,6 +1,6 @@
 # Smart Homelab Maintenance
 
-## Issue #63 · LXC update management (next beta)
+## Issue #63 · LXC update management (E2E completion status)
 
 Die vollständige LXC-Update-E2E-Abnahme ist noch offen. CI prüft den festen
 Helper-Vertrag und eine echte Paketinstallation in einem Wegwerf-Gastroot;
@@ -12,7 +12,7 @@ helper contract and a real package installation in a disposable guest root;
 final acceptance still requires a real non-production Proxmox LXC test guest.
 Productive package actions remain disabled.
 
-Die nächste Beta erweitert den opt-in Updatepfad für ausdrücklich
+Der Entwicklungsstand erweitert den opt-in Updatepfad für ausdrücklich
 autorisierte laufende Debian-/Ubuntu-LXCs. Simulation und echte Updates haben
 getrennte Berechtigungen und können pro LXC über den geschützten Agent-Endpunkt
 verwaltet werden. Ein frischer Plan-Digest und eine Bestätigung sind Pflicht.
@@ -24,7 +24,7 @@ keinen automatischen Neustart. Siehe
 Berechtigungsverwaltung ist in
 [`docs/update-permissions.md`](docs/update-permissions.md) beschrieben.
 
-The next beta provides an opt-in update path for explicitly authorized
+The development branch provides an opt-in update path for explicitly authorized
 running Debian/Ubuntu LXCs. Simulation and real updates use separate
 permissions and can be managed per LXC through the protected agent endpoint. A
 fresh plan digest and explicit confirmation are required. A dry run is also
@@ -84,7 +84,9 @@ row and renders simulation results below it. Host simulation remains
 read-only. LXC simulation is opt-in per explicitly authorized target and is
 not enabled in production. VMs are permanently monitoring-only: no VM package
 check, simulation, `pct exec`, or other VM update runner is used. Real package
-installation remains unsupported.
+installation is implemented as an opt-in path, but remains disabled by
+default and has not yet passed the required real non-production Proxmox-LXC
+E2E acceptance.
 
 ## Phase 35: automatische LXC-Discovery (Draft, kein Release)
 

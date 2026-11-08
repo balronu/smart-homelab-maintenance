@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased – Issue #63 E2E-Abschluss offen
+
+### Deutsch
+
+- Die Dokumentation stellt klar, dass Beta.39 keine vollständige LXC-E2E-Abnahme ist.
+- PR #65 ergänzt einen festen Helper-Transporttest bis zu einem Wegwerf-Gastroot
+  mit echter dpkg-Installation und Upgrade; der Test ist ausdrücklich kein
+  Ersatz für einen echten Proxmox-LXC.
+- Read-only auf `pve-home` wurde bestätigt: alle vorhandenen LXCs sind
+  produktive Dienste, CT112 bleibt gestoppt, und es gibt keinen ausgewiesenen
+  Testgast. Es wurden keine produktiven Paketaktionen ausgeführt.
+- Kein Merge, kein Release und kein Issue-Abschluss, solange der echte
+  `pct`-Transport mit einem nichtproduktiven LXC nicht nachgewiesen ist.
+
+### English
+
+- Documentation clarifies that Beta.39 is not complete LXC E2E acceptance.
+- PR #65 adds a fixed helper transport test to a disposable guest root with a
+  real dpkg install and upgrade; it is explicitly not a real Proxmox LXC test.
+- Read-only inspection of `pve-home` confirmed that all existing LXCs are
+  productive services, CT112 remains stopped, and no designated test guest
+  exists. No productive package action was executed.
+- No merge, release, or issue closure is allowed until the real `pct` transport
+  is proven with a non-production LXC.
+
 ## 0.1.0-beta.39 – LXC-Updateberechtigungen und isolierte E2E-Abnahme
 
 ### Deutsch

@@ -69,6 +69,7 @@ class UpdateResult:
     update_authorized: bool = False
     update_supported: bool = False
     update_reason: str | None = None
+    simulation_authorized: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         result = asdict(self)
@@ -77,6 +78,7 @@ class UpdateResult:
         result["conflicts"] = list(self.conflicts)
         result["removals"] = list(self.removals)
         result["fresh"] = self.is_fresh()
+        result["authorized"] = bool(self.simulation_authorized)
         if self.status in {"current", "updates_available"} and not result["fresh"]:
             result["status"] = "stale"
         return result
@@ -431,7 +433,7 @@ class UpdateService:
         update_authorized = bool(target.target.startswith("container:") and target.update_authorized)
         update_supported = bool(self.execution_enabled and update_authorized and not held and not conflicts and not removals)
         update_reason = None if update_supported else ("explicit-update-authorization-required" if not update_authorized else "update-execution-disabled")
-        return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item is True for item in security) if security else None, packages, held, conflicts, removals, utc_now(), None, 21600, digest, True, "local-apt" if target.target == "host" else "lxc-apt-helper", None, target.update_authorized, update_supported, update_reason)
+        return UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item is True for item in security) if security else None, packages, held, conflicts, removals, utc_now(), None, 21600, digest, True, "local-apt" if target.target == "host" else "lxc-apt-helper", None, target.update_authorized, update_supported, update_reason, target.authorized)
 
     def check(self, target_id: str, *, force: bool = False) -> UpdateResult:
         target = self.target_map().get(target_id)
@@ -472,7 +474,7 @@ class UpdateService:
                 return DryRunResult(target_id, True, False, False, current.plan_digest, error="apt simulation failed").as_dict()
             packages, held, conflicts, removals = _parse_apt(stdout, stderr)
             digest = _package_digest(packages) if self._reader is not None else hashlib.sha256((stdout + "\n" + stderr).encode("utf-8", "replace")).hexdigest()
-            latest = UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item.security is True for item in packages), packages, held, conflicts, removals, utc_now(), None, current.stale_after_seconds, digest, True, "local-apt" if target_id == "host" else "lxc-apt-helper", None, target.update_authorized, False, "update-execution-disabled")
+            latest = UpdateResult(target.target, target.name, True, True, target.os_name, target.os_version, target.package_manager, "updates_available" if packages else "current", len(packages), sum(item.security is True for item in packages), packages, held, conflicts, removals, utc_now(), None, current.stale_after_seconds, digest, True, "local-apt" if target_id == "host" else "lxc-apt-helper", None, target.update_authorized, False, "update-execution-disabled", target.authorized)
             if latest.plan_digest != current.plan_digest:
                 self._cache[target_id] = (latest, self._clock())
                 return DryRunResult(target_id, True, False, False, latest.plan_digest, error="update plan changed; dry run is stale").as_dict()

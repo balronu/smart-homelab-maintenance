@@ -271,6 +271,10 @@ def test_api_permission_endpoint_is_explicit_and_separates_simulation_from_updat
         status, _ = api.handle("POST", "/api/v1/updates/container:107/permissions", headers=headers, body=b'{"confirm":true,"simulation_authorized":true,"update_authorized":false}')
         assert status == 200
         assert updates.check("container:107", force=True).authorized is True
+        assert updates.check("container:107", force=True).as_dict()["simulation_authorized"] is True
+        status, _ = api.handle("POST", "/api/v1/updates/container:107/permissions", headers=headers, body=b'{"confirm":true,"simulation_authorized":false,"update_authorized":false}')
+        assert status == 200
+        assert updates.check("container:107", force=True).as_dict()["authorized"] is False
         status, _ = api.handle("POST", "/api/v1/updates/container:107/permissions", headers=headers, body=b'{"confirm":true,"simulation_authorized":false,"update_authorized":true}')
         assert status == 400
         repo.close()
