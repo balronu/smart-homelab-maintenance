@@ -1,5 +1,31 @@
 # Smart Homelab Maintenance
 
+## Beta.45 inventory-recovery fix candidate / Beta.45-Inventar-Recovery-Kandidat
+
+Der lokale Beta.45-Kandidat behebt die fehlende dynamische Erzeugung von VM-
+und LXC-Entitäten, wenn der erste Coordinator-Poll den Agenten nicht erreicht.
+Nach einer späteren erfolgreichen Antwort werden die 2 VM- und 10 LXC-
+Entitäten automatisch angelegt; wiederholte Polls erzeugen keine Duplikate.
+Die Abnahme erfolgt über den Pull Request und die vollständige GitHub-Actions-
+Pipeline. Merge, Veröffentlichung und produktive Installation sind noch nicht
+freigegeben.
+
+The local Beta.45 candidate fixes missing dynamic VM and LXC entity creation
+when the first coordinator poll cannot reach the agent. A later successful
+response materializes the 2 VM and 10 LXC entities automatically, while
+repeated polls remain duplicate-free. Acceptance is performed through the pull
+request and the complete GitHub Actions pipeline. Merge, publication and
+productive installation are not yet approved.
+
+Für eine spätere kompakte mobile Hostdarstellung wird vorgeschlagen, die
+Kennzahlen in einer zweispaltigen Reihe aus CPU, RAM, Speicher und Status zu
+gruppieren und Detailattribute weiterhin unterhalb der Reihe zu belassen. Das
+ist bewusst außerhalb dieses Bugfixes.
+
+For a future compact mobile host view, group CPU, RAM, storage and status in a
+two-column metric row and keep detailed attributes below it. This is
+deliberately outside this bug fix.
+
 ## Issue #63 · LXC update management (E2E completion status)
 
 Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.44` versioniert.
