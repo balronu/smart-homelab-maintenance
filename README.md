@@ -1,5 +1,20 @@
 # Smart Homelab Maintenance
 
+## Beta.33
+
+Die aktuelle Entwicklungs-Beta synchronisiert Agent, Home-Assistant-
+Integration, Lovelace-Karte und Manifest auf `0.1.0-beta.33`. Der sichere
+Betriebsvertrag bleibt unverändert: gezielte APT-Simulationen sind nur für
+explizit autorisierte Ziele vorgesehen; echte Paketinstallation, Entfernung
+und `apt update` bleiben deaktiviert. VMs bleiben Monitoring-only und
+gestoppte LXCs werden nie automatisch gestartet.
+
+The current development beta synchronizes the agent, Home Assistant
+integration, Lovelace card, and manifest at `0.1.0-beta.33`. The safety
+contract is unchanged: targeted APT simulations are limited to explicitly
+authorized targets; real package installation, removal, and `apt update`
+remain disabled. VMs stay monitoring-only and stopped LXCs are never started.
+
 ## Beta.32: sichere Orchestrierungsanzeige und Helper-Bereitschaft
 
 Beta.32 ergänzt den read-only Orchestrierungsstatus für Helper, Discovery-Socket,
