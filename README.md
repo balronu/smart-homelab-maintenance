@@ -1,5 +1,24 @@
 # Smart Homelab Maintenance
 
+## Beta.29: Sichere systemd-Lebenszyklusprüfung
+
+Beta.29 erweitert die Beta.28-Restart-Erkennung um `InvocationID` und den
+monotonen Prozessstartzeitpunkt. Der erwartete kontrollierte Wechsel von der
+alten zur neuen systemd-Instanz bleibt zulässig; fehlende oder ungültige
+`NRestarts`-Werte, Anstiege, unerwartete Rückgänge/Resets sowie spätere
+Lebenszykluswechsel führen sicher zum Rollback. Der Beta.28-APT-Parser für
+`amd64`/`all` bleibt enthalten und der Installationsbutton deaktiviert.
+
+Beta.29 extends the Beta.28 restart detection with `InvocationID` and the
+monotonic main-process start timestamp. The expected controlled transition
+from the old to the new systemd instance remains allowed; missing or invalid
+`NRestarts` values, increases, unexpected decreases/resets, and later
+lifecycle changes fail closed into rollback. The Beta.28 APT parser for
+`amd64`/`all` remains included and the install button stays disabled.
+
+Die zweisprachigen Release Notes liegen unter
+[`docs/releases/v0.1.0-beta.29.md`](docs/releases/v0.1.0-beta.29.md).
+
 ## Beta.28: APT-Architekturspalte und stale-Status-Lebenszyklus
 
 Beta.28 korrigiert das Parsen von `apt list --upgradable` für die reguläre

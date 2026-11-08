@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.0-beta.29 – Sichere systemd-Lebenszyklusprüfung (Prerelease)
+
+### Deutsch
+
+- Bindet die Restart-Prüfung an `InvocationID` und
+  `ExecMainStartTimestampMonotonic`.
+- Behandelt fehlende, ungültige, gestiegene und unerwartet zurückgesetzte
+  `NRestarts`-Werte sicher und lässt nur den erwarteten kontrollierten
+  alten→neuen Unit-Wechsel zu.
+- Führt bei einem nicht eindeutigen Lebenszyklus sicher den bestehenden
+  Rollback aus.
+- Enthält weiterhin den Beta.28-APT-Parser-Fix für `amd64` und `all`.
+
+### English
+
+- Binds restart validation to `InvocationID` and
+  `ExecMainStartTimestampMonotonic`.
+- Fails safely on missing, invalid, increased, or unexpected reset
+  `NRestarts` values and allows only the expected controlled old-to-new unit
+  transition.
+- Uses the existing safe rollback when the lifecycle is ambiguous.
+- Continues to include the Beta.28 APT parser fix for `amd64` and `all`.
+
 ## 0.1.0-beta.28 – APT-Parser und stale-Status-Lebenszyklus (Prerelease)
 
 ### Deutsch
