@@ -46,3 +46,11 @@ OS-Name, Version und den festen Paketmanager `apt` enthalten. Helper, Socket
 und Allowlist bleiben bis zu einer separaten Freigabe deaktiviert. Parallele
 Simulationen desselben Ziels werden abgewiesen; Antworten sind zeit- und
 ausgabebegrenzt.
+
+## Beta.31 Kandidatenmatrix
+
+Die konkrete LXC-/VM-Inventur, die festen Helper-Grenzen und die offenen
+Autorisierungsschritte stehen in
+[`beta31-simulation-readiness.md`](beta31-simulation-readiness.md). Sie ist
+eine read-only Abnahmegrundlage; sie aktiviert keinen Helper. VMs bleiben
+dort und im Backend dauerhaft von Paketprüfung und Simulation ausgeschlossen.
