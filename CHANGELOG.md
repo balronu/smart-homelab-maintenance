@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0-beta.39 – LXC-Updateberechtigungen und isolierte E2E-Abnahme
+
+### Deutsch
+
+- Simulation und echte Updates werden pro laufendem LXC über den geschützten Agent-Endpunkt getrennt autorisiert.
+- Frische, autorisierte Simulationen sind auch bei null verfügbaren Updates über die Karte möglich.
+- CI weist eine echte Paketinstallation und ein Upgrade in einem ephemeren dpkg-Testroot nach.
+- VMs, Host, gestoppte oder nicht nachgewiesene Gäste bleiben ausgeschlossen; `execution_enabled` bleibt die Ausführungsgrenze.
+
+### English
+
+- Simulation and real updates are authorized separately per running LXC through the protected agent endpoint.
+- Fresh authorized simulations remain available when zero updates are present.
+- CI proves a real package installation and upgrade in an ephemeral dpkg test root.
+- VMs, the host, stopped or unproven guests remain excluded; `execution_enabled` remains the execution gate.
+
 ## 0.1.0-beta.38 – API-kompatible Agent-Weiterentwicklung
 
 ### Deutsch

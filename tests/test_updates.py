@@ -10,6 +10,7 @@ from agent.smart_homelab_maintenance.api import ApiApplication
 from agent.smart_homelab_maintenance.discovery import DiscoveryService, FixtureProxmoxBackend, phase1_fixture
 from agent.smart_homelab_maintenance.errors import ValidationError
 from agent.smart_homelab_maintenance.jobs import JobRepository
+from agent.smart_homelab_maintenance.permissions import PermissionStore
 from agent.smart_homelab_maintenance.updates import AptCommandRunner, AptUpdateReader, GuestHelperUnavailableError, ProbeTarget, RootHelperTransport, UpdateService, _parse_apt, _parse_apt_upgradable, make_targets
 
 
@@ -255,6 +256,23 @@ def test_api_execute_returns_structured_update_result_after_fresh_check():
         status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=(f'{{"confirm":true,"plan_digest":"{digest}"}}').encode())
         assert status == 200 and body["data"]["success"] is True
         assert [step["name"] for step in body["data"]["steps"]] == ["apt-update", "apt-upgrade"]
+        repo.close()
+
+
+def test_api_permission_endpoint_is_explicit_and_separates_simulation_from_update():
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", False, True, False)
+    with tempfile.TemporaryDirectory() as directory:
+        store = PermissionStore(Path(directory) / "allowlist.toml")
+        updates = UpdateService(lambda: (authorized,), runner=runner, permission_store=store)
+        repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+        api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), repo, updates=updates, read_token="token")
+        headers = {"Authorization": "Bearer token"}
+        status, _ = api.handle("POST", "/api/v1/updates/container:107/permissions", headers=headers, body=b'{"confirm":true,"simulation_authorized":true,"update_authorized":false}')
+        assert status == 200
+        assert updates.check("container:107", force=True).authorized is True
+        status, _ = api.handle("POST", "/api/v1/updates/container:107/permissions", headers=headers, body=b'{"confirm":true,"simulation_authorized":false,"update_authorized":true}')
+        assert status == 400
         repo.close()
 
 

@@ -30,6 +30,7 @@ from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInven
 from .updates import AptCommandRunner, AptUpdateReader, RootHelperTransport, UpdateService, make_targets
 from .security import redact_secrets
 from .orchestration_status import read_installation_status
+from .permissions import PermissionStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -144,6 +145,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         runner=AptCommandRunner(guest_transport=guest_transport),
         reader=AptUpdateReader(guest_transport=guest_transport),
         execution_enabled=config.server.execution_enabled,
+        permission_store=PermissionStore("/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml", require_root=True),
     )
     application = ApiApplication(
         discovery,

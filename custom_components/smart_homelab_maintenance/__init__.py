@@ -78,6 +78,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 target=call.data.get("target"),
                 confirm=call.data.get("confirm", False),
                 plan_digest=call.data.get("plan_digest"),
+                simulation_authorized=call.data.get("simulation_authorized", False),
+                update_authorized=call.data.get("update_authorized", False),
             )
             if call.service == "dry_run":
                 coordinator.record_dry_run(str(call.data.get("target")), result.get("data", result))
@@ -93,7 +95,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             vol.Optional("confirm", default=False): cv.boolean,
             vol.Optional("after", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=1000000)),
         })
-        for action in ("check", "get_job", "get_job_events", "dry_run", "execute"):
+        for action in ("check", "get_job", "get_job_events", "dry_run", "execute", "set_permissions"):
             kwargs = {"schema": schema}
             if SupportsResponse is not None:
                 kwargs["supports_response"] = SupportsResponse.ONLY
