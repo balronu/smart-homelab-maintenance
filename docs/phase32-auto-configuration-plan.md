@@ -39,12 +39,14 @@ Die neue Planungslogik in `authorization.py` ist absichtlich ohne Seiteneffekt:
    (`discover_only` als Default oder der bewusst aktivierte Auto-Modus),
    plant atomare Allowlist-Diffs und entfernt stale/stopped/unsupported
    Autorisierungen ohne neue Berechtigungen durch bloße Erkennung.
-3. **Installer:** ein noch zu ergänzender offizieller Installer muss
-   preflight-only als Default haben, `--apply` explizit verlangen, vorhandene
-   Installationen erkennen, Hash/Modes prüfen, Helper/Unit idempotent
-   atomar aktualisieren und keinen Agent-Neustart erzwingen. Bei bestehender
-   `lxc_helper_enabled=false` muss er stoppen oder einen separat freigegebenen
-   Agent-Reload/Upgrade verlangen.
+3. **Installer:** `scripts/install-lxc-helper.sh` ist jetzt als sicherer,
+   preflight-only-by-default Installer ergänzt. `--apply` ist explizit nötig;
+   `--start` ist separat erforderlich. Er prüft Commit/Quellen, erkennt
+   unsichere Ziele, installiert root-owned Helper/Unit/Allowlist und legt ein
+   Rollback-Staging an. Eine vorhandene Allowlist wird erhalten; eine neue ist
+   leer. Er erweitert keine Berechtigungen und startet den Agenten nicht. Bei
+   bestehender `lxc_helper_enabled=false` bleibt die tatsächliche
+   Agent-Anbindung bis zu einem separat geprüften Agent-Upgrade offen.
 4. **HA-Onboarding:** Config-/Options-Flow soll Agent-Health, Helper-Status,
    Discovery-Mode und getrennte Statusgründe anzeigen. Änderungen dürfen
    keine Allowlist automatisch aktivieren; der Agent bleibt durchgehend
@@ -57,8 +59,9 @@ Die neue Planungslogik in `authorization.py` ist absichtlich ohne Seiteneffekt:
 
 Die isolierte Policy ist durch Tests für neue, gestoppte, unbekannte,
 unsupported, stale und numerisch ungültige Ziele abzunehmen. Vor Stable fehlen
-noch der Installer, der sichere Gast-Probeweg, die persistente Policy-/Diff-
-Orchestrierung, API-Felder für Helper-/Policy-Provenienz sowie der HA-Flow und
-die End-to-End-Erstinstallation in einer isolierten Umgebung. Bis dahin ist
+noch die sichere Gast-Probeweg, die persistente Policy-/Diff-Orchestrierung,
+API-Felder für Helper-/Policy-Provenienz, die idempotente
+Wiederherstellungsprüfung des Installers sowie der HA-Flow und die
+End-to-End-Erstinstallation in einer isolierten Umgebung. Bis dahin ist
 der produktive Helper- und Allowlist-Zustand unverändert und Stable bleibt
 NO-GO.
