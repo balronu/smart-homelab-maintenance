@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 
 import pytest
@@ -103,6 +104,39 @@ def test_allowlist_requires_root_safe_file_and_filters_metadata(tmp_path: Path) 
     assert helper._load_allowlist(allowlist) == {101}
 
 
+def test_policy_socket_operations_preserve_root_only_policy_and_split_rights(tmp_path: Path) -> None:
+    allowlist = tmp_path / "allowlist.toml"
+    allowlist.write_text(
+        '[containers."110"]\nauthorized = true\nos_name = "Debian"\nos_version = "12"\npackage_manager = "apt"\n',
+        encoding="utf-8",
+    )
+    allowlist.chmod(0o600)
+    read = helper.handle_policy({"operation": "policy_read"}, allowlist)
+    assert read["entries"]["110"]["authorized"] is True
+    result = helper.handle_policy({
+        "operation": "policy_set", "target": "container:110",
+        "simulation_authorized": True, "update_authorized": False,
+        "metadata": {"os_name": "Debian", "os_version": "12", "package_manager": "apt"},
+        "confirm": True,
+    }, allowlist)
+    assert result["data"]["simulation_authorized"] is True
+    assert helper._load_permissions(allowlist) == ({110}, set())
+    assert allowlist.stat().st_uid == 0 or allowlist.stat().st_uid == os.getuid()
+    assert allowlist.stat().st_mode & 0o077 == 0
+
+
+def test_policy_socket_rejects_update_without_simulation(tmp_path: Path) -> None:
+    allowlist = tmp_path / "allowlist.toml"
+    allowlist.write_text("# empty\n", encoding="utf-8")
+    allowlist.chmod(0o600)
+    with pytest.raises(helper.HelperError, match="requires simulation"):
+        helper.handle_policy({
+            "operation": "policy_set", "target": "container:110",
+            "simulation_authorized": False, "update_authorized": True,
+            "metadata": {}, "confirm": True,
+        }, allowlist)
+
+
 def test_helper_rejects_malformed_status() -> None:
     response = helper.handle(
         {"container_id": 101, "operation": "read"},
@@ -153,6 +187,7 @@ def test_socket_policy_requires_exact_agent_uid_and_per_request_allowlist() -> N
     assert "pwd.getpwnam(EXPECTED_CLIENT_USER)" in source
     assert "_load_permissions(self.server.allowlist_path)" in source
     assert "self.server.allowed_ids" not in source
+    assert "policy_read" in source and "policy_set" in source
 
 
 def test_peer_credentials_reject_wrong_uid(monkeypatch) -> None:
@@ -201,6 +236,8 @@ def test_helper_service_is_root_scoped_and_not_a_general_pct_service() -> None:
     assert "ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve" in unit
     assert "ExecStart=/usr/sbin/pct" not in unit
     assert "NOPASSWD" not in unit
+    assert "ReadWritePaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml" in unit
+    assert "ReadOnlyPaths=/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml" not in unit
 
 
 def test_discovery_unit_shares_helper_runtime_group() -> None:

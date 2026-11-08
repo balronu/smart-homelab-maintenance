@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.0-beta.41 – Beta.40-Policy-Migrationsfix-Kandidat
+
+### Deutsch
+
+- Behebt die Migration bestehender `root:root 0600`-Policies: Der Agent liest
+  und schreibt die Policy nicht mehr direkt, sondern ausschließlich über den
+  authentifizierten root-eigenen Helper-Socket.
+- Der Helper akzeptiert nur die festen Operationen `policy_read` und
+  `policy_set`, prüft den Agent-Peer per `SO_PEERCRED` und schreibt atomar
+  weiterhin root-owned mit Modus `0600`.
+- Fehlende, beschädigte oder unberechtigte Policies bleiben fail-closed;
+  `execution_enabled=false` und die getrennte Simulation-/Update-Freigabe
+  ändern sich nicht.
+- Der produktive Fix ist noch nicht installiert; der echte Proxmox-LXC-
+  Paketlauf bleibt offen.
+
+### English
+
+- Fixes migration of existing `root:root 0600` policies: the agent no longer
+  reads or writes the policy file directly and uses only the authenticated
+  root-owned helper socket.
+- The helper accepts only fixed `policy_read` and `policy_set` operations,
+  verifies the agent peer with `SO_PEERCRED`, and atomically preserves
+  root-owned mode `0600`.
+- Missing, damaged or unauthorized policies remain fail-closed;
+  `execution_enabled=false` and separate simulation/update authorization are
+  unchanged.
+- The productive fix is not installed yet; the real Proxmox LXC package run
+  remains open.
+
 ## 0.1.0-beta.40 – Release-Kandidat für die kontrollierte Migration
 
 ### Deutsch

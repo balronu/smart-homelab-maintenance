@@ -2,12 +2,12 @@
 
 ## Issue #63 · LXC update management (E2E completion status)
 
-Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.40` versioniert.
-Beta.39 bleibt der bestehende Produktivstand, bis eine separate
+Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.41` versioniert.
+Beta.40 bleibt der bestehende Produktivstand, bis eine separate
 Installationsfreigabe erteilt wird.
 
-The reviewed release candidate is uniquely versioned as `0.1.0-beta.40`.
-Beta.39 remains the installed productive state until a separate installation
+The reviewed release candidate is uniquely versioned as `0.1.0-beta.41`.
+Beta.40 remains the installed productive state until a separate installation
 approval is granted.
 
 Die vollständige LXC-Update-E2E-Abnahme ist noch offen. CI prüft den festen
@@ -19,6 +19,23 @@ The complete LXC update E2E acceptance is still open. CI checks the fixed
 helper contract and a real package installation in a disposable guest root;
 final acceptance still requires a real non-production Proxmox LXC test guest.
 Productive package actions remain disabled.
+
+## Beta.41 policy migration fix / Policy-Migrationsfix
+
+Die bestehende root-owned Policy bleibt absichtlich `root:root 0600`. Der
+unprivilegierte Agent greift deshalb nicht direkt auf die Datei zu, sondern
+verwendet ausschließlich den per `SO_PEERCRED` geschützten root-eigenen
+Helper-Socket für `policy_read` und `policy_set`. Der Helper schreibt atomar
+und fail-closed; `execution_enabled = false` sowie getrennte Simulations- und
+Updateberechtigungen bleiben unverändert. Dieser Fix ist vorbereitet, aber
+nicht produktiv installiert.
+
+The existing root-owned policy intentionally remains `root:root 0600`. The
+unprivileged agent therefore never reads it directly and uses only the
+`SO_PEERCRED`-protected root helper socket for `policy_read` and `policy_set`.
+The helper writes atomically and fails closed; `execution_enabled = false` and
+separate simulation/update permissions remain unchanged. This fix is prepared
+but not installed productively.
 
 Der Entwicklungsstand erweitert den opt-in Updatepfad für ausdrücklich
 autorisierte laufende Debian-/Ubuntu-LXCs. Simulation und echte Updates haben
