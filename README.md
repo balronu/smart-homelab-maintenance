@@ -1,30 +1,27 @@
 # Smart Homelab Maintenance
 
-## Post-Beta.45 permission-feedback fix candidate / Berechtigungs-Feedback-Kandidat
+## Beta.46 permission-feedback fix / Beta.46-Berechtigungs-Feedback-Fix
 
-Der Arbeitsstand nach Beta.45 macht Fehler und Erfolge der LXC-Berechtigungsänderung
+Beta.46 macht Fehler und Erfolge der LXC-Berechtigungsänderung
 direkt in der Lovelace-Karte sichtbar. Der Button setzt seinen Ladezustand auch bei
 HTTP-400/403/500-Fehlern und Timeouts zuverlässig zurück; ein erfolgreicher Aufruf
 fordert anschließend einen Coordinator-Refresh an. Es werden keine produktiven
-Freigaben automatisch ausgelöst. Dieser Stand ist noch nicht gemergt oder veröffentlicht.
+Freigaben automatisch ausgelöst.
 
-The post-Beta.45 work-in-progress displays LXC permission-change success and
+Beta.46 displays LXC permission-change success and
 failure directly in the Lovelace card. Loading state is reset for HTTP 400/403/500
 responses and timeouts, and successful calls request a coordinator refresh. No
-productive permission grant is triggered automatically. This branch is not merged
-or released.
+productive permission grant is triggered automatically.
 
-## Beta.45 inventory-recovery fix candidate / Beta.45-Inventar-Recovery-Kandidat
+## Beta.45 inventory-recovery fix / Beta.45-Inventar-Recovery-Fix
 
 Der lokale Beta.45-Kandidat behebt die fehlende dynamische Erzeugung von VM-
 und LXC-Entitäten, wenn der erste Coordinator-Poll den Agenten nicht erreicht.
 Nach einer späteren erfolgreichen Antwort werden die 2 VM- und 10 LXC-
 Entitäten automatisch angelegt; wiederholte Polls erzeugen keine Duplikate.
-Die Abnahme erfolgt über den Pull Request und die vollständige GitHub-Actions-
-Pipeline. Merge, Veröffentlichung und produktive Installation sind noch nicht
-freigegeben.
+Die Abnahme erfolgte über Pull Request und vollständige GitHub-Actions-Pipeline.
 
-The local Beta.45 candidate fixes missing dynamic VM and LXC entity creation
+The Beta.45 fix introduced dynamic VM and LXC entity creation
 when the first coordinator poll cannot reach the agent. A later successful
 response materializes the 2 VM and 10 LXC entities automatically, while
 repeated polls remain duplicate-free. Acceptance is performed through the pull
@@ -42,11 +39,11 @@ deliberately outside this bug fix.
 
 ## Issue #63 · LXC update management (E2E completion status)
 
-Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.44` versioniert.
+Der veröffentlichte Beta.46-Stand ist eindeutig als `0.1.0-beta.46` versioniert.
 Beta.42 bleibt der bestehende Produktivstand, bis eine separate
 Installationsfreigabe erteilt wird.
 
-The reviewed release candidate is uniquely versioned as `0.1.0-beta.44`.
+The published Beta.46 state is uniquely versioned as `0.1.0-beta.46`.
 Beta.42 remains the installed productive state until a separate installation
 approval is granted.
 

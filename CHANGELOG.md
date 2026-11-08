@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased – post-Beta.45 permission feedback candidate
+## 0.1.0-beta.46 – Permission feedback and inventory recovery
 
 ### Deutsch
 
@@ -24,7 +24,7 @@
 - Security boundaries remain unchanged: no automatic grant and no changes to
   `execution_enabled`, allowlists, or productive Home Assistant systems.
 
-## Unreleased – 0.1.0-beta.45 inventory recovery candidate
+## 0.1.0-beta.45 – inventory recovery candidate
 
 ### Deutsch
 
