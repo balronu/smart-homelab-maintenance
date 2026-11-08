@@ -11,6 +11,9 @@
   nicht autorisierende Allowlist-Vorlage.
 - Helper, Allowlist und Produktivpfade bleiben deaktiviert; keine Gastbefehle
   oder Simulationen wurden ausgeführt.
+- Ergänzt die passive Phase-29-Matrix für alle zehn LXCs mit Ressourcen,
+  Proxmox-OS-Metadaten, unbekannten APT-Nachweisen, Betriebsrisiken und den
+  späteren Einzel-Freigabegates.
 
 ### English
 
@@ -20,6 +23,9 @@
   allowlist template.
 - The helper, allowlist, and production execution paths remain disabled; no
   guest command or simulation was run.
+- Adds the passive Phase 29 matrix for all ten LXCs, including resources,
+  Proxmox OS metadata, unknown APT evidence, operating risks, and later
+  per-target authorization gates.
 
 ## 0.1.0-beta.31 – Mobile Aktionszeile und Simulationsgrenzen (Prerelease)
 

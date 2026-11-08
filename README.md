@@ -354,6 +354,9 @@ Skripte arbeiten standardmäßig nur im Prüfmodus und starten keinen Dienst.
 Die vollständige Stable-Abnahme steht in
 [`docs/STABLE_ACCEPTANCE.md`](docs/STABLE_ACCEPTANCE.md); sie ist eine
 Prüfcheckliste und keine Installationsfreigabe.
+Die passive Phase-29-Eignungs- und Aktivierungsmatrix steht in
+[`docs/phase29-lxc-activation-matrix.md`](docs/phase29-lxc-activation-matrix.md);
+auch sie aktiviert keinen Helper und keine Allowlist.
 
 ### Komponenten und Stable-Vorbereitung
 
