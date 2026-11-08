@@ -2,12 +2,12 @@
 
 ## Issue #63 · LXC update management (E2E completion status)
 
-Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.40` versioniert.
-Beta.39 bleibt der bestehende Produktivstand, bis eine separate
+Der geprüfte Release-Kandidat ist eindeutig als `0.1.0-beta.41` versioniert.
+Beta.40 bleibt der bestehende Produktivstand, bis eine separate
 Installationsfreigabe erteilt wird.
 
-The reviewed release candidate is uniquely versioned as `0.1.0-beta.40`.
-Beta.39 remains the installed productive state until a separate installation
+The reviewed release candidate is uniquely versioned as `0.1.0-beta.41`.
+Beta.40 remains the installed productive state until a separate installation
 approval is granted.
 
 Die vollständige LXC-Update-E2E-Abnahme ist noch offen. CI prüft den festen
@@ -20,7 +20,7 @@ helper contract and a real package installation in a disposable guest root;
 final acceptance still requires a real non-production Proxmox LXC test guest.
 Productive package actions remain disabled.
 
-## Beta.40 policy migration fix / Policy-Migrationsfix
+## Beta.41 policy migration fix / Policy-Migrationsfix
 
 Die bestehende root-owned Policy bleibt absichtlich `root:root 0600`. Der
 unprivilegierte Agent greift deshalb nicht direkt auf die Datei zu, sondern
