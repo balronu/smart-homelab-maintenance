@@ -111,6 +111,17 @@ class ApiApplication:
             if not isinstance(request, dict) or set(request) - {"confirm", "plan_digest"}:
                 raise ValidationError("update accepts only confirm and plan_digest")
             return self.updates.execute_update(parts[3], confirmed=request.get("confirm") is True, plan_digest=request.get("plan_digest"))
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] == "permissions" and method == "POST":
+            if self.updates is None:
+                raise ValidationError("permission management is unavailable")
+            try:
+                request = json.loads(body.decode("utf-8")) if body else {}
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValidationError("permission body must be valid JSON") from exc
+            allowed = {"confirm", "simulation_authorized", "update_authorized"}
+            if not isinstance(request, dict) or set(request) - allowed or not isinstance(request.get("simulation_authorized"), bool) or not isinstance(request.get("update_authorized"), bool):
+                raise ValidationError("permissions accepts confirm and two boolean authorization fields")
+            return self.updates.set_permissions(parts[3], simulation_authorized=request["simulation_authorized"], update_authorized=request["update_authorized"], confirmed=request.get("confirm") is True)
         if path in {"/api/v1/update", "/api/v1/execute"}:
             raise ValidationError("use the target-scoped, confirmed update endpoint")
         if len(parts) == 4 and parts[:3] == ["api", "v1", "apps"]:

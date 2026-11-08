@@ -12,3 +12,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Real root/systemd installer acceptance on ephemeral runner
         run: sudo scripts/test-lxc-helper-installer-systemd.sh
+      - name: Real isolated package install acceptance
+        run: scripts/test-isolated-package-install.sh

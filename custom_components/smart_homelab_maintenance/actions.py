@@ -9,7 +9,7 @@ from .http_transport import AgentHttpTransport, TransportError
 from .const import ACTIONS
 
 
-async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, plan_digest: str | None = None) -> dict[str, Any]:
+async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, plan_digest: str | None = None, simulation_authorized: bool = False, update_authorized: bool = False) -> dict[str, Any]:
     if action not in ACTIONS:
         raise ValueError("unknown action")
     if action == "check":
@@ -30,4 +30,8 @@ async def async_action(transport: AgentHttpTransport, action: str, *, job_id: st
         if not target or confirm is not True:
             raise ValueError("target and explicit confirmation are required")
         return await transport.execute_update(target, plan_digest=plan_digest)
+    if action == "set_permissions":
+        if not target or confirm is not True:
+            raise ValueError("target and explicit confirmation are required")
+        return await transport.set_permissions(target, simulation_authorized=simulation_authorized, update_authorized=update_authorized)
     raise TransportError("execution_disabled", "preflight is not available until a later gated phase")

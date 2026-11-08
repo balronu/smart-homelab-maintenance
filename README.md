@@ -1,21 +1,28 @@
 # Smart Homelab Maintenance
 
-## Beta.37 candidate
+## Issue #63 · LXC update management (next beta)
 
-Die nächste Entwicklungs-Beta ergänzt einen opt-in Updatepfad für ausdrücklich
+Die nächste Beta erweitert den opt-in Updatepfad für ausdrücklich
 autorisierte laufende Debian-/Ubuntu-LXCs. Simulation und echte Updates haben
-getrennte Berechtigungen; ein frischer Plan-Digest und eine Bestätigung sind
-Pflicht. Der sichere Standard `execution_enabled = false` bleibt unverändert.
+getrennte Berechtigungen und können pro LXC über den geschützten Agent-Endpunkt
+verwaltet werden. Ein frischer Plan-Digest und eine Bestätigung sind Pflicht.
+Ein Dry-Run ist auch bei null verfügbaren Updates möglich. Der sichere Standard
+`execution_enabled = false` bleibt unverändert.
 Es gibt kein Dist-Upgrade, keine Paketentfernung, keine VM-/Host-Aktion und
 keinen automatischen Neustart. Siehe
-[`docs/update-execution-beta34.md`](docs/update-execution-beta34.md).
+[`docs/update-execution-beta34.md`](docs/update-execution-beta34.md). Die
+Berechtigungsverwaltung ist in
+[`docs/update-permissions.md`](docs/update-permissions.md) beschrieben.
 
-The next development beta adds an opt-in update path for explicitly authorized
+Beta.38 provides an opt-in update path for explicitly authorized
 running Debian/Ubuntu LXCs. Simulation and real updates use separate
-permissions; a fresh plan digest and explicit confirmation are required. The
-safe default `execution_enabled = false` remains unchanged. There is no
-dist-upgrade, package removal, VM/host action, or automatic reboot. See
-[`docs/update-execution-beta34.md`](docs/update-execution-beta34.md).
+permissions and can be managed per LXC through the protected agent endpoint. A
+fresh plan digest and explicit confirmation are required. A dry run is also
+available when zero updates are present. The safe default
+`execution_enabled = false` remains unchanged. There is no dist-upgrade,
+package removal, VM/host action, or automatic reboot. See
+[`docs/update-execution-beta34.md`](docs/update-execution-beta34.md) and
+[`docs/update-permissions.md`](docs/update-permissions.md).
 
 ## Beta.32: sichere Orchestrierungsanzeige und Helper-Bereitschaft
 

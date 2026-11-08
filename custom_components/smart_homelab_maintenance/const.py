@@ -13,4 +13,4 @@ CONF_CA_FILE = "ca_file"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_POLICY_MODE = "policy_mode"
 POLICY_MODES = ("discover_only", "auto_eligible")
-ACTIONS = ("check", "preflight", "get_job", "get_job_events", "dry_run", "execute")
+ACTIONS = ("check", "preflight", "get_job", "get_job_events", "dry_run", "execute", "set_permissions")

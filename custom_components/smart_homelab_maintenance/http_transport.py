@@ -202,6 +202,24 @@ class AgentHttpTransport:
             if isinstance(exc.reason, ssl.SSLError):
                 raise TransportError("tls_error", "agent TLS verification failed") from exc
             raise TransportError("connection", "agent connection failed") from exc
+
+    async def set_permissions(self, target: str, *, simulation_authorized: bool, update_authorized: bool) -> dict[str, Any]:
+        if not isinstance(target, str) or not re.fullmatch(r"container:[1-9][0-9]{0,5}", target):
+            raise TransportError("invalid_target", "only numeric LXC targets may be authorized")
+        payload = {"confirm": True, "simulation_authorized": bool(simulation_authorized), "update_authorized": bool(update_authorized)}
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._post_json_sync, f"/api/v1/updates/{target}/permissions", payload),
+                self.config.timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            raise TransportError("timeout", "agent request timed out") from exc
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, ssl.SSLError):
+                raise TransportError("tls_error", "agent TLS verification failed") from exc
+            raise TransportError("connection", "agent connection failed") from exc
+        except (ConnectionError, OSError) as exc:
+            raise TransportError("connection", "agent connection failed") from exc
         except (ConnectionError, OSError) as exc:
             raise TransportError("connection", "agent connection failed") from exc
 

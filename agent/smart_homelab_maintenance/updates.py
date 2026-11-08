@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Sequence
 
 from .errors import ValidationError
+from .permissions import PermissionStore
 from .types import utc_now
 
 _VMID = re.compile(r"^[1-9][0-9]{0,5}$")
@@ -356,7 +357,7 @@ def _package_digest(packages: Sequence[PackageChange]) -> str:
 class UpdateService:
     """Passive checks plus explicitly confirmed, separately authorized updates."""
 
-    def __init__(self, targets: Callable[[], Sequence[ProbeTarget]], *, runner: AptCommandRunner | None = None, reader: AptUpdateReader | None = None, clock: Callable[[], float] | None = None, execution_enabled: bool = False) -> None:
+    def __init__(self, targets: Callable[[], Sequence[ProbeTarget]], *, runner: AptCommandRunner | None = None, reader: AptUpdateReader | None = None, clock: Callable[[], float] | None = None, execution_enabled: bool = False, permission_store: PermissionStore | None = None) -> None:
         self._targets = targets
         self._runner = runner or AptCommandRunner()
         self._reader = reader
@@ -364,9 +365,30 @@ class UpdateService:
         self._cache: dict[str, tuple[UpdateResult, float]] = {}
         self._active_simulations: set[str] = set()
         self.execution_enabled = execution_enabled
+        self._permission_store = permission_store
 
     def target_map(self) -> dict[str, ProbeTarget]:
-        return {target.target: target for target in self._targets()}
+        targets = {target.target: target for target in self._targets()}
+        if self._permission_store is None:
+            return targets
+        entries = self._permission_store.read()
+        for target_id, target in list(targets.items()):
+            if target_id.startswith("container:"):
+                entry = entries.get(target_id.split(":", 1)[1], {})
+                targets[target_id] = ProbeTarget(target.target, target.name, target.vmid, target.os_name, target.os_version, target.package_manager, bool(entry.get("simulation_authorized", entry.get("authorized", target.authorized))), target.checkable, bool(entry.get("update_authorized", target.update_authorized)))
+        return targets
+
+    def set_permissions(self, target_id: str, *, simulation_authorized: bool, update_authorized: bool, confirmed: bool) -> dict[str, Any]:
+        if confirmed is not True or self._permission_store is None:
+            raise ValidationError("explicit confirmation and a protected permission store are required")
+        target = {target.target: target for target in self._targets()}.get(target_id)
+        if target is None or not target_id.startswith("container:") or not target.checkable:
+            raise ValidationError("only running LXC targets may be authorized")
+        if target.package_manager != "apt" or target.os_name.lower() not in {"debian", "ubuntu"}:
+            raise ValidationError("target is not a proven Debian/Ubuntu apt LXC")
+        if update_authorized and not simulation_authorized:
+            raise ValidationError("real update authorization requires simulation authorization")
+        return self._permission_store.set_permissions(target_id, simulation_authorized=simulation_authorized, update_authorized=update_authorized, metadata={"os_name": target.os_name, "os_version": target.os_version, "package_manager": target.package_manager})
 
     def _check_uncached(self, target: ProbeTarget) -> UpdateResult:
         if target.target.startswith("vm:"):
