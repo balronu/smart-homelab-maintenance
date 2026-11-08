@@ -82,6 +82,7 @@ def plan_allowlist(
     *,
     mode: AuthorizationMode = AuthorizationMode.DISCOVER_ONLY,
     existing_authorized_ids: Iterable[int] = (),
+    manual_authorized_ids: Iterable[int] = (),
 ) -> AllowlistPlan:
     """Plan exact numeric entries without granting permissions implicitly.
 
@@ -94,6 +95,7 @@ def plan_allowlist(
     """
 
     existing = {item for item in existing_authorized_ids if _valid_id(item)}
+    manual = {item for item in manual_authorized_ids if _valid_id(item)}
     normalized: list[AuthorizationDecision] = []
     seen: set[int] = set()
     for raw in records:
@@ -102,12 +104,14 @@ def plan_allowlist(
             continue
         seen.add(container_id)
         ok, reason = _supported(raw)
-        allowed = mode == AuthorizationMode.AUTO_AUTHORIZE_SUPPORTED_RUNNING and ok
+        allowed = (mode == AuthorizationMode.AUTO_AUTHORIZE_SUPPORTED_RUNNING and ok) or (container_id in manual and ok)
         # A previously authorized target remains authorized only while the
         # selected policy still permits it.  Stopped/removed/unknown targets
         # therefore cannot retain guest access by stale inventory.
         if mode == AuthorizationMode.DISCOVER_ONLY:
             allowed = container_id in existing and ok
+            if container_id in manual and ok:
+                allowed = True
             reason = "already-authorized-policy-preserved" if allowed else reason
         normalized.append(AuthorizationDecision(
             container_id=container_id,

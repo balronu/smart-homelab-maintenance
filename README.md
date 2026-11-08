@@ -38,6 +38,27 @@ not enabled in production. VMs are permanently monitoring-only: no VM package
 check, simulation, `pct exec`, or other VM update runner is used. Real package
 installation remains unsupported.
 
+## Phase 35: automatische LXC-Discovery (Draft, kein Release)
+
+Die Entwicklungsarchitektur kennt keine fest eingetragenen CTIDs. Eine
+versionierte Policy verwendet standardmäßig `discover_only`; nur eine
+ausdrücklich gewählte `auto_eligible`-Policy darf nach einer festen,
+lesenden Probe laufende Debian-/Ubuntu-LXCs mit APT als Kandidaten planen.
+Gestoppte Gäste, VMs, fehlende oder veraltete Nachweise und unbekannte Systeme
+bleiben gesperrt. Die Orchestrierung erzeugt zunächst nur einen atomar
+prüfbaren Allowlist-Plan; Helper-Installation, Socket, HA-Onboarding und die
+produktive Anwendung sind noch nicht Bestandteil dieses Draft-Stands.
+
+## Phase 35: automatic LXC discovery (draft, not a release)
+
+The development architecture does not contain hard-coded CTIDs. A versioned
+policy defaults to `discover_only`; only an explicitly selected
+`auto_eligible` policy may plan running Debian/Ubuntu LXCs with APT after a
+fixed read-only probe. Stopped guests, VMs, missing or stale evidence, and
+unknown systems remain blocked. The orchestration first produces an atomic,
+reviewable allowlist plan; helper installation, socket deployment, HA
+onboarding, and production application are not included in this draft.
+
 ## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 
 Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen

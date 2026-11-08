@@ -1,5 +1,15 @@
 # Stable-Abnahme / Stable acceptance
 
+## Phase 35 automation boundary
+
+- [ ] The versioned policy is deployed with `discover_only` as its default.
+- [ ] `auto_eligible` is enabled only through an explicit onboarding action.
+- [ ] Discovery evidence is fresh, bounded, and obtained through the fixed
+      read-only transport; no free shell or VM transport is present.
+- [ ] The serialized allowlist plan is reviewed before any production apply.
+- [ ] Helper/socket deployment, HA onboarding, health reporting, migration,
+      and rollback are tested end-to-end. These remain open for Phase 36.
+
 Diese Checkliste ist ein Prüfvertrag für eine spätere Stable-Freigabe. Sie
 ist keine Installations- oder Aktivierungsfreigabe. Jede Zeile benötigt einen
 nachvollziehbaren PASS, BLOCKED oder NOT RUN-Nachweis; ein fehlender Nachweis

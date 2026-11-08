@@ -4,6 +4,13 @@
 
 ### Deutsch
 
+- Ergänzt die isolierte Phase-35-Orchestrierung mit versionierter,
+  fail-closed Policy (`discover_only` als Standard und ausdrücklich wählbares
+  `auto_eligible`), fester Discovery-Probe und deterministischem Allowlist-Plan.
+- Neue, gestoppte, entfernte, unbekannte oder veraltete Ziele erzeugen keine
+  neue Berechtigung; VMs und ungültige IDs bleiben ausgeschlossen. Die Policy
+  wird atomar und mit sicheren Dateirechten gespeichert.
+
 - Präzisiert den Backend-Status für einen fehlenden oder ungültigen LXC-Helper
   als `helper-unavailable`, getrennt von `unauthorized`, `unsupported` und
   `not_checked`.
@@ -21,6 +28,13 @@
   produktive Aktivierung bleibt separat freigabepflichtig.
 
 ### English
+
+- Adds the isolated Phase 35 orchestration layer with a versioned fail-closed
+  policy (`discover_only` by default and explicitly selectable
+  `auto_eligible`), a fixed discovery probe, and a deterministic allowlist plan.
+- New, stopped, removed, unknown, or stale targets never create new access;
+  VMs and invalid IDs remain excluded. Policy persistence is atomic and uses
+  secure file permissions.
 
 - Reports a missing or invalid LXC helper as `helper-unavailable`, distinct
   from `unauthorized`, `unsupported`, and `not_checked`.
