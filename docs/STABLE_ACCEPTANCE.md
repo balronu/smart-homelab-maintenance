@@ -14,6 +14,8 @@
       recovery, and idempotency tests in an isolated environment.
 - [ ] The orchestration status API and HA policy selector preserve
       `discover_only` on migration and never enable real package actions.
+- [ ] The orchestration API and HA helper-status entity report missing helper,
+      discovery socket, integrity, and policy state without granting access.
 - [ ] Isolated Phase-37 end-to-end acceptance passes for first install,
       repeat install, upgrade/recovery, dynamic container events, VM blocking,
       audit, rollback, API status, and HA options migration.

@@ -3,7 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import stat
+from pathlib import Path
 from typing import Any
+
+
+HELPER_PATH = Path("/usr/libexec/smart-homelab-maintenance/lxc-apt-helper")
+DISCOVERY_PATH = Path("/usr/libexec/smart-homelab-maintenance/lxc-discovery.py")
+HELPER_UNIT_PATH = Path("/etc/systemd/system/smart-homelab-maintenance-lxc-helper.service")
+DISCOVERY_UNIT_PATH = Path("/etc/systemd/system/smart-homelab-maintenance-lxc-discovery.service")
+DISCOVERY_SOCKET_PATH = Path("/run/smart-homelab-maintenance/lxc-discovery.sock")
+ALLOWLIST_PATH = Path("/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml")
 
 
 @dataclass(slots=True)
@@ -24,3 +34,35 @@ class OrchestrationStatus:
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _root_regular(path: Path) -> bool:
+    try:
+        info = path.stat()
+    except OSError:
+        return False
+    return stat.S_ISREG(info.st_mode) and info.st_uid == 0
+
+
+def read_installation_status() -> OrchestrationStatus:
+    """Return non-secret installation state without starting or changing anything."""
+
+    helper_files = (HELPER_PATH, DISCOVERY_PATH, HELPER_UNIT_PATH, DISCOVERY_UNIT_PATH)
+    helper_installed = all(_root_regular(path) for path in helper_files)
+    try:
+        socket_active = DISCOVERY_SOCKET_PATH.is_socket()
+    except OSError:
+        socket_active = False
+    allowlist_ok = True
+    if ALLOWLIST_PATH.exists():
+        try:
+            info = ALLOWLIST_PATH.stat()
+            allowlist_ok = stat.S_ISREG(info.st_mode) and info.st_uid == 0 and info.st_mode & 0o777 in {0o600, 0o640, 0o644}
+        except OSError:
+            allowlist_ok = False
+    return OrchestrationStatus(
+        helper_installed=helper_installed,
+        discovery_socket_active=socket_active,
+        integrity_ok=helper_installed and allowlist_ok,
+        policy_mode="discover_only",
+    )

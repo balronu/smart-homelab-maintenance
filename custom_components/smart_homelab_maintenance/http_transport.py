@@ -218,6 +218,9 @@ class AgentHttpTransport:
     async def capabilities(self) -> dict[str, Any]:
         return await self.get("/api/v1/capabilities")
 
+    async def orchestration(self) -> dict[str, Any]:
+        return await self.get("/api/v1/orchestration")
+
     async def jobs(self) -> dict[str, Any]:
         return await self.get("/api/v1/jobs?limit=100")
 

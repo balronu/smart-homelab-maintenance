@@ -29,6 +29,7 @@ from .jobs import JobRepository
 from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInventoryBackend
 from .updates import AptCommandRunner, AptUpdateReader, RootHelperTransport, UpdateService, make_targets
 from .security import redact_secrets
+from .orchestration_status import read_installation_status
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -142,8 +143,14 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         runner=AptCommandRunner(guest_transport=guest_transport),
         reader=AptUpdateReader(guest_transport=guest_transport),
     )
-    application = ApiApplication(discovery, repository, updates=updates,
-                                read_token=agent_token, max_bytes=config.max_response_bytes)
+    application = ApiApplication(
+        discovery,
+        repository,
+        updates=updates,
+        read_token=agent_token,
+        max_bytes=config.max_response_bytes,
+        orchestration_status=read_installation_status(),
+    )
     return application, repository
 
 

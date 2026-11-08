@@ -80,6 +80,18 @@ Phase 41 documents the read-only Beta.31 rollout gate, the machine-readable
 helper preflight, the single official upgrade path and the fail-closed
 rollback contract. It does not authorize a production upgrade.
 
+Phase 45 exposes the non-secret helper/discovery installation status through
+`/api/v1/orchestration` and the Home Assistant helper-status entity. A missing
+helper is reported as unavailable, not as authorization; `discover_only`
+remains the safe default and no helper, socket or allowlist is activated by
+the integration.
+
+Phase 45 exposes the non-secret helper/discovery installation status through
+`/api/v1/orchestration` and the Home Assistant helper-status entity. A missing
+helper is reported as unavailable rather than authorized; `discover_only`
+remains the safe default and the integration never activates a helper, socket,
+or allowlist by itself.
+
 ## Beta.30: Mobile UI und dauerhafter VM-Ausschluss
 
 Dieser Entwicklungsstand verbessert die mobile Darstellung von Simulationen

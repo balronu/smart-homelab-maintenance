@@ -22,6 +22,9 @@
   fail-closed Quellintegrität werden geprüft, ohne pve-home zu verändern.
 - Ergänzt Phase 41 um einen JSON-Preflight mit eindeutiger GO/NO-GO-Entscheidung
   sowie den read-only Prüf-, Upgrade- und Rückfallvertrag für Beta.31.
+- Ergänzt Phase 45 um eine read-only Orchestrierungs-Statusverdrahtung für
+  Helper, Discovery-Socket, Integrität und `discover_only`; der Status wird in
+  API und Home Assistant angezeigt, ohne produktive Aktivierung.
 
 - Präzisiert den Backend-Status für einen fehlenden oder ungültigen LXC-Helper
   als `helper-unavailable`, getrennt von `unauthorized`, `unsupported` und
@@ -70,6 +73,9 @@
 - Adds the Phase 31 joint plan for all nine running LXCs with per-target
   acceptance, negative tests, abort handling, and a shared security boundary;
   production activation still requires separate approval.
+- Adds Phase 45 read-only orchestration status wiring for helper, discovery
+  socket, integrity, and `discover_only`; API and Home Assistant expose the
+  status without activating production components.
 
 ## 0.1.0-beta.31 – Mobile Aktionszeile und Simulationsgrenzen (Prerelease)
 

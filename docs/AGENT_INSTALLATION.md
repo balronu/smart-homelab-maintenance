@@ -12,6 +12,12 @@ Die zugehörige Abnahme ist in
 beschrieben. Diese Anleitung erklärt den Ablauf; sie ersetzt weder den
 Preflight-Nachweis noch die Freigabe für Apply oder Neustart.
 
+Der read-only Endpunkt `/api/v1/orchestration` meldet den Installationsstatus
+von Helper und Discovery-Socket, die Integritätsprüfung und den Policy-Modus.
+Fehlen Helper oder Socket, lautet der Status `unavailable`; daraus werden keine
+Gastberechtigungen abgeleitet. Home Assistant zeigt denselben Zustand über die
+Helper-Status-Entity. `discover_only` bleibt der sichere Standard.
+
 ## Stable-Vorbereitung: Komponenten und Grenzen
 
 Die Home-Assistant-Integration wird über HACS installiert und aktualisiert;

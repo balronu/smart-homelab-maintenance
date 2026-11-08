@@ -20,7 +20,26 @@ def coordinator_sensors(data: Any) -> tuple[SensorValue, ...]:
         SensorValue("agent_running_jobs", "Laufende Jobs", len([j for j in data.jobs if j.get("state") in {"preflight", "running", "postcheck"}]), {}),
         SensorValue("agent_last_error", "Letzter Fehler", data.error or data.update_error or "none", {}),
         SensorValue("agent_compatibility", "Agent-Kompatibilität", data.compatibility.status, data.compatibility.as_attributes()),
+        SensorValue("agent_helper_status", "LXC-Helper-Status", _helper_status(data.orchestration), _orchestration_attributes(data.orchestration)),
     )
+
+
+def _orchestration_data(value: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        return {}
+    data = value.get("data")
+    return data if isinstance(data, Mapping) else value
+
+
+def _helper_status(value: Mapping[str, Any] | None) -> str:
+    data = _orchestration_data(value)
+    if data.get("helper_installed") is True and data.get("discovery_socket_active") is True and data.get("integrity_ok") is True:
+        return "ready"
+    return "not_installed" if data.get("helper_installed") is False else "unavailable"
+
+
+def _orchestration_attributes(value: Mapping[str, Any] | None) -> dict[str, Any]:
+    return dict(_orchestration_data(value))
 
 
 def container_sensors(container: Mapping[str, Any]) -> tuple[SensorValue, ...]:
@@ -58,6 +77,7 @@ try:
             _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"preflight", "running", "postcheck"}])),
             _ProjectedSensor(coordinator, "agent_last_error", "Last error", lambda d: d.error or "none"),
             _ProjectedSensor(coordinator, "agent_compatibility", "Agent compatibility", lambda d: d.compatibility.status, lambda d: d.compatibility.as_attributes()),
+            _ProjectedSensor(coordinator, "agent_helper_status", "LXC helper status", lambda d: _helper_status(d.orchestration), lambda d: _orchestration_attributes(d.orchestration)),
             _ProjectedSensor(coordinator, "host", "Host", lambda d: d.host.get("name", "unknown") if d.host else "unknown", lambda d: d.host or {}),
         ]
         for vm in coordinator.data.virtual_machines:
