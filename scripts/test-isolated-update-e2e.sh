@@ -117,7 +117,7 @@ case "$1" in
         : ;;
       *) exit 2 ;;
     esac
-    exec /usr/bin/systemd-nspawn -D "$ROOTFS" --quiet "$@"
+    exec /usr/bin/systemd-nspawn -D "$ROOTFS" --quiet --register=no "$@"
     ;;
   *) exit 2 ;;
 esac
