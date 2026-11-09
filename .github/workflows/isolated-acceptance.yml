@@ -1,0 +1,22 @@
+name: Isolated RC1 package acceptance
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  debian-systemd-apt-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install disposable-environment prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y debootstrap dpkg-dev systemd-container
+      - name: Run isolated RC1 acceptance
+        env:
+          GITHUB_STEP_SUMMARY: ${{ github.step_summary }}
+        run: sudo scripts/test-isolated-update-e2e.sh
