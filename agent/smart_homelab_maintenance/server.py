@@ -171,6 +171,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
             require_root=True,
             privileged_transport=policy_transport,
         ),
+        jobs=repository,
     )
     application = ApiApplication(
         discovery,

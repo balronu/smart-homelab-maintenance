@@ -16,7 +16,7 @@ from .types import JobPhase, JobRequest, JobState, TERMINAL_STATES, Verification
 _ACTIVE = (JobState.PREFLIGHT, JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.POSTCHECK)
 _TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     JobState.QUEUED: frozenset({JobState.PREFLIGHT, JobState.CANCELLED, JobState.BLOCKED}),
-    JobState.PREFLIGHT: frozenset({JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.BLOCKED, JobState.FAILED}),
+    JobState.PREFLIGHT: frozenset({JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.BLOCKED, JobState.FAILED, JobState.MANUAL_RECOVERY}),
     JobState.WAITING_CONFIRMATION: frozenset({JobState.RUNNING, JobState.CANCELLED, JobState.BLOCKED}),
     JobState.RUNNING: frozenset({JobState.POSTCHECK, JobState.FAILED, JobState.TIMEOUT, JobState.MANUAL_RECOVERY}),
     JobState.POSTCHECK: frozenset({JobState.SUCCEEDED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.TIMEOUT}),

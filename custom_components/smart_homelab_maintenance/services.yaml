@@ -92,6 +92,12 @@ execute:
       required: true
       selector:
         text:
+    install_confirmed:
+      name: Confirm installation separately
+      description: Required second confirmation that packages may actually be installed.
+      required: true
+      selector:
+        boolean:
 set_permissions:
   name: Set LXC permissions
   description: Explicitly grant or revoke simulation and real-update permissions for one running LXC.

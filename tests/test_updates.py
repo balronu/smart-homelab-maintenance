@@ -279,22 +279,22 @@ def test_real_update_requires_explicit_permission_fresh_plan_and_confirmation():
     assert result.update_authorized is True and result.update_supported is True
     # Validation is deliberately raised before any guest call.
     runner.calls.clear()
-    with pytest.raises(ValidationError, match="explicit confirmation"):
+    with pytest.raises(ValidationError, match="explicit.*confirmation"):
         checked.execute_update("container:107", confirmed=False, plan_digest=result.plan_digest)
-    success = checked.execute_update("container:107", confirmed=True, plan_digest=result.plan_digest)
+    success = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=result.plan_digest)
     assert success["success"] is True and success["operation"] == "update"
     assert ("update", 107) in runner.calls
-    stale = checked.execute_update("container:107", confirmed=True, plan_digest="wrong-digest")
+    stale = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest="wrong-digest")
     assert stale["success"] is False and "stale" in stale["error"]
 
 
 def test_real_update_is_disabled_or_rejected_for_unauthorized_and_vm_targets():
     runner = Runner("Inst curl [1] (2)")
     disabled = UpdateService(lambda: (target(),), runner=runner, execution_enabled=False)
-    assert disabled.execute_update("container:107", confirmed=True, plan_digest="x")["error"] == "update execution is disabled"
+    assert disabled.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest="x")["error"] == "update execution is disabled"
     vm = ProbeTarget("vm:104", "haos", 104, "Home Assistant OS", "unknown", None, True, True, True)
     enabled = UpdateService(lambda: (vm,), runner=runner, execution_enabled=True)
-    result = enabled.execute_update("vm:104", confirmed=True, plan_digest="x")
+    result = enabled.execute_update("vm:104", confirmed=True, install_confirmed=True, plan_digest="x")
     assert result["success"] is False and "only authorized LXC" in result["error"]
     assert runner.calls == []
 
@@ -309,7 +309,7 @@ def test_api_execute_returns_structured_update_result_after_fresh_check():
         headers = {"Authorization": "Bearer token"}
         _, check_body = api.handle("GET", "/api/v1/updates/container:107", headers=headers)
         digest = check_body["data"]["plan_digest"]
-        status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=(f'{{"confirm":true,"plan_digest":"{digest}"}}').encode())
+        status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=(f'{{"confirm":true,"install_confirmed":true,"plan_digest":"{digest}"}}').encode())
         assert status == 200 and body["data"]["success"] is True
         assert [step["name"] for step in body["data"]["steps"]] == ["apt-update", "apt-upgrade"]
         repo.close()
@@ -381,6 +381,30 @@ def test_api_exposes_dry_run_and_rejects_future_execution():
         assert status == 200 and body["data"]["status"] == "updates_available"
         status, body = api.handle("POST", "/api/v1/updates/container:107/dry-run", headers=headers, body=b'{"confirm":true}')
         assert status == 200 and body["data"]["simulation"] is True
-        status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=b'{}')
+        status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=b'{"confirm":true}')
         assert status == 400 and body["error"]["code"] == "invalid_request"
         repo.close()
+
+
+def test_execute_requires_a_separate_installation_confirmation():
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True)
+    plan = checked.check("container:107")
+    with pytest.raises(ValidationError, match="both required"):
+        checked.execute_update("container:107", confirmed=True, plan_digest=plan.plan_digest)
+    assert runner.calls == [107]
+
+
+def test_execute_revalidates_simulation_before_mutation_and_persists_job(tmp_path):
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    result = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
+    assert result["success"] is True and result["job_id"]
+    stored = jobs.get(result["job_id"])
+    assert stored["state"] == "succeeded"
+    assert [call for call in runner.calls if call == 107] == [107, 107, 107]
+    jobs.close()
