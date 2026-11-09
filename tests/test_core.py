@@ -402,6 +402,7 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(service.app("paperless").update_supported)
 
     def test_agent_compatibility_is_conservative(self) -> None:
+        self.assertEqual(evaluate_agent("0.1.0-beta.49", "1.1").status, "current")
         self.assertEqual(evaluate_agent("0.1.0-beta.37", "1.1").status, "current")
         self.assertEqual(evaluate_agent("0.1.0-beta.38", "1.1").status, "current")
         self.assertEqual(evaluate_agent("0.1.0-beta.36", "1.1").status, "current")
