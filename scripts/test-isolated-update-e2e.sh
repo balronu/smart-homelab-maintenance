@@ -85,7 +85,7 @@ cp "$WORK/smh-e2e-fixture_1.0_all.deb" "$ROOTFS/opt/smh-repo/"
 cp "$WORK/smh-e2e-fixture_2.0_all.deb" "$ROOTFS/opt/smh-repo/"
 (
   cd "$ROOTFS/opt/smh-repo"
-  dpkg-scanpackages . /dev/null > Packages
+  dpkg-scanpackages --multiversion . /dev/null > Packages
   gzip -9c Packages > Packages.gz
 )
 mkdir -p "$ROOTFS/etc/apt/sources.list.d"
@@ -188,7 +188,7 @@ assert status == 200 and result["success"] and result["returncode"] == 0, result
 assert result["postcheck"]["performed"] is True and result["postcheck"]["remaining_packages"] == 0, result
 assert result["status"] == "succeeded" and result["job_id"]
 job = call("GET", "/api/v1/jobs/" + result["job_id"])[1]
-assert job["state"] == JobState.SUCCEEDED.value and job["verification"]["postcheck_passed"] is True, job
+assert job["state"] == JobState.SUCCEEDED.value and job["preflight_verified"] == 1 and job["postcheck_verified"] == 1, job
 events = call("GET", f"/api/v1/jobs/{result['job_id']}/events?after=0&limit=50")[1]
 assert events["events"]
 status, revoked = call("POST", "/api/v1/updates/container:321/permissions", {"confirm": True, "simulation_authorized": False, "update_authorized": False})
