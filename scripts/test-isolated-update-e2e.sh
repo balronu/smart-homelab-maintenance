@@ -132,7 +132,7 @@ EOF
 systemctl daemon-reload
 "$ROOT_DIR/scripts/install-lxc-helper.sh" --source-dir "$ROOT_DIR" --expected-commit "$(git -C "$ROOT_DIR" rev-parse HEAD)" --apply --start
 
-runuser -u "$SERVICE_USER" -- env PYTHONPATH="$ROOT_DIR/agent" ROOT_DIR="$ROOT_DIR" WORK="$WORK" python3 - <<'PY'
+runuser -u "$SERVICE_USER" -- python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); exec(compile(sys.stdin.read(), "<phase56-agent-test>", "exec"))' "$ROOT_DIR/agent" "$WORK" <<'PY'
 import json, os
 from pathlib import Path
 
@@ -146,7 +146,7 @@ from smart_homelab_maintenance.updates import AptCommandRunner, AptUpdateReader,
 token = "phase56-test-token"
 transport = RootHelperTransport()
 target = ProbeTarget("container:321", "phase56-debian", 321, "Debian", "12", "apt", False, True, False)
-jobs = JobRepository(str(Path(os.environ["WORK"]) / "jobs.sqlite"))
+jobs = JobRepository(str(Path(__import__("sys").argv[2]) / "jobs.sqlite"))
 service = UpdateService(
     lambda: [target], runner=AptCommandRunner(guest_transport=transport),
     reader=AptUpdateReader(guest_transport=transport), execution_enabled=True,
@@ -188,7 +188,7 @@ print(json.dumps({"agent_api": "PASS", "package": "smh-e2e-fixture", "job_id": r
 PY
 
 systemctl stop "${AGENT_NAME}-lxc-helper.service"
-if runuser -u "$SERVICE_USER" -- env PYTHONPATH="$ROOT_DIR/agent" python3 - <<'PY'
+if runuser -u "$SERVICE_USER" -- python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); exec(compile(sys.stdin.read(), "<phase56-outage-test>", "exec"))' "$ROOT_DIR/agent" <<'PY'
 from smart_homelab_maintenance.updates import RootHelperTransport, GuestHelperUnavailableError
 try:
     RootHelperTransport().read(321)
