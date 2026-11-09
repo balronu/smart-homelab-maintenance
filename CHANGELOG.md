@@ -1,6 +1,6 @@
 # Changelog
 
-## Stable-readiness candidate after Beta.49
+## 1.0.0-rc.1 – Release Candidate
 
 ### Deutsch
 
@@ -26,8 +26,8 @@
   `manual_recovery_required` with no retry or automatic repair.
 - Browser regression coverage checks the two-step installation confirmation.
 
-This is a PR candidate only. Merge, Stable publication, and productive testing
-require separate approval.
+This is a Release Candidate, not a Stable release. Productive installation and
+real package actions remain separately gated.
 
 ## 0.1.0-beta.49 – Controlled LXC orchestration
 
