@@ -1,5 +1,18 @@
 # Smart Homelab Maintenance
 
+## Beta.47 eligibility-metadata fix / Beta.47-Eligibility-Metadaten-Fix
+
+Beta.47 übernimmt nach einer gespeicherten Freigabe die nachgewiesenen
+Debian-/Ubuntu- und APT-Metadaten in den Update-Zieltyp. Dadurch bleiben geeignete
+Container nach dem Coordinator-Refresh nicht mehr fälschlich „Nicht unterstützt“.
+Serviceantworten mit eingebetteten Fehlern werden sichtbar angezeigt. `discover_only`
+bleibt sicher und führt weiterhin keine Gastprobe oder automatische Freigabe aus.
+
+Beta.47 carries proven Debian/Ubuntu and APT metadata into the update target after
+a stored grant, so eligible containers are not incorrectly shown as unsupported
+after a coordinator refresh. Embedded service errors are shown visibly. The
+`discover_only` mode remains safe and performs no guest probe or automatic grant.
+
 ## Beta.46 permission-feedback fix / Beta.46-Berechtigungs-Feedback-Fix
 
 Beta.46 macht Fehler und Erfolge der LXC-Berechtigungsänderung

@@ -189,7 +189,7 @@ async def test_inventory_entities_are_added_after_initial_inventory_failure(hass
     async def fake_jobs(self): return {"schema_version": "1", "data": {"items": []}}
     async def fake_capabilities(self): return {"schema_version": "1", "data": {"execution_enabled": False}}
     async def fake_updates(self): return {"schema_version": "1", "data": {"items": []}}
-    async def fake_health(self): return {"schema_version": "1", "data": {"agent_version": "0.1.0-beta.46", "api_contract": "1.1"}}
+    async def fake_health(self): return {"schema_version": "1", "data": {"agent_version": "0.1.0-beta.47", "api_contract": "1.1"}}
     async def fake_orchestration(self): return {"schema_version": "1", "data": {"status": "ok", "helper_installed": True, "discovery_socket_active": True, "integrity_ok": True}}
 
     monkeypatch.setattr(AgentHttpTransport, "host", fake_host)
