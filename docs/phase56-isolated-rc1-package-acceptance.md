@@ -21,9 +21,11 @@ confirmation, API health/capabilities, and helper outage handling.
 GitHub-hosted Actions cannot provide a Proxmox node, `/usr/sbin/pct`, the
 Proxmox IPC socket, or a real LXC namespace. The workflow therefore installs a
 fixed, disposable `/usr/sbin/pct` adapter that accepts only container ID 321,
-`status`, and the helper's fixed commands, then executes those commands in the
-Debian rootfs through `systemd-nspawn`. It does **not** accept free-form guest
-commands and it is removed during cleanup.
+`status`, and the helper's fixed commands, then executes those commands via a
+bounded `chroot` into the Debian rootfs. `systemd-nspawn` is used for rootfs
+preparation, but its nested machine setup is incompatible with the helper
+unit's production-like sandbox on the hosted runner. The adapter does **not**
+accept free-form guest commands and it is removed during cleanup.
 
 Consequently this is a real Debian/APT/dpkg/systemd/helper/API acceptance, but
 not a claim of Proxmox `pct` or real-LXC compatibility. A non-production
