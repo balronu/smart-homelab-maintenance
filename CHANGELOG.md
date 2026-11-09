@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.0.0 – Stable
+
+### Deutsch
+
+- Veröffentlicht den fail-closed Update-Workflow mit persistenter Job-ID,
+  Fortschritt, Postcheck und `manual_recovery_required` bei unklarem Zustand.
+- Erzwingt eine frische Simulation, einen unveränderten Plan-Digest, getrennte
+  Simulations-/Updateberechtigungen und eine separate Installationsbestätigung.
+- Behält `execution_enabled=false` als sicheren Standard bei; Aktivierung und
+  Dienstneustart bleiben bewusste administrative Schritte.
+- Aktualisiert Agent-/Integrationsversion auf `1.0.0` und hält RC-/Beta-Agenten
+  mit API 1.1 während des Übergangs kompatibel.
+- Dokumentiert die externe echte Proxmox-LXC-Abnahmeplanung sowie die Desktop-
+  und iPhone/iPad-Abnahme. Der echte Proxmox-LXC-Pakettest wurde nicht
+  durchgeführt und ist keine bestandene Stable-Abnahme.
+
+### English
+
+- Publishes the fail-closed update workflow with persistent job IDs, progress,
+  postchecks, and `manual_recovery_required` for uncertain states.
+- Requires a fresh simulation, unchanged plan digest, separate simulation/update
+  permissions, and a separate installation confirmation.
+- Keeps `execution_enabled=false` as the safe default; activation and service
+  restart remain deliberate administrative steps.
+- Updates the agent/integration version to `1.0.0` and keeps RC/Beta agents
+  using API 1.1 compatible during the transition.
+- Documents the external real-Proxmox-LXC acceptance plan and desktop/iPhone/
+  iPad acceptance. The real Proxmox-LXC package test was not performed and is
+  not represented as passed Stable acceptance.
+
+**Compatibility / migration:** update the HA integration and the independently
+managed agent from the same Stable commit. Existing API 1.1 RC/Beta agents are
+recognized during transition; do not enable execution solely because the
+integration was updated.
+
+**Post-update step:** verify `/api/v1/health`, `/api/v1/capabilities`, TLS,
+`execution_enabled=false`, and the selected LXC's read-only status before any
+administrative activation.
+
+**Known limitation:** no productive installation was performed and no real
+Proxmox-LXC package transaction was executed for this release.
+
 ## 1.0.0-rc.1 – Release Candidate
 
 ### Deutsch

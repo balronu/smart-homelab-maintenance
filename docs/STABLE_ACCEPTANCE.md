@@ -93,15 +93,16 @@ RUN evidence. VMs are permanently monitoring-only, LXC simulation requires
 explicit reviewed authorization; real updates remain disabled by default and
 require a fresh digest and explicit confirmation.
 
-## Offene Stable-Entscheidungen / Open Stable decisions
+## Nach Stable offene Entscheidungen / Open post-Stable decisions
 
-- Stable needs a separately approved release and production rollout window.
+- Stable publication is complete; productive rollout remains a separate
+  operator decision.
 - LXC helper/allowlist enablement remains a separate security decision.
 - The Phase 31 joint activation plan is documented in
   `docs/phase31-lxc-activation-plan.md`; it is not an activation approval.
 - VM package checks and simulations are permanently out of scope.
-- A GitHub prerelease does not authorize installation in Home Assistant or on
-  the Proxmox host.
+- A GitHub release does not authorize installation in Home Assistant or on the
+  Proxmox host. The real Proxmox-LXC package transaction remains NOT RUN.
 
 ## Beta.31 evidence status / Beta.31-Nachweisstatus
 
