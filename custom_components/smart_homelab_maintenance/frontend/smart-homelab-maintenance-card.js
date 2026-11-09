@@ -9,7 +9,7 @@ export function resolveLanguage(hass) {
 }
 const textFor = (language) => language === "de" ? { connected: "Verbunden", offline: "Agent nicht erreichbar", hostOffline: "Host offline", overview: "Übersicht", host: "Proxmox-Host", lastUpdated: "Letzte Aktualisierung", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung", running: "laufend", stopped: "gestoppt", unknown: "unbekannt", cpu: "CPU", memory: "RAM", storage: "Speicher", availableMemory: "Freier RAM", freeStorage: "Freier Speicher", version: "Version", kernel: "Kernel", uptime: "Laufzeit", jobs: "Laufende Jobs", noData: "Keine Daten verfügbar", noVms: "Keine VMs erkannt", noContainers: "Keine Container erkannt", error: "Fehler", readOnly: "Nur-Lese-Modus", updates: "Updates", simulate: "Update simulieren", install: "Updates installieren", installConfirm: "Die Simulation ist bestanden. Soll dieses konkrete Paket-Update jetzt wirklich installiert werden?", installDisabled: "Updatefunktion noch nicht freigegeben", simulateDisabled: "Simulation nicht verfügbar", unauthorizedReason: "Simulation nicht verfügbar: Ziel nicht autorisiert", helperUnavailableReason: "Simulation nicht verfügbar: Helper nicht eingerichtet", stoppedReason: "Simulation nicht verfügbar: Container ist gestoppt", unsupportedReason: "Simulation nicht verfügbar: Ziel nicht unterstützt", staleReason: "Simulation nicht verfügbar: Prüfdaten veraltet", notCheckedReason: "Simulation nicht verfügbar: Ziel noch nicht geprüft", vmExclusion: "Updates dieser virtuellen Maschine werden nicht über Smart Homelab Maintenance durchgeführt. Bitte die Updatefunktion des jeweiligen Gastbetriebssystems verwenden.", noUpdatesReason: "Keine verfügbaren Updates für die Simulation", current: "Aktuell", updatesAvailable: "verfügbar", notChecked: "Noch nicht geprüft", unsupported: "Nicht unterstützt", unauthorized: "Nicht autorisiert", failed: "Prüfung fehlgeschlagen", stale: "Daten veraltet", unknownUpdate: "Unbekannt", security: "Sicherheitsupdates", checked: "Letzte Prüfung", simulation: "Simulation", compatibility: "Agent-Kompatibilität", compatibilityCurrent: "Aktuell", compatibilityOutdated: "Veraltet", compatibilityIncompatible: "Inkompatibel", compatibilityUnknown: "Unbekannt" } : { connected: "Connected", offline: "Agent unreachable", hostOffline: "Host offline", overview: "Overview", host: "Proxmox host", lastUpdated: "Last updated", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance", running: "running", stopped: "stopped", unknown: "unknown", cpu: "CPU", memory: "RAM", storage: "Storage", availableMemory: "Free RAM", freeStorage: "Free storage", version: "Version", kernel: "Kernel", uptime: "Uptime", jobs: "Running jobs", noData: "No data available", noVms: "No virtual machines detected", noContainers: "No containers detected", error: "Error", readOnly: "Read-only mode", updates: "Updates", simulate: "Simulate update", install: "Install updates", installConfirm: "The simulation passed. Do you really want to install this specific package update now?", installDisabled: "Update function not released", simulateDisabled: "Simulation unavailable", unauthorizedReason: "Simulation unavailable: target is not authorized", helperUnavailableReason: "Simulation unavailable: helper is not configured", stoppedReason: "Simulation unavailable: container is stopped", unsupportedReason: "Simulation unavailable: target is not supported", staleReason: "Simulation unavailable: check data is stale", notCheckedReason: "Simulation unavailable: target has not been checked", vmExclusion: "Updates for this virtual machine are not performed through Smart Homelab Maintenance. Please use the update function of the respective guest operating system.", noUpdatesReason: "No updates are available for simulation", current: "Up to date", updatesAvailable: "available", notChecked: "Not checked", unsupported: "Not supported", unauthorized: "Not authorized", failed: "Check failed", stale: "Data is stale", unknownUpdate: "Unknown", security: "security updates", checked: "Last checked", simulation: "Simulation", compatibility: "Agent compatibility", compatibilityCurrent: "Current", compatibilityOutdated: "Outdated", compatibilityIncompatible: "Incompatible", compatibilityUnknown: "Unknown" };
 const editorText = (language) => language === "de" ? { title: "Titel", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung" } : { title: "Title", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance" };
-const permissionText = (language) => language === "de" ? { allowSimulation: "Simulation freigeben", revokeSimulation: "Simulation widerrufen", allowUpdates: "Updates freigeben", revokeUpdates: "Updates widerrufen", permissionConfirm: "Berechtigung wirklich ändern?", permissionRunning: "Berechtigung wird geändert …", permissionSuccess: "Berechtigung erfolgreich geändert.", permissionFailed: "Berechtigungsänderung fehlgeschlagen" } : { allowSimulation: "Allow simulation", revokeSimulation: "Revoke simulation", allowUpdates: "Allow updates", revokeUpdates: "Revoke updates", permissionConfirm: "Really change this permission?", permissionRunning: "Changing permission …", permissionSuccess: "Permission changed successfully.", permissionFailed: "Permission change failed" };
+const permissionText = (language) => language === "de" ? { allowSimulation: "Simulation freigeben", revokeSimulation: "Simulation widerrufen", allowUpdates: "Updates freigeben", revokeUpdates: "Updates widerrufen", permissionConfirm: "Berechtigung wirklich ändern?", permissionRunning: "Berechtigung wird geändert …", permissionSuccess: "Berechtigung erfolgreich geändert.", permissionFailed: "Berechtigungsänderung fehlgeschlagen", permissionReadbackFailed: "Berechtigung geändert, aber der bestätigte Rückread fehlt." } : { allowSimulation: "Allow simulation", revokeSimulation: "Revoke simulation", allowUpdates: "Allow updates", revokeUpdates: "Revoke updates", permissionConfirm: "Really change this permission?", permissionRunning: "Changing permission …", permissionSuccess: "Permission changed successfully.", permissionFailed: "Permission change failed", permissionReadbackFailed: "Permission changed, but the confirmed readback is missing." };
 const esc = (value) => String(value ?? "").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 const bytes = (value) => { if (!Number.isFinite(Number(value))) return null; const units = ["B", "KB", "MB", "GB", "TB"]; let n = Number(value); let i = 0; while (Math.abs(n) >= 1024 && i < units.length - 1) { n /= 1024; i += 1; } return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${units[i]}`; };
 const finiteMetric = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
@@ -41,7 +41,7 @@ const editorCss = `:host{display:block;box-sizing:border-box;color:var(--primary
 const premiumCss = `.card{background:linear-gradient(145deg,var(--ha-card-background,var(--card-background-color)),color-mix(in srgb,var(--ha-card-background,var(--card-background-color)) 86%,var(--primary-color,#03a9f4)));border:1px solid color-mix(in srgb,var(--divider-color,#ddd) 70%,transparent);}.header{padding-bottom:4px}.status{padding:5px 9px;border-radius:999px;background:var(--secondary-background-color);}.status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--success-color,#43a047) 18%,transparent)}.offline .status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--error-color,#db4437) 18%,transparent)}.section{border-top:1px solid color-mix(in srgb,var(--divider-color,#ddd) 55%,transparent);padding-top:14px}.item{background:color-mix(in srgb,var(--card-background-color,#fff) 76%,transparent);transition:border-color .18s ease,background .18s ease}.item[open]{border-color:color-mix(in srgb,var(--primary-color,#03a9f4) 55%,var(--divider-color,#ddd));background:color-mix(in srgb,var(--primary-color,#03a9f4) 5%,var(--card-background-color,#fff))}.item>summary{list-style:none}.item>summary::-webkit-details-marker{display:none}.item-head{cursor:pointer;padding:0}.item-head::after{content:"+";color:var(--secondary-text-color);font-weight:700}.item[open]>.item-head::after{content:"−"}.item-body{padding-top:10px}.metric strong{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){.item{transition:none}}`;
 const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch;margin-top:10px}.action-row button{width:100%;min-width:0;height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.vm-exclusion{margin:10px 0 0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--secondary-background-color);overflow-wrap:anywhere}.simulation-result,.permission-result{margin-top:8px;min-width:0;overflow-wrap:anywhere}.simulation-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.simulation-summary strong{font-size:1.05em}.package-list{margin-top:8px}.package-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:5px 0;border-top:1px solid var(--divider-color,#ddd);min-width:0}.package-name,.package-version{min-width:0;overflow-wrap:anywhere;word-break:break-word}@media(max-width:600px){.simulation-summary{grid-template-columns:1fr}.package-row{grid-template-columns:1fr}.action-row button{font-size:.92em}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
-  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._lastSize = null; this._resizeObserver = null; }
+  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._updateSnapshots = new Map(); this._lastSize = null; this._resizeObserver = null; }
   connectedCallback() { this._ensureShell(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
   disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; }
   setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
@@ -99,6 +99,37 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   static getConfigElement() { return document.createElement("smart-homelab-maintenance-card-editor"); }
   static getStubConfig() { return { title: "Smart Homelab Maintenance", show_vms: true, show_containers: true }; }
 }
+const originalUpdateItems = SmartHomelabMaintenanceCard.prototype._updateItems;
+SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labels, prefix) {
+  const normalized = items.map((item) => {
+    const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id);
+    const target = `${kind}:${id}`;
+    const base = item.update === null ? { status: "not_checked" } : (item.update || {});
+    const override = this._permissionOverrides.get(target);
+    const hasPermissionFields = typeof base.simulation_authorized === "boolean" || typeof base.update_authorized === "boolean";
+    const snapshot = hasPermissionFields && override ? this._updateSnapshots.get(target) : null;
+    if (!snapshot) this._updateSnapshots.delete(target);
+    if (override && samePermissions(base, override) && ["updates_available", "current"].includes(base.status)) this._permissionOverrides.delete(target);
+    const effectiveOverride = hasPermissionFields ? override : null;
+    return { ...item, __permissionSnapshot: Boolean(base.status === "not_checked" && snapshot && effectiveOverride), __permissionOverridePending: Boolean(effectiveOverride && !samePermissions(base, effectiveOverride)), __permissionOverride: effectiveOverride, update: { ...(base.status === "not_checked" && snapshot ? snapshot : base), ...(effectiveOverride || {}) } };
+  });
+  originalUpdateItems.call(this, kind, normalized, labels, prefix);
+  normalized.forEach((item) => {
+    const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id);
+    const refs = this._items[kind].get(id);
+    if (!refs || kind === "vm") return;
+    const target = `${kind}:${id}`;
+    const update = item.update || {};
+    if (item.__permissionSnapshot && this._permissionOverrides.has(`${kind}:${id}`)) this._permissionOverrides.set(`${kind}:${id}`, { ...this._permissionOverrides.get(`${kind}:${id}`) });
+    if (item.__permissionOverridePending && item.__permissionOverride) this._permissionOverrides.set(`${kind}:${id}`, { ...item.__permissionOverride });
+    if (["updates_available", "current"].includes(update.status)) this._updateSnapshots.set(target, { ...update });
+    if (refs.simulationPermission) {
+      const simulationAuthorized = update.simulation_authorized === true || update.authorized === true;
+      refs.simulationPermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: update.update_authorized === true };
+    }
+  });
+};
+
 export class SmartHomelabMaintenanceCardEditor extends HTMLElement {
   constructor() { super(); this.config = { ...DEFAULTS }; this._rendered = false; this._hass = undefined; }
   set hass(value) { this._hass = value; this.render(); }
@@ -204,6 +235,13 @@ function permissionResponseError(response) {
   }
   return null;
 }
+function permissionResponseData(response) {
+  const candidates = [response?.response?.data, response?.data, response?.response, response];
+  return candidates.find((candidate) => candidate && typeof candidate === "object" && typeof candidate.simulation_authorized === "boolean" && typeof candidate.update_authorized === "boolean") || null;
+}
+function samePermissions(left, right) {
+  return Boolean(left && right) && left.simulation_authorized === right.simulation_authorized && left.update_authorized === right.update_authorized;
+}
 SmartHomelabMaintenanceCard.prototype._permissionButton = function (target, permission, result) {
   const button = document.createElement("button");
   button.className = "permission";
@@ -235,7 +273,10 @@ SmartHomelabMaintenanceCard.prototype._permissionButton = function (target, perm
       ]);
       const responseError = permissionResponseError(response);
       if (responseError) throw new Error(responseError);
-      button._permissions = next;
+      const readback = permissionResponseData(response);
+      if (!samePermissions(readback, next)) throw new Error(labels.permissionReadbackFailed);
+      this._permissionOverrides.set(target, { ...readback });
+      this.render();
       result.textContent = labels.permissionSuccess;
     } catch (error) {
       result.textContent = `${labels.permissionFailed}: ${error?.message || "unknown error"}`;
@@ -318,6 +359,19 @@ SmartHomelabMaintenanceCard.prototype._dryRunButton = function (target) {
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Zeitüberschreitung bei der Simulation.")), Number(globalThis.__SMART_HOMELAB_DRY_RUN_TIMEOUT_MS__) || DRY_RUN_TIMEOUT_MS); }),
       ]);
       renderDryRunResult(result, response, resolveLanguage(this._hass) === "de");
+      const data = dryRunData(response);
+      if (data?.success === true && data?.safe === true && target.startsWith("container:")) {
+        const current = button._update || {};
+        this._updateSnapshots.set(target, {
+          ...current,
+          status: Array.isArray(data.packages) && data.packages.length ? "updates_available" : "current",
+          available_count: Array.isArray(data.packages) ? data.packages.length : current.available_count,
+          packages: data.packages || current.packages,
+          plan_digest: data.plan_digest || current.plan_digest,
+          fresh: true,
+          dry_run: data,
+        });
+      }
       result.classList.toggle("warning", Boolean(dryRunData(response)?.success === false || dryRunData(response)?.safe === false));
     } catch (error) {
       result.textContent = `Simulation fehlgeschlagen: ${localizedDryRunError(error?.message || "unbekannter Servicefehler", resolveLanguage(this._hass) === "de")}`;
