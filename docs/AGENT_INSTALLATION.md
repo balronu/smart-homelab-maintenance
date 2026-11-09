@@ -1,11 +1,10 @@
 # Agent-Installation
 
 Dieses Dokument beschreibt den kontrollierten Installationsweg des
-Smart-Homelab-Maintenance-Agenten auf Proxmox. Es ist eine Stable-
-Vorbereitungsanleitung, keine Installationsfreigabe. Die aktuelle Anwendung
-bleibt read-only und der Installationspfad serverseitig deaktiviert; jede
-produktive Installation, jedes Upgrade und jeder Dienstneustart benötigen
-eine eigene Freigabe.
+Smart-Homelab-Maintenance-Agenten auf Proxmox. Es ist die Stable-
+Installations- und Aktivierungsanleitung. Die globale Ausführungssperre bleibt
+standardmäßig aktiv; jede produktive Installation, jedes Upgrade und jeder
+Dienstneustart benötigen weiterhin eine bewusste administrative Entscheidung.
 
 Die zugehörige Abnahme ist in
 [`docs/STABLE_ACCEPTANCE.md`](STABLE_ACCEPTANCE.md) als getrennte Checkliste
@@ -40,7 +39,7 @@ Die Funktionsmatrix bleibt klar begrenzt:
 | Proxmox-Host | passiver Check und fester APT-Dry-Run | nur mit frischem Plan, TLS/API und Sicherheitsprüfung |
 | LXC | vorbereiteter fester Helper-Pfad | laufend, OS/Paketmanager nachgewiesen, pro Ziel allowlistet |
 | VM | dauerhaft ausgeschlossen | Karte zeigt Name/Status/Ressourcen und einen DE/EN-Hinweis; niemals `pct exec` oder einen anderen Update-Runner verwenden |
-| Paketinstallation | nicht unterstützt | UI und API bleiben dauerhaft deaktiviert |
+| Paketinstallation | opt-in unterstützt | UI/API bleiben bis zur administrativen Aktivierung deaktiviert |
 
 Installation, Update und Rollback sind getrennt zu dokumentieren. Ein
 erfolgreicher Healthcheck des neuen Agenten ist kein Ersatz für die HA-
@@ -347,7 +346,9 @@ GET /api/v1/capabilities        (Bearer-Token)
 GET /api/v1/containers           (Bearer-Token)
 ```
 
-Es werden keine Update- oder Shell-Endpunkte angeboten.
+Update-Endpunkte sind vorhanden, aber authentifiziert und bis zur globalen
+Ausführungsschaltung sowie den getrennten Zielberechtigungen gesperrt. Freie
+Shell-Endpunkte gibt es nicht.
 
 ## 7. Funktionstest
 
@@ -358,6 +359,34 @@ dynamische Container/VMs und `execution_enabled=false`.
 
 Ein Test gegen VM 104 oder produktive Container ist kein Ersatz für diese
 Abnahme und benötigt eine eigene Freigabe.
+
+## 7a. Bewusste administrative Aktivierung
+
+Der sichere Standard bleibt `execution_enabled = false`. Für einen bewusst
+ausgewählten, nicht anderweitig geschützten LXC ist der Ablauf:
+
+1. Integration und Agent aus demselben geprüften Stable-Commit installieren;
+   Health, API 1.1, TLS und `/api/v1/capabilities` read-only prüfen.
+2. In der Agent-Konfiguration `execution_enabled = true` setzen. Diese Änderung
+   wird nicht automatisch vorgenommen; danach den Agent-Dienst bewusst neu
+   starten und die effektive Konfiguration read-backen.
+3. In der HA-Karte genau einen laufenden Debian-/Ubuntu-LXC auswählen, zuerst
+   die Simulation autorisieren und separat die Updateberechtigung erteilen.
+   VMs, gestoppte oder nicht geeignete Ziele bleiben gesperrt.
+4. Simulation ausführen, Paketdetails und Plan-Digest prüfen, danach die
+   Installation in einem separaten Dialog bestätigen. Ein frischer Plan ist
+   Pflicht; stale oder unklare Jobs blockieren weitere Installationen.
+5. Job-ID, Ereignisse, Fortschritt, Exit-Code, Postcheck und Ergebnis prüfen.
+   Bei Timeout, Transportverlust oder unklarem Status nicht wiederholen und
+   keine automatische Paketmanager-Reparatur ausführen; manuelle Recovery ist
+   erforderlich.
+6. Nach dem kontrollierten Lauf die Update- und Simulationsberechtigung wieder
+   entziehen. Wenn keine weitere Abnahme geplant ist, `execution_enabled = false`
+   setzen, den Dienst bewusst neu starten und den Read-back verifizieren.
+
+Dieser Ablauf ist eine Bedienungsanleitung, keine bereits ausgeführte
+Produktivabnahme. VM104 und `pve-home` wurden für diese Stable-Veröffentlichung
+nicht verändert.
 
 ## 8. Fehlerbehandlung
 

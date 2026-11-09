@@ -1,28 +1,31 @@
 # Smart Homelab Maintenance
 
-## v1.0.0-rc.1 – Release Candidate / Release-Kandidat
+## v1.0.0 – Stable
 
 ### Deutsch
 
-Der Release-Kandidat bündelt die kontrollierte LXC-Orchestrierung aus Beta.49
+Stable bündelt die kontrollierte LXC-Orchestrierung aus Beta.49
 mit dem fail-closed Update-Workflow aus PR #77. Update-Jobs werden persistent
 geführt, benötigen eine frische Simulation und eine getrennte
 Installationsbestätigung. Unsichere Abbrüche, Timeouts oder Transportverluste
 enden in `manual_recovery_required`; es gibt keinen automatischen Retry, kein
 Rollback, kein `apt --fix-broken`, kein `dpkg --configure -a` und keinen Reboot.
-`execution_enabled=false` bleibt unverändert. Dieser RC ist noch keine Stable-
-Freigabe: reale Paketaktionen und die produktive Installation bleiben offen.
+`execution_enabled=false` bleibt der sichere Standard. Reale Paketaktionen
+bleiben bis zu einer bewussten administrativen Aktivierung gesperrt; der echte
+Proxmox-LXC-Pakettest wurde nicht durchgeführt und bleibt eine bekannte
+Abnahmegrenze.
 
 ### English
 
-This release candidate combines the controlled LXC orchestration from Beta.49
+This Stable release combines the controlled LXC orchestration from Beta.49
 with the fail-closed update workflow from PR #77. Update jobs are persistent,
 require a fresh simulation and a separate installation confirmation. Uncertain
 cancellation, timeout or transport loss ends in `manual_recovery_required`;
 there is no automatic retry, rollback, `apt --fix-broken`,
-`dpkg --configure -a`, or reboot. `execution_enabled=false` remains unchanged.
-This RC is not a Stable release: real package actions and productive
-installation remain outstanding.
+`dpkg --configure -a`, or reboot. `execution_enabled=false` remains the safe
+default. Real package actions require deliberate administrative activation;
+real Proxmox-LXC package acceptance was not performed and remains a known
+acceptance limitation.
 
 ## Beta.49 controlled LXC orchestration / Kontrollierte LXC-Orchestrierung
 
@@ -50,7 +53,9 @@ separate installation confirmation, persistent progress and recovery states,
 and no automatic retry or repair. Cancellation is allowed only before
 mutation. Once a fixed helper update is running, cancellation is refused
 because no verifiable PID/PGID is exposed; the job remains locked for manual
-recovery. Real package actions remain disabled (`execution_enabled=false`).
+recovery. Real package actions remain disabled by default
+(`execution_enabled=false`) and require deliberate administrative activation
+for a selected LXC.
 
 Der gemergte PR #77 ergänzt einen fail-closed Update-Workflow mit frischer
 Endsimulation, separater Installationsbestätigung sowie persistentem Fortschritt
@@ -164,7 +169,8 @@ LXC-Testgast erforderlich. Produktive Paketaktionen bleiben deaktiviert.
 The complete LXC update E2E acceptance is still open. CI checks the fixed
 helper contract and a real package installation in a disposable guest root;
 final acceptance still requires a real non-production Proxmox LXC test guest.
-Productive package actions remain disabled.
+Productive package actions remain disabled by default and require the
+documented administrative activation for a selected LXC.
 
 ## Beta.42 grant eligibility fix / Freigabe-Eignungsprüfung
 
@@ -666,7 +672,9 @@ Paketprüfung und Simulation ausgeschlossen; ihre Karten bleiben mit Name,
 Laufstatus und Ressourcen sichtbar, zeigen aber den Hinweis „Updates dieser
 virtuellen Maschine werden nicht über Smart Homelab Maintenance durchgeführt.
 Bitte die Updatefunktion des jeweiligen Gastbetriebssystems verwenden.“ und
-erreichen niemals einen Update-Runner. Echte Installationen bleiben deaktiviert.
+erreichen niemals einen Update-Runner. Echte Installationen bleiben
+standardmäßig deaktiviert und können nur durch eine bewusste administrative
+Aktivierung für einen ausgewählten LXC erfolgen.
 
 The HACS package contains the Home Assistant integration and Lovelace card.
 The Proxmox agent is a separate service and must be updated independently
@@ -679,7 +687,8 @@ permanently excluded from package checks and simulations by product decision:
 their cards still show name, runtime state, and resources, while the card
 explains that updates must be performed by the guest operating system. VM
 identifiers never reach `pct exec` or another update runner. Real installation
-remains disabled.
+remains disabled by default and requires documented administrative activation
+for a selected LXC.
 
 Für eine spätere Veröffentlichung müssen die Marketplace-Struktur, die
 Release-Artefakte und der Installationsweg erneut gegen die Zielversion von
