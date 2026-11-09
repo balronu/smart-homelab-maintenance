@@ -11,6 +11,7 @@ AGENT_NAME="smart-homelab-maintenance"
 SERVICE_USER="$AGENT_NAME"
 ROOTFS="$(mktemp -d /var/lib/smh-phase56-rootfs.XXXXXX)"
 WORK="$(mktemp -d /var/lib/smh-phase56-work.XXXXXX)"
+chmod 0755 "$WORK"
 PCT_ADAPTER="/usr/sbin/pct"
 CREATED_GROUP=0
 CREATED_USER=0
@@ -123,7 +124,7 @@ EOF
 sed -i "s#__SMH_PHASE56_ROOTFS__#$ROOTFS#" "$PCT_ADAPTER"
 chmod 0755 "$PCT_ADAPTER"
 
-export ROOT_DIR
+export ROOT_DIR WORK
 mkdir -p "/etc/systemd/system/${AGENT_NAME}-lxc-helper.service.d"
 cat > "/etc/systemd/system/${AGENT_NAME}-lxc-helper.service.d/phase56-rootfs.conf" <<EOF
 [Service]
@@ -132,8 +133,9 @@ EOF
 systemctl daemon-reload
 "$ROOT_DIR/scripts/install-lxc-helper.sh" --source-dir "$ROOT_DIR" --expected-commit "$(git -C "$ROOT_DIR" rev-parse HEAD)" --apply --start
 
-runuser -u "$SERVICE_USER" -- sh -c "PYTHONPATH='$ROOT_DIR/agent' WORK='$WORK' exec python3 -" <<'PY'
+PYTHONPATH="$ROOT_DIR/agent" python3 - <<'PY'
 import json, os
+import pwd
 from pathlib import Path
 
 from smart_homelab_maintenance.api import ApiApplication
@@ -146,6 +148,12 @@ from smart_homelab_maintenance.updates import AptCommandRunner, AptUpdateReader,
 token = "phase56-test-token"
 transport = RootHelperTransport()
 target = ProbeTarget("container:321", "phase56-debian", 321, "Debian", "12", "apt", False, True, False)
+# Import as root so the checkout is readable, then use the exact agent UID for
+# every socket/database operation. The helper's SO_PEERCRED gate is therefore
+# exercised exactly as it is in deployment.
+agent_user = pwd.getpwnam("smart-homelab-maintenance")
+os.setgid(agent_user.pw_gid)
+os.setuid(agent_user.pw_uid)
 jobs = JobRepository(str(Path(os.environ["WORK"]) / "jobs.sqlite"))
 service = UpdateService(
     lambda: [target], runner=AptCommandRunner(guest_transport=transport),
@@ -188,8 +196,12 @@ print(json.dumps({"agent_api": "PASS", "package": "smh-e2e-fixture", "job_id": r
 PY
 
 systemctl stop "${AGENT_NAME}-lxc-helper.service"
-if runuser -u "$SERVICE_USER" -- sh -c "PYTHONPATH='$ROOT_DIR/agent' exec python3 -" <<'PY'
+PYTHONPATH="$ROOT_DIR/agent" python3 - <<'PY'
+import os, pwd
 from smart_homelab_maintenance.updates import RootHelperTransport, GuestHelperUnavailableError
+agent_user = pwd.getpwnam("smart-homelab-maintenance")
+os.setgid(agent_user.pw_gid)
+os.setuid(agent_user.pw_uid)
 try:
     RootHelperTransport().read(321)
 except (GuestHelperUnavailableError, OSError):
@@ -197,6 +209,5 @@ except (GuestHelperUnavailableError, OSError):
 else:
     raise SystemExit("helper outage was not surfaced")
 PY
-then :; else die "helper outage test failed"; fi
 
 printf '%s\n' 'PASS: Phase 56 isolated agent/helper/API/dpkg acceptance completed in disposable Debian rootfs'
