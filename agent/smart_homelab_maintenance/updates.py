@@ -431,7 +431,9 @@ class UpdateService:
         # incomplete; it never grants access and preserves existing metadata.
         if not simulation_authorized and not update_authorized:
             metadata = {key: existing.get(key) for key in ("os_name", "os_version", "package_manager")}
-            return self._permission_store.set_permissions(target_id, simulation_authorized=False, update_authorized=False, metadata=metadata)
+            result = self._permission_store.set_permissions(target_id, simulation_authorized=False, update_authorized=False, metadata=metadata)
+            self._cache.pop(target_id, None)
+            return result
         try:
             probe = self._runner.probe(target.vmid)
         except AttributeError as exc:
@@ -445,7 +447,9 @@ class UpdateService:
         package_manager = str(probe.get("package_manager", ""))
         if os_name.lower() not in {"debian", "ubuntu"} or not os_version or package_manager != "apt":
             raise ValidationError("target is not a proven Debian/Ubuntu apt LXC")
-        return self._permission_store.set_permissions(target_id, simulation_authorized=simulation_authorized, update_authorized=update_authorized, metadata={"os_name": os_name, "os_version": os_version, "package_manager": package_manager})
+        result = self._permission_store.set_permissions(target_id, simulation_authorized=simulation_authorized, update_authorized=update_authorized, metadata={"os_name": os_name, "os_version": os_version, "package_manager": package_manager})
+        self._cache.pop(target_id, None)
+        return result
 
     def _check_uncached(self, target: ProbeTarget) -> UpdateResult:
         if target.target.startswith("vm:"):
