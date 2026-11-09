@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.0-beta.47 – Eligibility metadata recovery
+
+### Deutsch
+
+- Übernimmt nach einer gespeicherten Freigabe die nachgewiesenen Debian-/Ubuntu-
+  und APT-Metadaten in den Update-Zieltyp, damit geeignete Container nicht mehr
+  fälschlich als „Nicht unterstützt“ erscheinen.
+- Bewahrt die sichere Trennung zwischen gespeicherter Autorisierung und
+  tatsächlicher Eligibility; `discover_only` führt weiterhin keine Gastprobe aus.
+- Die Lovelace-Karte validiert Serviceantworten auch bei HTTP 200 mit eingebettetem
+  Fehler und zeigt Fehler statt einer irreführenden Erfolgsmeldung an.
+- Beta.45-Inventar-Recovery und Beta.46-Berechtigungsfeedback bleiben enthalten.
+
+### English
+
+- After a stored grant, proven Debian/Ubuntu and APT metadata is carried into the
+  update target so eligible containers are no longer shown as unsupported.
+- The safe separation between stored authorization and actual eligibility remains;
+  `discover_only` still performs no guest probe.
+- The Lovelace card validates service responses even when HTTP 200 contains an
+  embedded error and shows the error instead of misleading success feedback.
+- Beta.45 inventory recovery and Beta.46 permission feedback remain included.
+
 ## 0.1.0-beta.46 – Permission feedback and inventory recovery
 
 ### Deutsch
