@@ -195,6 +195,15 @@ function renderDryRunResult(result, response, german) {
   }
   if (data?.safe !== true && data?.success !== false) result.classList.add("warning");
 }
+function permissionResponseError(response) {
+  const candidates = [response, response?.response, response?.data, response?.response?.data];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object") continue;
+    if (candidate.error) return typeof candidate.error === "string" ? candidate.error : candidate.error.message || "permission request failed";
+    if (candidate.success === false) return candidate.message || "permission request failed";
+  }
+  return null;
+}
 SmartHomelabMaintenanceCard.prototype._permissionButton = function (target, permission, result) {
   const button = document.createElement("button");
   button.className = "permission";
@@ -220,10 +229,12 @@ SmartHomelabMaintenanceCard.prototype._permissionButton = function (target, perm
       if (!call || typeof call.then !== "function") throw new Error(labels.permissionFailed);
       const timeout = typeof globalThis !== "undefined" && Number.isFinite(globalThis.__SMART_HOMELAB_PERMISSION_TIMEOUT_MS__)
         ? globalThis.__SMART_HOMELAB_PERMISSION_TIMEOUT_MS__ : 30000;
-      await Promise.race([
+      const response = await Promise.race([
         call,
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(german ? "Zeitüberschreitung bei der Berechtigungsänderung." : "Permission change timed out.")), timeout); }),
       ]);
+      const responseError = permissionResponseError(response);
+      if (responseError) throw new Error(responseError);
       button._permissions = next;
       result.textContent = labels.permissionSuccess;
     } catch (error) {

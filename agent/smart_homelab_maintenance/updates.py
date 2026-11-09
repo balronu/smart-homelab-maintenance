@@ -388,7 +388,22 @@ class UpdateService:
         for target_id, target in list(targets.items()):
             if target_id.startswith("container:"):
                 entry = entries.get(target_id.split(":", 1)[1], {})
-                targets[target_id] = ProbeTarget(target.target, target.name, target.vmid, target.os_name, target.os_version, target.package_manager, bool(entry.get("simulation_authorized", entry.get("authorized", target.authorized))), target.checkable, bool(entry.get("update_authorized", target.update_authorized)))
+                # A successful eligibility probe persists the authoritative
+                # OS/APT evidence beside the grant.  Reapply that evidence to
+                # the live target on every read; otherwise a Proxmox inventory
+                # record with unknown metadata remains ``unsupported`` even
+                # though the permission write succeeded.
+                targets[target_id] = ProbeTarget(
+                    target.target,
+                    target.name,
+                    target.vmid,
+                    str(entry.get("os_name", target.os_name)),
+                    str(entry.get("os_version", target.os_version)),
+                    entry.get("package_manager", target.package_manager),
+                    bool(entry.get("simulation_authorized", entry.get("authorized", target.authorized))),
+                    target.checkable,
+                    bool(entry.get("update_authorized", target.update_authorized)),
+                )
         return targets
 
     def set_permissions(self, target_id: str, *, simulation_authorized: bool, update_authorized: bool, confirmed: bool) -> dict[str, Any]:
