@@ -174,6 +174,26 @@ def test_permission_grant_probes_unknown_discovery_before_writing_policy(tmp_pat
     assert store.read()["102"]["os_name"] == "Debian"
 
 
+def test_permission_metadata_is_reused_for_followup_update_checks(tmp_path):
+    store = PermissionStore(tmp_path / "policy.toml")
+    store.set_permissions(
+        "container:102",
+        simulation_authorized=True,
+        update_authorized=False,
+        metadata={"os_name": "Debian", "os_version": "12", "package_manager": "apt"},
+    )
+    service = UpdateService(
+        lambda: (ProbeTarget("container:102", "zigbee2mqtt", 102, "unknown", "unknown", None, False, True),),
+        runner=Runner("0 upgraded, 0 newly installed, 0 to remove."),
+        permission_store=store,
+    )
+    result = service.check("container:102")
+    data = result.as_dict()
+    assert result.status == "current"
+    assert data["authorized"] is True and data["simulation_authorized"] is True
+    assert result.os_name == "Debian" and result.package_manager == "apt"
+
+
 def test_permission_revoke_does_not_require_a_fresh_eligibility_probe(tmp_path):
     store = PermissionStore(tmp_path / "policy.toml")
     store.set_permissions("container:102", simulation_authorized=True, update_authorized=False, metadata={"os_name": "Debian", "os_version": "12", "package_manager": "apt"})
