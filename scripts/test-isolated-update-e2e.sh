@@ -20,7 +20,9 @@ cleanup() {
   set +e
   systemctl stop "${AGENT_NAME}-lxc-helper.service" >/dev/null 2>&1 || true
   systemctl disable "${AGENT_NAME}-lxc-helper.service" >/dev/null 2>&1 || true
+  systemctl disable "${AGENT_NAME}-agent.service" >/dev/null 2>&1 || true
   rm -f /etc/systemd/system/${AGENT_NAME}-lxc-helper.service
+  rm -f /etc/systemd/system/${AGENT_NAME}-agent.service
   rm -rf /etc/systemd/system/${AGENT_NAME}-lxc-helper.service.d
   rm -f /usr/libexec/${AGENT_NAME}/lxc-apt-helper
   rm -f /etc/${AGENT_NAME}/lxc-apt-allowlist.toml
@@ -47,6 +49,19 @@ getent passwd "$SERVICE_USER" >/dev/null 2>&1 || {
   useradd --system --no-create-home --shell /usr/sbin/nologin --gid "$SERVICE_USER" "$SERVICE_USER"
   CREATED_USER=1
 }
+
+cat > "/etc/systemd/system/${AGENT_NAME}-agent.service" <<'EOF'
+[Unit]
+Description=Ephemeral Phase 56 agent test anchor
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable "${AGENT_NAME}-agent.service" >/dev/null
 
 debootstrap --variant=minbase --include=apt,dpkg,systemd,systemd-sysv,ca-certificates \
   bookworm "$ROOTFS" https://deb.debian.org/debian >/dev/null
