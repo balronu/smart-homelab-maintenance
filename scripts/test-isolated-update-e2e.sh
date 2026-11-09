@@ -50,6 +50,7 @@ getent passwd "$SERVICE_USER" >/dev/null 2>&1 || {
   useradd --system --no-create-home --shell /usr/sbin/nologin --gid "$SERVICE_USER" "$SERVICE_USER"
   CREATED_USER=1
 }
+chown "$SERVICE_USER:$SERVICE_USER" "$WORK"
 
 cat > "/etc/systemd/system/${AGENT_NAME}-agent.service" <<'EOF'
 [Unit]
