@@ -2,6 +2,10 @@ name: Installer systemd acceptance
 
 on:
   push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
   pull_request:
 
 jobs:

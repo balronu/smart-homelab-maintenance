@@ -1,5 +1,29 @@
 # Smart Homelab Maintenance
 
+## v1.0.0-rc.1 – Release Candidate / Release-Kandidat
+
+### Deutsch
+
+Der Release-Kandidat bündelt die kontrollierte LXC-Orchestrierung aus Beta.49
+mit dem fail-closed Update-Workflow aus PR #77. Update-Jobs werden persistent
+geführt, benötigen eine frische Simulation und eine getrennte
+Installationsbestätigung. Unsichere Abbrüche, Timeouts oder Transportverluste
+enden in `manual_recovery_required`; es gibt keinen automatischen Retry, kein
+Rollback, kein `apt --fix-broken`, kein `dpkg --configure -a` und keinen Reboot.
+`execution_enabled=false` bleibt unverändert. Dieser RC ist noch keine Stable-
+Freigabe: reale Paketaktionen und die produktive Installation bleiben offen.
+
+### English
+
+This release candidate combines the controlled LXC orchestration from Beta.49
+with the fail-closed update workflow from PR #77. Update jobs are persistent,
+require a fresh simulation and a separate installation confirmation. Uncertain
+cancellation, timeout or transport loss ends in `manual_recovery_required`;
+there is no automatic retry, rollback, `apt --fix-broken`,
+`dpkg --configure -a`, or reboot. `execution_enabled=false` remains unchanged.
+This RC is not a Stable release: real package actions and productive
+installation remain outstanding.
+
 ## Beta.49 controlled LXC orchestration / Kontrollierte LXC-Orchestrierung
 
 Beta.49 verbindet die bestehende Eligibility-Planung mit einem authentifizierten
@@ -19,16 +43,16 @@ Debian/Ubuntu LXCs with proven APT; VMs and stopped containers are excluded.
 remain unchanged. Merge, publication and productive installation require
 separate approval.
 
-## Stable-readiness candidate / Stable-Reife-Kandidat
+## Stable-readiness implementation / Stable-Reife-Implementierung
 
-The open PR #77 adds a fail-closed update workflow: a fresh final simulation,
+Merged PR #77 adds a fail-closed update workflow: a fresh final simulation,
 separate installation confirmation, persistent progress and recovery states,
 and no automatic retry or repair. Cancellation is allowed only before
 mutation. Once a fixed helper update is running, cancellation is refused
 because no verifiable PID/PGID is exposed; the job remains locked for manual
 recovery. Real package actions remain disabled (`execution_enabled=false`).
 
-Der offene PR #77 ergänzt einen fail-closed Update-Workflow mit frischer
+Der gemergte PR #77 ergänzt einen fail-closed Update-Workflow mit frischer
 Endsimulation, separater Installationsbestätigung sowie persistentem Fortschritt
 und Recovery. Während eines laufenden Helper-Updates wird ein Abbruch wegen
 fehlender verifizierbarer PID/PGID abgelehnt; der Job bleibt bis zur manuellen
