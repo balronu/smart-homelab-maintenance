@@ -105,7 +105,7 @@ The full regression run is `180 passed, 8 subtests passed`.
 | Beta.49 tag CI | PASS after browser recovery, exact tag unchanged |
 | HACS / Hassfest / HA runtime / Browser / Installer / Security | PASS for Beta.49 |
 | Candidate local full suite | PASS: 180 tests and 8 subtests |
-| Candidate PR CI | MUST PASS after Phase 55 push; PR remains open |
+| Candidate PR CI | PASS on `6bf14cd` (runs `42617240957` and duplicate push run); PR remains open |
 | Productive HA runtime | NOT RUN; separate approval required |
 | Productive helper/allowlist activation | NOT RUN; separate approval required |
 | Productive package update | NOT RUN and prohibited in this phase |
