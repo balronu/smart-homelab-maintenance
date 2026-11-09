@@ -66,7 +66,7 @@ def parse_policy(raw: Mapping[str, Any]) -> Policy:
 def load_policy(path: Path, *, require_root: bool = True) -> Policy:
     try:
         mode = stat.S_IMODE(path.stat().st_mode)
-        if (require_root and path.stat().st_uid != 0) or mode & 0o022:
+        if (require_root and path.stat().st_uid != 0) or mode != 0o600:
             raise PolicyError("policy file is not root-owned and safe")
         raw = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):

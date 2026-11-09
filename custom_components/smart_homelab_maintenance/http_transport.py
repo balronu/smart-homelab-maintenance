@@ -83,6 +83,8 @@ _SAFE_AGENT_MESSAGES = {
     "container is not authorized",
     "container is not in the root-owned allowlist",
     "privileged policy helper is unavailable",
+    "simulation and installation confirmations are both required",
+    "explicit simulation and installation confirmations are both required",
 }
 
 
@@ -221,12 +223,12 @@ class AgentHttpTransport:
         except (ConnectionError, OSError) as exc:
             raise TransportError("connection", "agent connection failed") from exc
 
-    async def execute_update(self, target: str, *, plan_digest: str | None) -> dict[str, Any]:
+    async def execute_update(self, target: str, *, plan_digest: str | None, install_confirmed: bool = False) -> dict[str, Any]:
         if not isinstance(target, str) or not re.fullmatch(r"container:[1-9][0-9]{0,5}", target):
             raise TransportError("invalid_target", "only numeric LXC targets may be updated")
         try:
             return await asyncio.wait_for(
-                asyncio.to_thread(self._post_json_sync, f"/api/v1/updates/{target}/execute", {"confirm": True, "plan_digest": plan_digest}),
+                asyncio.to_thread(self._post_json_sync, f"/api/v1/updates/{target}/execute", {"confirm": True, "install_confirmed": bool(install_confirmed), "plan_digest": plan_digest}),
                 self.config.timeout_seconds,
             )
         except asyncio.TimeoutError as exc:

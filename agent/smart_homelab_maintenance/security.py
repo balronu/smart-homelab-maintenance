@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from .errors import ResourceGateError, ValidationError
 from .types import GateResult, JobRequest, ResourcePolicy, ResourceSnapshot
 
-_ID = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+_ID = re.compile(r"^(?:[a-z][a-z0-9_-]{0,63}|container:[1-9][0-9]{0,5})$")
 _KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 _FORBIDDEN = re.compile(r"[;&|`$<>\n\r]|\b(?:sh|bash|zsh|sudo|pct|ssh|rm|curl|wget)\b", re.I)
 _SECRET_KEY = re.compile(r"token|secret|password|passwd|authorization|cookie|api[_-]?key", re.I)

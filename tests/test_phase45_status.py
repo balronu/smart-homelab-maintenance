@@ -76,7 +76,8 @@ def test_orchestration_status_maps_legacy_and_split_grants_without_escalation():
         policy_reader=lambda: entries,
         policy_mode_reader=lambda: "discover_only",
     )
-    assert result.authorized_container_ids == list(range(101, 111))
+    assert result.authorized_container_ids == [*range(101, 109), 110]
+    assert 109 not in result.authorized_container_ids
     assert 111 not in result.authorized_container_ids
     assert result.policy_mode == "discover_only"
 

@@ -16,7 +16,7 @@ from .types import JobPhase, JobRequest, JobState, TERMINAL_STATES, Verification
 _ACTIVE = (JobState.PREFLIGHT, JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.POSTCHECK)
 _TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     JobState.QUEUED: frozenset({JobState.PREFLIGHT, JobState.CANCELLED, JobState.BLOCKED}),
-    JobState.PREFLIGHT: frozenset({JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.BLOCKED, JobState.FAILED}),
+    JobState.PREFLIGHT: frozenset({JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.CANCELLED, JobState.BLOCKED, JobState.FAILED, JobState.MANUAL_RECOVERY}),
     JobState.WAITING_CONFIRMATION: frozenset({JobState.RUNNING, JobState.CANCELLED, JobState.BLOCKED}),
     JobState.RUNNING: frozenset({JobState.POSTCHECK, JobState.FAILED, JobState.TIMEOUT, JobState.MANUAL_RECOVERY}),
     JobState.POSTCHECK: frozenset({JobState.SUCCEEDED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.TIMEOUT}),
@@ -79,6 +79,16 @@ class JobRepository:
                     ON jobs(target) WHERE state IN ('preflight','waiting_confirmation','running','postcheck');
                 """
             )
+            columns = {row[1] for row in self._connection.execute("PRAGMA table_info(jobs)")}
+            migrations = {
+                "cancel_requested": "ALTER TABLE jobs ADD COLUMN cancel_requested INTEGER NOT NULL DEFAULT 0",
+                "process_pid": "ALTER TABLE jobs ADD COLUMN process_pid INTEGER",
+                "process_starttime": "ALTER TABLE jobs ADD COLUMN process_starttime TEXT",
+                "process_pgid": "ALTER TABLE jobs ADD COLUMN process_pgid INTEGER",
+            }
+            for name, statement in migrations.items():
+                if name not in columns:
+                    self._connection.execute(statement)
 
     def create(self, request: JobRequest) -> str:
         validate_job_request(request)
@@ -163,6 +173,56 @@ class JobRepository:
                     (SELECT sequence FROM job_logs WHERE job_id=? ORDER BY sequence DESC LIMIT ?)""",
                     (job_id, job_id, self.max_log_entries),
                 )
+
+    def has_unresolved_target(self, target: str) -> bool:
+        """Return true while execution state is active or needs recovery."""
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT 1 FROM jobs WHERE target=? AND state IN (?, ?, ?, ?, ?)",
+                (target, JobState.PREFLIGHT, JobState.WAITING_CONFIRMATION,
+                 JobState.RUNNING, JobState.POSTCHECK, JobState.MANUAL_RECOVERY),
+            ).fetchone()
+        return row is not None
+
+    def request_cancel(self, job_id: str) -> dict[str, Any]:
+        """Cancel only before mutation; never signal an unverified process."""
+        with self._lock:
+            row = self._connection.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+            if row is None:
+                raise ValidationError("unknown job_id")
+            state = JobState(row["state"])
+            if state in {JobState.QUEUED, JobState.PREFLIGHT, JobState.WAITING_CONFIRMATION}:
+                with self._connection:
+                    self._connection.execute("UPDATE jobs SET cancel_requested=1 WHERE job_id=?", (job_id,))
+                self.transition(job_id, JobState.CANCELLED, phase=JobPhase.RECOVERY,
+                                progress=100, message="job cancelled before package mutation",
+                                error_code="cancelled_before_execution")
+                self.append_log(job_id, "cancel accepted before mutation")
+                return {"accepted": True, "state": JobState.CANCELLED, "reason": "cancelled_before_execution"}
+            if state in {JobState.RUNNING, JobState.POSTCHECK}:
+                self.append_log(job_id, "cancel refused: running process identity is not exposed by the fixed helper", level="warning")
+                return {"accepted": False, "state": state, "reason": "running_cancellation_not_safe"}
+            if state is JobState.MANUAL_RECOVERY:
+                return {"accepted": False, "state": state, "reason": "manual_recovery_required"}
+            return {"accepted": False, "state": state, "reason": "job_is_terminal"}
+
+    def mark_process_identity(self, job_id: str, *, pid: int, starttime: str, pgid: int) -> None:
+        if not isinstance(pid, int) or pid <= 1 or not isinstance(pgid, int) or pgid <= 1 or not starttime:
+            raise ValidationError("invalid process identity")
+        with self._lock, self._connection:
+            updated = self._connection.execute(
+                "UPDATE jobs SET process_pid=?,process_starttime=?,process_pgid=? WHERE job_id=?",
+                (pid, str(starttime), pgid, job_id),
+            ).rowcount
+            if updated != 1:
+                raise ValidationError("unknown job_id")
+
+    def cancel_requested(self, job_id: str) -> bool:
+        with self._lock:
+            row = self._connection.execute("SELECT cancel_requested FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+        if row is None:
+            raise ValidationError("unknown job_id")
+        return bool(row[0])
 
     def logs(self, job_id: str, *, offset: int = 0, limit: int = 50) -> list[dict[str, Any]]:
         if offset < 0 or limit < 1 or limit > self.max_log_entries:

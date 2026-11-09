@@ -20,8 +20,9 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Sequence
 
 from .errors import ValidationError
+from .jobs import JobRepository
 from .permissions import PermissionStore
-from .types import utc_now
+from .types import JobPhase, JobRequest, JobState, Verification, utc_now
 
 _VMID = re.compile(r"^[1-9][0-9]{0,5}$")
 _TARGET = re.compile(r"^(host|container:[1-9][0-9]{0,5}|vm:[1-9][0-9]{0,5})$")
@@ -82,6 +83,14 @@ class UpdateResult:
         if self.status in {"current", "updates_available"} and not result["fresh"]:
             result["status"] = "stale"
         return result
+
+    @property
+    def fresh(self) -> bool:
+        return self.is_fresh()
+
+    @property
+    def authorized(self) -> bool:
+        return bool(self.simulation_authorized)
 
     def is_fresh(self, now: float | None = None) -> bool:
         if not self.checked_at or self.status in {"unknown", "error", "unsupported"}:
@@ -336,7 +345,7 @@ def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tup
 
 _APT_UPGRADABLE = re.compile(
     r"^(\S+?)/\S+\s+(\S+)"
-    r"(?:\s+\S+)?"
+    r"(?:\s+(?!\[)\S+)?"
     r"(?:\s+\[[^]]*upgradable from:\s*([^]]+)\])?"
 )
 
@@ -370,7 +379,7 @@ def _package_digest(packages: Sequence[PackageChange]) -> str:
 class UpdateService:
     """Passive checks plus explicitly confirmed, separately authorized updates."""
 
-    def __init__(self, targets: Callable[[], Sequence[ProbeTarget]], *, runner: AptCommandRunner | None = None, reader: AptUpdateReader | None = None, clock: Callable[[], float] | None = None, execution_enabled: bool = False, permission_store: PermissionStore | None = None) -> None:
+    def __init__(self, targets: Callable[[], Sequence[ProbeTarget]], *, runner: AptCommandRunner | None = None, reader: AptUpdateReader | None = None, clock: Callable[[], float] | None = None, execution_enabled: bool = False, permission_store: PermissionStore | None = None, jobs: JobRepository | None = None) -> None:
         self._targets = targets
         self._runner = runner or AptCommandRunner()
         self._reader = reader
@@ -379,6 +388,7 @@ class UpdateService:
         self._active_simulations: set[str] = set()
         self.execution_enabled = execution_enabled
         self._permission_store = permission_store
+        self._jobs = jobs
 
     def target_map(self) -> dict[str, ProbeTarget]:
         targets = {target.target: target for target in self._targets()}
@@ -528,9 +538,9 @@ class UpdateService:
         finally:
             self._active_simulations.discard(target_id)
 
-    def execute_update(self, target_id: str, *, confirmed: bool, plan_digest: str | None) -> dict[str, Any]:
-        if confirmed is not True:
-            raise ValidationError("real update requires explicit confirmation")
+    def execute_update(self, target_id: str, *, confirmed: bool, install_confirmed: bool = False, plan_digest: str | None) -> dict[str, Any]:
+        if confirmed is not True or install_confirmed is not True:
+            raise ValidationError("explicit simulation and installation confirmations are both required")
         if not self.execution_enabled:
             return {"target": target_id, "success": False, "safe": False, "error": "update execution is disabled"}
         target = self.target_map().get(target_id)
@@ -538,8 +548,12 @@ class UpdateService:
             return {"target": target_id, "success": False, "safe": False, "error": "only authorized LXC targets may be updated"}
         if not target.update_authorized:
             return {"target": target_id, "success": False, "safe": False, "error": "target is not authorized for real updates"}
+        if self._jobs is not None and self._jobs.has_unresolved_target(target_id):
+            return {"target": target_id, "success": False, "safe": False,
+                    "error": "another update is active or requires manual recovery",
+                    "status": "manual_recovery_required"}
         current = self.check(target_id, force=True)
-        if current.status != "updates_available" or not current.fresh:
+        if current.status != "updates_available" or not current.is_fresh():
             return {"target": target_id, "success": False, "safe": False, "error": "fresh updates are not available"}
         if current.plan_digest != plan_digest:
             return {"target": target_id, "success": False, "safe": False, "error": "update plan changed; confirmation is stale", "plan_digest": current.plan_digest}
@@ -547,16 +561,79 @@ class UpdateService:
             return {"target": target_id, "success": False, "safe": False, "error": "update plan contains held, conflicting, or removing packages"}
         if target_id in self._active_simulations:
             return {"target": target_id, "success": False, "safe": False, "error": "another update is already running for target"}
+        job_id: str | None = None
+        if self._jobs is not None:
+            try:
+                job_id = self._jobs.create(JobRequest(
+                    target=target_id,
+                    operation="update",
+                    expected_version=None,
+                    idempotency_key=f"{target_id}:{current.plan_digest}",
+                    confirmation_hash=current.plan_digest,
+                ))
+                self._jobs.transition(job_id, JobState.PREFLIGHT, phase=JobPhase.PREFLIGHT, progress=10, message="fresh update plan validated")
+                self._jobs.append_log(job_id, "fresh plan and target authorization validated")
+            except Exception as exc:
+                return {"target": target_id, "success": False, "safe": False, "error": "update job could not be created", "job_error": type(exc).__name__}
         self._active_simulations.add(target_id)
         try:
+            # The displayed plan is never the execution proof. Re-run the
+            # fixed simulation immediately before the mutating helper call.
+            simulation_code, simulation_stdout, simulation_stderr = self._runner.simulate(target.vmid)
+            if simulation_code != 0:
+                if job_id and self._jobs:
+                    self._jobs.transition(job_id, JobState.FAILED, phase=JobPhase.PREFLIGHT, progress=20, message="pre-execution simulation failed", error_code="simulation_failed")
+                return {"target": target_id, "success": False, "safe": False, "error": "pre-execution simulation failed", "job_id": job_id}
+            simulated, held, conflicts, removals = _parse_apt(simulation_stdout, simulation_stderr)
+            simulation_digest = _package_digest(simulated) if self._reader is not None else hashlib.sha256((simulation_stdout + "\n" + simulation_stderr).encode("utf-8", "replace")).hexdigest()
+            if simulation_digest != current.plan_digest:
+                if job_id and self._jobs:
+                    self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="plan changed before execution", error_code="stale_plan")
+                return {"target": target_id, "success": False, "safe": False, "error": "update plan changed during final validation", "plan_digest": simulation_digest, "job_id": job_id}
+            if held or conflicts or removals:
+                if job_id and self._jobs:
+                    self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="simulation contains unsafe changes", error_code="unsafe_plan")
+                return {"target": target_id, "success": False, "safe": False, "error": "final simulation contains held, conflicting, or removing packages", "job_id": job_id}
+            if job_id and self._jobs:
+                self._jobs.transition(job_id, JobState.RUNNING, phase=JobPhase.EXECUTION, progress=30, message="fixed APT update started")
+                self._jobs.append_log(job_id, "apt update and no-remove upgrade started")
             update_result = self._runner.update(target.vmid)
             code, stdout, stderr = update_result[:3]
             steps = list(update_result[3]) if len(update_result) > 3 else [{"name": "apt-update"}, {"name": "apt-upgrade"}]
-            return {"target": target_id, "operation": "update", "success": code == 0, "safe": code == 0, "returncode": code, "stdout": stdout, "stderr": stderr, "steps": steps, "plan_digest": current.plan_digest, "error": None if code == 0 else "apt update or upgrade failed"}
+            postcheck = {"performed": False}
+            postcheck_passed = True
+            if code == 0 and self._reader is not None:
+                try:
+                    post_code, post_stdout, post_stderr = self._reader.list_upgradable(target.vmid)
+                    remaining = _parse_apt_upgradable(post_stdout, post_stderr)
+                    postcheck = {"performed": True, "returncode": post_code, "remaining_packages": len(remaining)}
+                    postcheck_passed = post_code == 0
+                except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
+                    postcheck = {"performed": True, "returncode": None, "error": type(exc).__name__}
+                    postcheck_passed = False
+            if job_id and self._jobs:
+                if code == 0 and postcheck_passed:
+                    self._jobs.transition(job_id, JobState.POSTCHECK, phase=JobPhase.POSTCHECK, progress=90, message="update command completed; postcheck required")
+                    self._jobs.complete(job_id, Verification(True, True, message="fixed APT update completed"), message="fixed APT update completed")
+                else:
+                    self._jobs.transition(job_id, JobState.MANUAL_RECOVERY if code == 0 else JobState.FAILED, phase=JobPhase.RECOVERY, progress=100, message="postcheck failed" if code == 0 else "APT update failed", error_code="postcheck_failed" if code == 0 else "apt_failed")
+            success = code == 0 and postcheck_passed
+            return {"target": target_id, "operation": "update", "success": success, "safe": success, "returncode": code, "stdout": stdout, "stderr": stderr, "steps": steps, "postcheck": postcheck, "plan_digest": current.plan_digest, "job_id": job_id, "status": "succeeded" if success else ("manual_recovery_required" if code == 0 else "failed"), "error": None if success else ("post-update verification failed" if code == 0 else "apt update or upgrade failed")}
         except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
-            return {"target": target_id, "operation": "update", "success": False, "safe": False, "error": type(exc).__name__}
+            if job_id and self._jobs:
+                self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="execution status is uncertain; manual recovery required", error_code="execution_status_unknown")
+                self._jobs.append_log(job_id, "transport or timeout failure; no automatic retry was attempted", level="warning")
+            return {"target": target_id, "operation": "update", "success": False, "safe": False, "error": type(exc).__name__, "status": "manual_recovery_required", "job_id": job_id}
         finally:
             self._active_simulations.discard(target_id)
+
+    def cancel_job(self, job_id: str, *, confirmed: bool) -> dict[str, Any]:
+        """Cancel only pre-mutation work; running helper jobs remain locked."""
+        if confirmed is not True:
+            raise ValidationError("explicit cancellation confirmation is required")
+        if self._jobs is None:
+            raise ValidationError("persistent job tracking is unavailable")
+        return self._jobs.request_cancel(job_id)
 
 
 def make_targets(host: Mapping[str, Any], containers: Sequence[Mapping[str, Any]], target_overrides: Mapping[str, Mapping[str, Any]] | None = None, virtual_machines: Sequence[Mapping[str, Any]] = ()) -> list[ProbeTarget]:
