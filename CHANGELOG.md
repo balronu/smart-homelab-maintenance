@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.0-beta.48 – Orchestration status integrity
+
+### Deutsch
+
+- Behebt die Statusabbildung der geschützten LXC-Allowlist: Legacy- und getrennte
+  Simulationsfreigaben werden korrekt als `authorized_container_ids` angezeigt.
+- `update_authorized` wird niemals stillschweigend als Simulationsfreigabe gewertet;
+  beschädigte Policies und unbekannte Modi bleiben fail-closed.
+- Der aktive Policy-Modus wird validiert aus der Agent-Konfiguration übernommen.
+  `last_reconcile_at` bleibt leer, bis ein echter Reconciliation-Lauf ihn setzt.
+- Keine Gastprüfung, kein Grant-Schreiben und keine automatische Aktivierung von
+  `auto_eligible` durch einen reinen Statusabruf.
+
+### English
+
+- Fixes protected LXC allowlist status mapping: legacy and split simulation grants
+  are exposed correctly as `authorized_container_ids`.
+- `update_authorized` is never implicitly treated as simulation authorization;
+  malformed policies and unknown modes fail closed.
+- The active policy mode is validated from the agent configuration. The
+  `last_reconcile_at` field stays empty until a real reconciliation run sets it.
+- A status read never probes guests, writes grants, or enables `auto_eligible`.
+
+This is an isolated Beta.48 candidate. Merge, tag, publication and productive
+installation require separate approval.
+
 ## 0.1.0-beta.47 – Eligibility metadata recovery
 
 ### Deutsch

@@ -1,5 +1,24 @@
 # Smart Homelab Maintenance
 
+## Beta.48 orchestration-status integrity / Orchestrierungsstatus-Integrität
+
+Der Beta.48-Kandidat korrigiert die read-only Orchestrierungsanzeige: neun
+bestehende Simulationsfreigaben einschließlich des Legacy-Formats werden aus
+der geschützten Allowlist korrekt dargestellt. Eine Update-Freigabe wird nie
+als Simulation interpretiert. Beschädigte Policies und unbekannte Modi bleiben
+fail-closed; ein Statusabruf führt keine Gastprüfung und keine Grant-Schreibung
+aus. `last_reconcile_at` bleibt leer, bis ein echter Reconciliation-Lauf ihn
+setzt. Merge, Veröffentlichung und produktive Installation benötigen eine
+separate Freigabe.
+
+The Beta.48 candidate fixes the read-only orchestration display: nine existing
+simulation grants, including the legacy format, are mapped from the protected
+allowlist correctly. Update authorization is never treated as simulation
+authorization. Malformed policies and unknown modes fail closed; a status read
+performs no guest probe or grant write. `last_reconcile_at` stays empty until a
+real reconciliation run sets it. Merge, publication and productive installation
+require separate approval.
+
 ## Beta.47 eligibility-metadata fix / Beta.47-Eligibility-Metadaten-Fix
 
 Beta.47 übernimmt nach einer gespeicherten Freigabe die nachgewiesenen
