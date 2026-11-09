@@ -5,6 +5,7 @@ listen_port = 48128
 api_version = "1"
 state_directory = "/var/lib/smart-homelab-maintenance"
 execution_enabled = false
+policy_mode = "discover_only"
 certificate = "/etc/smart-homelab-maintenance/agent.crt"
 private_key = "/etc/smart-homelab-maintenance/agent.key"
 proxmox_url = "https://proxmox.example.home.arpa:8006/api2/json"

@@ -29,7 +29,8 @@ from .jobs import JobRepository
 from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInventoryBackend
 from .updates import AptCommandRunner, AptUpdateReader, RootHelperTransport, UpdateService, make_targets
 from .security import redact_secrets
-from .orchestration_status import read_installation_status
+from .orchestration_status import OrchestrationStatus, read_installation_status
+from .policy import PolicyMode
 from .permissions import PermissionStore, PolicyHelperTransport
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ class AgentRuntimeConfig:
     max_response_bytes: int = 256_000
     update_targets: dict[str, dict[str, Any]] = field(default_factory=dict)
     lxc_helper_enabled: bool = False
+    policy_mode: str = PolicyMode.DISCOVER_ONLY.value
 
 
 def _strict_bool(value: Any, name: str) -> bool:
@@ -123,7 +125,12 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
             raise ValueError("update target metadata must be strings")
         update_targets[target] = dict(values)
     helper_enabled = _strict_bool(raw.get("lxc_helper_enabled", False), "lxc_helper_enabled")
-    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets, helper_enabled)
+    policy_mode = str(raw.get("policy_mode", PolicyMode.DISCOVER_ONLY.value))
+    try:
+        policy_mode = PolicyMode(policy_mode).value
+    except ValueError as exc:
+        raise ValueError("policy_mode is invalid") from exc
+    return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets, helper_enabled, policy_mode)
 
 
 def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:
@@ -141,6 +148,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
     discovery = DiscoveryService(backend)
     guest_transport = RootHelperTransport() if config.lxc_helper_enabled else None
     policy_transport = PolicyHelperTransport()
+    runtime_status = OrchestrationStatus(policy_mode=config.policy_mode)
     updates = UpdateService(
         lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()], config.update_targets, discovery.virtual_machines()),
         runner=AptCommandRunner(guest_transport=guest_transport),
@@ -158,7 +166,11 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         updates=updates,
         read_token=agent_token,
         max_bytes=config.max_response_bytes,
-        orchestration_status=lambda: read_installation_status(policy_reader=policy_transport.read),
+        orchestration_status=lambda: read_installation_status(
+            policy_reader=policy_transport.read,
+            policy_mode_reader=lambda: config.policy_mode,
+            runtime_status=runtime_status,
+        ),
     )
     return application, repository
 

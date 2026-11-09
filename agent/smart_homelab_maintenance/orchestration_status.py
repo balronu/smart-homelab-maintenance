@@ -7,6 +7,8 @@ import stat
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from .policy import PolicyMode
+
 
 HELPER_PATH = Path("/usr/libexec/smart-homelab-maintenance/lxc-apt-helper")
 DISCOVERY_PATH = Path("/usr/libexec/smart-homelab-maintenance/lxc-discovery.py")
@@ -43,7 +45,33 @@ def _root_regular(path: Path) -> bool:
     return stat.S_ISREG(info.st_mode) and info.st_uid == 0
 
 
-def read_installation_status(*, policy_reader: Callable[[], Mapping[str, Mapping[str, Any]]] | None = None) -> OrchestrationStatus:
+def _authorized_ids(entries: Mapping[str, Mapping[str, Any]]) -> list[int]:
+    """Normalize legacy and split grants without conflating their meanings."""
+
+    result: list[int] = []
+    for raw_id, values in entries.items():
+        if not isinstance(raw_id, str) or not raw_id.isdigit():
+            raise ValueError("policy container id is invalid")
+        container_id = int(raw_id)
+        if not 1 <= container_id <= 999_999 or not isinstance(values, Mapping):
+            raise ValueError("policy container entry is invalid")
+        for key in ("authorized", "simulation_authorized", "update_authorized"):
+            if key in values and not isinstance(values[key], bool):
+                raise ValueError("policy authorization field is invalid")
+        # An explicit split field wins over the legacy field.  update_authorized
+        # is deliberately never used as a simulation grant.
+        simulation = values["simulation_authorized"] if "simulation_authorized" in values else values.get("authorized", False)
+        if simulation is True:
+            result.append(container_id)
+    return sorted(set(result))
+
+
+def read_installation_status(
+    *,
+    policy_reader: Callable[[], Mapping[str, Mapping[str, Any]]] | None = None,
+    policy_mode_reader: Callable[[], str] | None = None,
+    runtime_status: OrchestrationStatus | None = None,
+) -> OrchestrationStatus:
     """Return non-secret installation state without starting or changing anything."""
 
     helper_files = (HELPER_PATH, DISCOVERY_PATH, HELPER_UNIT_PATH, DISCOVERY_UNIT_PATH)
@@ -54,16 +82,35 @@ def read_installation_status(*, policy_reader: Callable[[], Mapping[str, Mapping
         socket_active = False
     policy_ok = False
     security_error: str | None = None
+    policy_mode = "discover_only"
+    authorized_ids: list[int] = []
     if policy_reader is not None:
         try:
-            policy_ok = isinstance(policy_reader(), Mapping)
+            entries = policy_reader()
+            if not isinstance(entries, Mapping):
+                raise ValueError("policy response is not a mapping")
+            authorized_ids = _authorized_ids(entries)
+            policy_ok = True
         except Exception:
             # Never expose helper/file details through the status endpoint.
             security_error = "policy_unavailable"
+    if policy_mode_reader is not None:
+        try:
+            policy_mode = PolicyMode(policy_mode_reader()).value
+        except Exception:
+            security_error = "policy_invalid"
+            policy_ok = False
+    current = runtime_status or OrchestrationStatus()
     return OrchestrationStatus(
         helper_installed=helper_installed,
         discovery_socket_active=socket_active,
-        integrity_ok=helper_installed and socket_active and policy_ok,
-        policy_mode="discover_only",
+        integrity_ok=helper_installed and socket_active and policy_ok and security_error is None,
+        policy_mode=policy_mode,
+        last_reconcile_at=current.last_reconcile_at,
+        authorized_container_ids=authorized_ids,
+        unauthorized_container_ids=list(current.unauthorized_container_ids),
+        stale_container_ids=list(current.stale_container_ids),
         security_error=security_error,
+        last_apply=current.last_apply,
+        rollback_status=current.rollback_status,
     )
