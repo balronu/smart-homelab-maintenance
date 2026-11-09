@@ -174,6 +174,19 @@ def test_permission_grant_probes_unknown_discovery_before_writing_policy(tmp_pat
     assert store.read()["102"]["os_name"] == "Debian"
 
 
+def test_permission_change_invalidates_cached_update_authorization(tmp_path):
+    store = PermissionStore(tmp_path / "policy.toml")
+    runner = Runner("0 upgraded, 0 newly installed, 0 to remove.")
+    service = UpdateService(
+        lambda: (ProbeTarget("container:102", "cloudflared", 102, "Debian", "12", "apt", False, True),),
+        runner=runner,
+        permission_store=store,
+    )
+    assert service.check("container:102").status == "unauthorized"
+    service.set_permissions("container:102", simulation_authorized=True, update_authorized=False, confirmed=True)
+    assert service.check("container:102").status == "current"
+
+
 def test_permission_metadata_is_reused_for_followup_update_checks(tmp_path):
     store = PermissionStore(tmp_path / "policy.toml")
     store.set_permissions(
