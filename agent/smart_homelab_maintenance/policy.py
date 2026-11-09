@@ -63,10 +63,10 @@ def parse_policy(raw: Mapping[str, Any]) -> Policy:
     return Policy(mode, generation, _ids(raw.get("manual_authorized_ids", [])))
 
 
-def load_policy(path: Path) -> Policy:
+def load_policy(path: Path, *, require_root: bool = True) -> Policy:
     try:
         mode = stat.S_IMODE(path.stat().st_mode)
-        if path.stat().st_uid != 0 or mode & 0o022:
+        if (require_root and path.stat().st_uid != 0) or mode & 0o022:
             raise PolicyError("policy file is not root-owned and safe")
         raw = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
@@ -98,3 +98,33 @@ def save_policy(path: Path, policy: Policy) -> None:
         except FileNotFoundError:
             pass
         raise
+
+
+class PolicyStore:
+    """Small persistent policy boundary owned by the agent process.
+
+    The store is deliberately separate from the root-owned guest allowlist.
+    It is only changed through the authenticated API controller, and a missing
+    file falls back to the safe discover-only migration default.
+    """
+
+    def __init__(self, path: Path, *, initial: Policy | None = None) -> None:
+        if not path.is_absolute():
+            raise ValueError("policy path must be absolute")
+        self.path = path
+        self.initial = initial or Policy()
+
+    def read(self) -> Policy:
+        if not self.path.exists():
+            return self.initial
+        return load_policy(self.path, require_root=False)
+
+    def write(self, policy: Policy, *, expected_generation: int, confirmed: bool) -> Policy:
+        if not confirmed:
+            raise PolicyError("explicit policy confirmation is required")
+        current = self.read()
+        if current.generation != expected_generation:
+            raise PolicyError("policy generation is stale")
+        candidate = Policy(policy.mode, expected_generation + 1, policy.manual_authorized_ids)
+        save_policy(self.path, candidate)
+        return self.read()

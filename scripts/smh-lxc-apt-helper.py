@@ -191,6 +191,24 @@ def handle_policy(request: Any, path: Path = DEFAULT_ALLOWLIST) -> dict[str, Any
         if set(request) != {"operation"}:
             raise HelperError("invalid_request", "policy_read accepts no additional fields")
         return {"ok": True, "operation": operation, "entries": _load_policy_entries(path)}
+    if operation == "policy_apply":
+        if set(request) != {"operation", "entries", "confirm"} or request.get("confirm") is not True:
+            raise HelperError("confirmation_required", "complete allowlist apply requires explicit confirmation")
+        entries = request.get("entries")
+        if not isinstance(entries, dict):
+            raise HelperError("allowlist_invalid", "allowlist candidate must be an object")
+        _validate_policy_entries(entries)
+        normalized: dict[str, dict[str, Any]] = {}
+        for raw_id, values in entries.items():
+            if values.get("authorized") is not True or values.get("simulation_authorized") is not True:
+                raise HelperError("invalid_permissions", "every applied entry must be simulation-authorized")
+            if values.get("update_authorized") is True:
+                raise HelperError("invalid_permissions", "automatic orchestration cannot grant updates")
+            if values.get("package_manager") != "apt" or str(values.get("os_name", "")).lower() not in {"debian", "ubuntu"} or not values.get("os_version"):
+                raise HelperError("unsupported_target", "only proven Debian/Ubuntu APT entries may be applied")
+            normalized[raw_id] = dict(values)
+        _write_policy_entries(path, normalized)
+        return {"ok": True, "operation": operation, "data": {"authorized_ids": sorted(map(int, normalized))}}
     if operation != "policy_set" or set(request) != {"operation", "target", "simulation_authorized", "update_authorized", "metadata", "confirm"}:
         raise HelperError("invalid_request", "policy_set request is invalid")
     target = request["target"]

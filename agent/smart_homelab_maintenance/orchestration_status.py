@@ -25,6 +25,7 @@ class OrchestrationStatus:
     helper_commit: str | None = None
     integrity_ok: bool = False
     policy_mode: str = "discover_only"
+    policy_generation: int = 0
     last_reconcile_at: str | None = None
     authorized_container_ids: list[int] = field(default_factory=list)
     unauthorized_container_ids: list[int] = field(default_factory=list)
@@ -70,6 +71,7 @@ def read_installation_status(
     *,
     policy_reader: Callable[[], Mapping[str, Mapping[str, Any]]] | None = None,
     policy_mode_reader: Callable[[], str] | None = None,
+    policy_generation_reader: Callable[[], int] | None = None,
     runtime_status: OrchestrationStatus | None = None,
 ) -> OrchestrationStatus:
     """Return non-secret installation state without starting or changing anything."""
@@ -83,6 +85,7 @@ def read_installation_status(
     policy_ok = False
     security_error: str | None = None
     policy_mode = "discover_only"
+    policy_generation = 0
     authorized_ids: list[int] = []
     if policy_reader is not None:
         try:
@@ -100,12 +103,22 @@ def read_installation_status(
         except Exception:
             security_error = "policy_invalid"
             policy_ok = False
+    if policy_generation_reader is not None:
+        try:
+            generation = policy_generation_reader()
+            if isinstance(generation, bool) or not isinstance(generation, int) or generation < 0:
+                raise ValueError("invalid generation")
+            policy_generation = generation
+        except Exception:
+            security_error = "policy_invalid"
+            policy_ok = False
     current = runtime_status or OrchestrationStatus()
     return OrchestrationStatus(
         helper_installed=helper_installed,
         discovery_socket_active=socket_active,
         integrity_ok=helper_installed and socket_active and policy_ok and security_error is None,
         policy_mode=policy_mode,
+        policy_generation=policy_generation,
         last_reconcile_at=current.last_reconcile_at,
         authorized_container_ids=authorized_ids,
         unauthorized_container_ids=list(current.unauthorized_container_ids),

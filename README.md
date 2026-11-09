@@ -1,5 +1,24 @@
 # Smart Homelab Maintenance
 
+## Beta.49 controlled LXC orchestration / Kontrollierte LXC-Orchestrierung
+
+Beta.49 verbindet die bestehende Eligibility-Planung mit einem authentifizierten
+Agent-/HA-Ablauf: aktuelle Policy anzeigen, Policy-Wechsel vorbereiten, eine
+explizite nicht schreibende Preview starten und einen unveränderten Plan erst
+nach ausdrücklicher Bestätigung anwenden. Die Preview prüft ausschließlich
+laufende Debian-/Ubuntu-LXCs mit nachgewiesenem APT; VMs und gestoppte Container
+werden ausgeschlossen. `execution_enabled=false` sowie die Trennung von
+Simulations- und Update-Grants bleiben unverändert.
+
+Beta.49 connects the existing eligibility planner to an authenticated
+agent/Home Assistant workflow: show the current policy, prepare a policy
+change, start an explicit non-writing preview, and apply an unchanged plan only
+after explicit confirmation. Preview probes are limited to running
+Debian/Ubuntu LXCs with proven APT; VMs and stopped containers are excluded.
+`execution_enabled=false` and the separation of simulation and update grants
+remain unchanged. Merge, publication and productive installation require
+separate approval.
+
 ## Beta.48 orchestration-status integrity / Orchestrierungsstatus-Integrität
 
 Der Beta.48-Kandidat korrigiert die read-only Orchestrierungsanzeige: neun
