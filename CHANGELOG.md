@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.0-beta.49 – Controlled LXC orchestration
+
+### Deutsch
+
+- Ergänzt authentifizierte Policy-Routen für `discover_only` und `auto_eligible`.
+- Ergänzt eine explizit gestartete Eligibility-Preview ohne Allowlist-Schreibzugriff.
+- Ergänzt einen separaten, bestätigungspflichtigen Apply mit Stale-Plan-Prüfung,
+  atomarem Helper-Schreibpfad und Read-back-Grenze.
+- Gestoppte Container, VMs und Update-Berechtigungen bleiben ausgeschlossen;
+  `execution_enabled=false` bleibt unverändert.
+
+### English
+
+- Adds authenticated policy routes for `discover_only` and `auto_eligible`.
+- Adds an explicitly started eligibility preview that never writes the allowlist.
+- Adds a separate confirmed apply with stale-plan validation, atomic helper apply,
+  and a read-back boundary.
+- Stopped containers, VMs, and update permissions remain excluded;
+  `execution_enabled=false` is unchanged.
+
+This is an isolated Beta.49 candidate. Merge, publication and productive
+installation require separate approval.
+
 ## 0.1.0-beta.48 – Orchestration status integrity
 
 ### Deutsch

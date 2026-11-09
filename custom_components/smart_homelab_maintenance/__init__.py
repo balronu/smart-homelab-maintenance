@@ -66,7 +66,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     if vol is not None:
         async def handle_action(call):
             entry_id = call.data.get("entry_id")
-            if call.service == "set_permissions":
+            if call.service in {"set_permissions", "policy_prepare", "policy_apply", "orchestration_preview", "orchestration_apply"}:
                 user_id = getattr(call.context, "user_id", None)
                 if not user_id or not hasattr(hass, "auth"):
                     return {"error": "administrator_required"}
@@ -87,8 +87,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 plan_digest=call.data.get("plan_digest"),
                 simulation_authorized=call.data.get("simulation_authorized", False),
                 update_authorized=call.data.get("update_authorized", False),
+                mode=call.data.get("mode"),
+                generation=call.data.get("generation"),
+                preview_token=call.data.get("preview_token"),
+                manual_authorized_ids=list(call.data.get("manual_authorized_ids", [])),
             )
-            if call.service in ("dry_run", "set_permissions"):
+            if call.service in ("dry_run", "set_permissions", "policy_apply", "orchestration_preview", "orchestration_apply"):
                 if call.service == "dry_run":
                     coordinator.record_dry_run(str(call.data.get("target")), result.get("data", result))
                 await coordinator.async_request_refresh()
@@ -104,8 +108,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             vol.Optional("simulation_authorized", default=False): cv.boolean,
             vol.Optional("update_authorized", default=False): cv.boolean,
             vol.Optional("after", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=1000000)),
+            vol.Optional("mode"): vol.In({"discover_only", "auto_eligible"}),
+            vol.Optional("generation"): vol.All(vol.Coerce(int), vol.Range(min=0, max=1000000)),
+            vol.Optional("preview_token"): str,
+            vol.Optional("manual_authorized_ids", default=[]): [vol.All(vol.Coerce(int), vol.Range(min=1, max=999999))],
         })
-        for action in ("check", "get_job", "get_job_events", "dry_run", "execute", "set_permissions"):
+        for action in ("check", "get_job", "get_job_events", "dry_run", "execute", "set_permissions", "policy_prepare", "policy_apply", "orchestration_preview", "orchestration_apply"):
             kwargs = {"schema": schema}
             if SupportsResponse is not None:
                 kwargs["supports_response"] = SupportsResponse.ONLY

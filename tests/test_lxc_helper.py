@@ -169,6 +169,20 @@ def test_policy_socket_rejects_update_without_simulation(tmp_path: Path) -> None
         }, allowlist)
 
 
+def test_policy_apply_replaces_complete_candidate_atomically_without_update_grants(tmp_path: Path) -> None:
+    allowlist = tmp_path / "allowlist.toml"
+    allowlist.write_text('[containers."999"]\nauthorized = true\nos_name = "Debian"\nos_version = "12"\npackage_manager = "apt"\n', encoding="utf-8")
+    allowlist.chmod(0o600)
+    result = helper.handle_policy({
+        "operation": "policy_apply", "confirm": True,
+        "entries": {"101": {"authorized": True, "simulation_authorized": True,
+                              "update_authorized": False, "os_name": "Debian",
+                              "os_version": "12", "package_manager": "apt"}},
+    }, allowlist)
+    assert result["data"]["authorized_ids"] == [101]
+    assert helper._load_permissions(allowlist) == ({101}, set())
+
+
 def test_helper_rejects_malformed_status() -> None:
     response = helper.handle(
         {"container_id": 101, "operation": "read"},

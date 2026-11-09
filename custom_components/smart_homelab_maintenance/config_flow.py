@@ -22,6 +22,7 @@ def validate_config(data: Mapping[str, Any]) -> dict[str, Any]:
 
 try:
     from homeassistant import config_entries
+    from homeassistant.helpers import config_validation as cv
     import voluptuous as vol
 
     async def _check_agent(data: Mapping[str, Any]) -> None:
@@ -68,12 +69,33 @@ try:
                     mode = str(user_input[CONF_POLICY_MODE])
                     if mode not in POLICY_MODES:
                         return self.async_show_form(step_id="init", errors={"base": "invalid_policy_mode"})
-                    data[CONF_POLICY_MODE] = mode
+                    self._pending_policy_mode = mode
+                    try:
+                        transport = AgentHttpTransport(TransportConfig(self.config_entry.data[CONF_AGENT_URL], self.config_entry.data[CONF_TOKEN], ca_file=self.config_entry.data.get(CONF_CA_FILE)))
+                        current = await transport.policy()
+                        self._pending_policy_generation = int(current.get("data", {}).get("generation", 0))
+                        await transport.policy_prepare(mode=mode, generation=self._pending_policy_generation)
+                    except (TransportError, ValueError, TypeError):
+                        return self.async_show_form(step_id="init", errors={"base": "policy_unavailable"})
+                    self._pending_scan_interval = data[CONF_SCAN_INTERVAL]
+                    return await self.async_step_confirm_policy()
                 return self.async_create_entry(data=data)
             return self.async_show_form(step_id="init", data_schema=vol.Schema({
                 vol.Required(CONF_SCAN_INTERVAL, default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)),
                 vol.Optional(CONF_POLICY_MODE): vol.In(POLICY_MODES),
             }))
+
+        async def async_step_confirm_policy(self, user_input=None):
+            if user_input is not None:
+                if not user_input.get("confirm", False):
+                    return self.async_show_form(step_id="confirm_policy", errors={"base": "confirmation_required"})
+                try:
+                    transport = AgentHttpTransport(TransportConfig(self.config_entry.data[CONF_AGENT_URL], self.config_entry.data[CONF_TOKEN], ca_file=self.config_entry.data.get(CONF_CA_FILE)))
+                    await transport.policy_apply(mode=self._pending_policy_mode, generation=self._pending_policy_generation, confirm=True)
+                except (TransportError, ValueError, TypeError):
+                    return self.async_show_form(step_id="confirm_policy", errors={"base": "policy_apply_failed"})
+                return self.async_create_entry(data={CONF_SCAN_INTERVAL: self._pending_scan_interval})
+            return self.async_show_form(step_id="confirm_policy", data_schema=vol.Schema({vol.Required("confirm", default=False): cv.boolean}))
 except ImportError:
     SmartHomelabConfigFlow = None
     SmartHomelabOptionsFlow = None

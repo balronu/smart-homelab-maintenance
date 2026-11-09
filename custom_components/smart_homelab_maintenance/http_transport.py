@@ -291,6 +291,21 @@ class AgentHttpTransport:
     async def orchestration(self) -> dict[str, Any]:
         return await self.get("/api/v1/orchestration")
 
+    async def policy(self) -> dict[str, Any]:
+        return await self.get("/api/v1/policy")
+
+    async def policy_prepare(self, *, mode: str, generation: int, manual_authorized_ids: list[int] | None = None) -> dict[str, Any]:
+        return await self._post_json("/api/v1/policy/prepare", {"mode": mode, "generation": generation, "manual_authorized_ids": manual_authorized_ids or []})
+
+    async def policy_apply(self, *, mode: str, generation: int, confirm: bool, manual_authorized_ids: list[int] | None = None) -> dict[str, Any]:
+        return await self._post_json("/api/v1/policy/apply", {"mode": mode, "generation": generation, "confirm": bool(confirm), "manual_authorized_ids": manual_authorized_ids or []})
+
+    async def orchestration_preview(self) -> dict[str, Any]:
+        return await self._post_json("/api/v1/orchestration/preview", {})
+
+    async def orchestration_apply(self, *, preview_token: str, confirm: bool) -> dict[str, Any]:
+        return await self._post_json("/api/v1/orchestration/apply", {"preview_token": preview_token, "confirm": bool(confirm)})
+
     async def jobs(self) -> dict[str, Any]:
         return await self.get("/api/v1/jobs?limit=100")
 
@@ -299,3 +314,15 @@ class AgentHttpTransport:
 
     async def job_events(self, job_id: str, after: int = 0) -> dict[str, Any]:
         return await self.get(f"/api/v1/jobs/{job_id}/events?after={after}&limit=50")
+
+    async def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(self._post_json_sync, path, payload), self.config.timeout_seconds)
+        except asyncio.TimeoutError as exc:
+            raise TransportError("timeout", "agent request timed out") from exc
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, ssl.SSLError):
+                raise TransportError("tls_error", "agent TLS verification failed") from exc
+            raise TransportError("connection", "agent connection failed") from exc
+        except (ConnectionError, OSError) as exc:
+            raise TransportError("connection", "agent connection failed") from exc

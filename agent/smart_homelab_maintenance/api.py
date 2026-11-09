@@ -21,13 +21,14 @@ from . import API_CONTRACT_VERSION, __version__
 
 
 class ApiApplication:
-    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None) -> None:
+    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None, orchestration: Any | None = None) -> None:
         self.discovery = discovery
         self.jobs = jobs
         self.updates = updates
         self.read_token = read_token
         self.max_bytes = max_bytes
         self.orchestration_status = orchestration_status
+        self.orchestration = orchestration
 
     def handle(self, method: str, path: str, *, headers: Mapping[str, str] | None = None, body: bytes | None = None) -> tuple[int, dict[str, Any]]:
         request_id = secrets.token_hex(8)
@@ -74,6 +75,10 @@ class ApiApplication:
             value = current_status.as_dict() if hasattr(current_status, "as_dict") else dict(current_status)
             ready = value.get("helper_installed") is True and value.get("discovery_socket_active") is True and value.get("integrity_ok") is True
             return {"status": "ok" if ready else "unavailable", **value}
+        if path == "/api/v1/policy" and method == "GET":
+            if self.orchestration is None:
+                raise ValidationError("orchestration is unavailable")
+            return self.orchestration.policy()
         if path == "/api/v1/host":
             return self.discovery.host()
         if path == "/api/v1/virtual-machines":
@@ -125,6 +130,23 @@ class ApiApplication:
             return self.updates.set_permissions(parts[3], simulation_authorized=request["simulation_authorized"], update_authorized=request["update_authorized"], confirmed=request.get("confirm") is True)
         if path in {"/api/v1/update", "/api/v1/execute"}:
             raise ValidationError("use the target-scoped, confirmed update endpoint")
+        if path in {"/api/v1/policy/prepare", "/api/v1/policy/apply"} and method == "POST":
+            if self.orchestration is None:
+                raise ValidationError("orchestration is unavailable")
+            request = self._json_object(body, "policy")
+            return (self.orchestration.prepare_policy(request) if path.endswith("/prepare")
+                    else self.orchestration.apply_policy(request))
+        if path == "/api/v1/orchestration/preview" and method == "POST":
+            if self.orchestration is None:
+                raise ValidationError("orchestration is unavailable")
+            request = self._json_object(body, "preview")
+            if request:
+                raise ValidationError("preview accepts an empty JSON object only")
+            return self.orchestration.preview()
+        if path == "/api/v1/orchestration/apply" and method == "POST":
+            if self.orchestration is None:
+                raise ValidationError("orchestration is unavailable")
+            return self.orchestration.apply(self._json_object(body, "apply"))
         if len(parts) == 4 and parts[:3] == ["api", "v1", "apps"]:
             return self.discovery.app(parts[3]).as_dict()
         if len(parts) == 4 and parts[:3] == ["api", "v1", "jobs"]:
@@ -151,3 +173,13 @@ class ApiApplication:
     @staticmethod
     def _error(code: str, message: str, request_id: str) -> dict[str, Any]:
         return {"schema_version": "1", "error": asdict(ApiError(code, str(redact_secrets(message)), request_id))}
+
+    @staticmethod
+    def _json_object(body: bytes, operation: str) -> dict[str, Any]:
+        try:
+            value = json.loads(body.decode("utf-8")) if body else {}
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValidationError(f"{operation} body must be valid JSON") from exc
+        if not isinstance(value, dict):
+            raise ValidationError(f"{operation} body must be a JSON object")
+        return value

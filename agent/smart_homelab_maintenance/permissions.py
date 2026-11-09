@@ -85,6 +85,16 @@ class PolicyHelperTransport:
             "confirm": True,
         }).get("data", {})
 
+    def apply_allowlist(self, entries: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+        """Apply a complete, already-reviewed candidate through the helper."""
+        if not isinstance(entries, Mapping):
+            raise ValidationError("allowlist candidate is invalid")
+        return self._call({
+            "operation": "policy_apply",
+            "entries": {str(key): dict(value) for key, value in entries.items()},
+            "confirm": True,
+        }).get("data", {})
+
 
 class PermissionStore:
     def __init__(self, path: str | os.PathLike[str], *, require_root: bool = False, privileged_transport: PolicyHelperTransport | None = None) -> None:

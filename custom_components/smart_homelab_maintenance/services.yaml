@@ -123,3 +123,69 @@ set_permissions:
       required: true
       selector:
         boolean:
+
+policy_prepare:
+  name: Prepare orchestration policy
+  description: Validate a discover-only or auto-eligible policy candidate without changing the agent or guests.
+  fields:
+    mode:
+      required: true
+      selector:
+        select:
+          options:
+            - discover_only
+            - auto_eligible
+    generation:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    manual_authorized_ids:
+      required: false
+      selector:
+        object: {}
+
+policy_apply:
+  name: Apply orchestration policy
+  description: Apply a prepared policy only with the current generation and explicit confirmation.
+  fields:
+    mode:
+      required: true
+      selector:
+        select:
+          options:
+            - discover_only
+            - auto_eligible
+    generation:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    confirm:
+      required: true
+      selector:
+        boolean: {}
+    manual_authorized_ids:
+      required: false
+      selector:
+        object: {}
+
+orchestration_preview:
+  name: Preview LXC eligibility
+  description: Explicitly probe eligible running LXC containers and return a non-writing plan.
+  fields: {}
+
+orchestration_apply:
+  name: Apply LXC eligibility plan
+  description: Apply an unchanged preview plan only after explicit confirmation.
+  fields:
+    preview_token:
+      required: true
+      selector:
+        text: {}
+    confirm:
+      required: true
+      selector:
+        boolean: {}

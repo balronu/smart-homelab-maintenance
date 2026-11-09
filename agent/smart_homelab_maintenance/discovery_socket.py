@@ -15,6 +15,7 @@ import socket
 import socketserver
 import struct
 import threading
+import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,28 @@ EXPECTED_CLIENT_USER = "smart-homelab-maintenance"
 
 class DiscoverySocketError(ValueError):
     """A bounded, structured discovery socket error."""
+
+
+class DiscoverySocketTransport:
+    """Bounded client for the fixed root-owned discovery socket."""
+
+    def __init__(self, *, timeout_seconds: float = 10.0, socket_path: str = DISCOVERY_SOCKET) -> None:
+        if socket_path != DISCOVERY_SOCKET or not 1.0 <= timeout_seconds <= 15.0:
+            raise ValueError("discovery transport configuration is invalid")
+        self.timeout_seconds = timeout_seconds
+        self.socket_path = socket_path
+
+    def probe(self, container_id: int) -> Mapping[str, str]:
+        request = (json.dumps(build_request(container_id).as_dict(), separators=(",", ":")) + "\n").encode()
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+            channel.settimeout(self.timeout_seconds)
+            channel.connect(self.socket_path)
+            channel.sendall(request)
+            raw = channel.recv(64 * 1024 + 1)
+        if len(raw) > 64 * 1024:
+            raise DiscoverySocketError("probe_response_too_large")
+        response = json.loads(raw.decode().splitlines()[0])
+        return validate_response(response, container_id=container_id)
 
 
 def verify_peer_uid(sock: socket.socket, *, expected_uid: int | None = None) -> None:

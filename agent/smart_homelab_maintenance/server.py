@@ -30,8 +30,12 @@ from .proxmox_backend import ProxmoxApiClient, ProxmoxClientConfig, ProxmoxInven
 from .updates import AptCommandRunner, AptUpdateReader, RootHelperTransport, UpdateService, make_targets
 from .security import redact_secrets
 from .orchestration_status import OrchestrationStatus, read_installation_status
-from .policy import PolicyMode
+from .policy import Policy, PolicyMode, PolicyStore
 from .permissions import PermissionStore, PolicyHelperTransport
+from .discovery_socket import DiscoverySocketTransport
+from .helper_apply_controller import HelperAllowlistApplyController
+from .orchestrator import LxcOrchestrator
+from .orchestration_service import OrchestrationService
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -148,7 +152,15 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
     discovery = DiscoveryService(backend)
     guest_transport = RootHelperTransport() if config.lxc_helper_enabled else None
     policy_transport = PolicyHelperTransport()
+    policy_store = PolicyStore(Path(config.state_directory) / "policy.json", initial=Policy(PolicyMode(config.policy_mode)))
     runtime_status = OrchestrationStatus(policy_mode=config.policy_mode)
+    orchestrator = LxcOrchestrator(HelperAllowlistApplyController(policy_transport), runtime_status)
+    orchestration = OrchestrationService(
+        discovery, policy_store, orchestrator,
+        DiscoverySocketTransport() if config.lxc_helper_enabled else None,
+        status=runtime_status,
+        authorized_ids_reader=lambda: read_installation_status(policy_reader=policy_transport.read).authorized_container_ids,
+    )
     updates = UpdateService(
         lambda: make_targets(discovery.host(), [item.as_dict() for item in discovery.containers()], config.update_targets, discovery.virtual_machines()),
         runner=AptCommandRunner(guest_transport=guest_transport),
@@ -168,9 +180,11 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         max_bytes=config.max_response_bytes,
         orchestration_status=lambda: read_installation_status(
             policy_reader=policy_transport.read,
-            policy_mode_reader=lambda: config.policy_mode,
+            policy_mode_reader=lambda: policy_store.read().mode.value,
+            policy_generation_reader=lambda: policy_store.read().generation,
             runtime_status=runtime_status,
         ),
+        orchestration=orchestration,
     )
     return application, repository
 

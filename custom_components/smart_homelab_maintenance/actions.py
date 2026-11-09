@@ -9,7 +9,7 @@ from .http_transport import AgentHttpTransport, TransportError
 from .const import ACTIONS
 
 
-async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, plan_digest: str | None = None, simulation_authorized: bool = False, update_authorized: bool = False) -> dict[str, Any]:
+async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, plan_digest: str | None = None, simulation_authorized: bool = False, update_authorized: bool = False, mode: str | None = None, generation: int | None = None, preview_token: str | None = None, manual_authorized_ids: list[int] | None = None) -> dict[str, Any]:
     if action not in ACTIONS:
         raise ValueError("unknown action")
     if action == "check":
@@ -34,4 +34,18 @@ async def async_action(transport: AgentHttpTransport, action: str, *, job_id: st
         if not target or confirm is not True:
             raise ValueError("target and explicit confirmation are required")
         return await transport.set_permissions(target, simulation_authorized=simulation_authorized, update_authorized=update_authorized)
+    if action == "policy_prepare":
+        if mode not in {"discover_only", "auto_eligible"} or generation is None:
+            raise ValueError("mode and generation are required")
+        return await transport.policy_prepare(mode=mode, generation=generation, manual_authorized_ids=manual_authorized_ids)
+    if action == "policy_apply":
+        if mode not in {"discover_only", "auto_eligible"} or generation is None or confirm is not True:
+            raise ValueError("mode, generation and explicit confirmation are required")
+        return await transport.policy_apply(mode=mode, generation=generation, confirm=True, manual_authorized_ids=manual_authorized_ids)
+    if action == "orchestration_preview":
+        return await transport.orchestration_preview()
+    if action == "orchestration_apply":
+        if not preview_token or confirm is not True:
+            raise ValueError("preview token and explicit confirmation are required")
+        return await transport.orchestration_apply(preview_token=preview_token, confirm=True)
     raise TransportError("execution_disabled", "preflight is not available until a later gated phase")

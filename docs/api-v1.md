@@ -19,6 +19,11 @@ Alle übrigen Endpunkte verlangen `Authorization: Bearer <read-token>`.
 | GET | `/api/v1/jobs/{job_id}` | Jobstatus ohne große Historie |
 | GET | `/api/v1/jobs/{job_id}/events?after=&limit=` | Cursor-basierte Ereignisse |
 | GET | `/api/v1/updates` | Passive Updateprüfung aller autorisierten Ziele |
+| GET | `/api/v1/policy` | Aktuelle Policy mit Generation |
+| POST | `/api/v1/policy/prepare` | Bestätigungslose Policy-Vorschau |
+| POST | `/api/v1/policy/apply` | Bestätigter Policy-Wechsel |
+| POST | `/api/v1/orchestration/preview` | Explizite, nicht schreibende Eligibility-Preview |
+| POST | `/api/v1/orchestration/apply` | Bestätigter, plan- und statusgeprüfter Allowlist-Apply |
 | GET | `/api/v1/updates/{target}` | Ergebnis für `host`, `container:{vmid}` oder `vm:{vmid}` |
 | POST | `/api/v1/updates/{target}/dry-run` | Bestätigte, feste Paketmanager-Simulation |
 | POST | `/api/v1/updates/container:{vmid}/execute` | Bestätigtes, plan-gebundenes `apt update` plus `apt upgrade` |
@@ -46,3 +51,12 @@ Route zur echten Updateausführung: `/execute` und `/update` werden auch bei
 direktem API-Aufruf serverseitig abgewiesen. Der Server bindet standardmäßig nicht öffentlich, verlangt Zertifikat und
 privaten Schlüssel, TLS ab 1.2 und ein systemd-Credential für das Bearer-Token.
 Es gibt keine POST-Route für echte Updates oder beliebige Shell-Kommandos.
+
+Policy- und Orchestrierungsrouten verlangen ebenfalls einen Bearer-Token. Ein
+Policy-Apply benötigt die aktuelle `generation` und `confirm=true`. Eine Preview
+führt nur bei aktivem `auto_eligible` die festen, begrenzten Eligibility-Probes
+für laufende Debian-/Ubuntu-LXCs aus; `discover_only` bleibt probe-frei. Die
+Preview schreibt niemals Grants. Der Apply akzeptiert ausschließlich einen
+unveränderten Preview-Token, führt die Probe gegen den aktuellen Bestand erneut
+aus und delegiert den atomaren Allowlist-Schreibvorgang an den root-owned Helper.
+Update-Grants werden durch diesen Pfad nie erzeugt.
