@@ -151,6 +151,13 @@ class ApiApplication:
             return self.discovery.app(parts[3]).as_dict()
         if len(parts) == 4 and parts[:3] == ["api", "v1", "jobs"]:
             return self.jobs.get(parts[3])
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "cancel" and method == "POST":
+            if self.updates is None:
+                raise ValidationError("job cancellation is unavailable")
+            request = self._json_object(body, "cancel")
+            if set(request) - {"confirm"}:
+                raise ValidationError("cancel accepts confirm")
+            return self.updates.cancel_job(parts[3], confirmed=request.get("confirm") is True)
         if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "events":
             return {"events": self.jobs.events(parts[3], after=self._int(query, "after", 0), limit=self._int(query, "limit", min(50, self.jobs.max_log_entries)))}
         raise KeyError(path)

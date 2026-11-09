@@ -548,6 +548,10 @@ class UpdateService:
             return {"target": target_id, "success": False, "safe": False, "error": "only authorized LXC targets may be updated"}
         if not target.update_authorized:
             return {"target": target_id, "success": False, "safe": False, "error": "target is not authorized for real updates"}
+        if self._jobs is not None and self._jobs.has_unresolved_target(target_id):
+            return {"target": target_id, "success": False, "safe": False,
+                    "error": "another update is active or requires manual recovery",
+                    "status": "manual_recovery_required"}
         current = self.check(target_id, force=True)
         if current.status != "updates_available" or not current.is_fresh():
             return {"target": target_id, "success": False, "safe": False, "error": "fresh updates are not available"}
@@ -622,6 +626,14 @@ class UpdateService:
             return {"target": target_id, "operation": "update", "success": False, "safe": False, "error": type(exc).__name__, "status": "manual_recovery_required", "job_id": job_id}
         finally:
             self._active_simulations.discard(target_id)
+
+    def cancel_job(self, job_id: str, *, confirmed: bool) -> dict[str, Any]:
+        """Cancel only pre-mutation work; running helper jobs remain locked."""
+        if confirmed is not True:
+            raise ValidationError("explicit cancellation confirmation is required")
+        if self._jobs is None:
+            raise ValidationError("persistent job tracking is unavailable")
+        return self._jobs.request_cancel(job_id)
 
 
 def make_targets(host: Mapping[str, Any], containers: Sequence[Mapping[str, Any]], target_overrides: Mapping[str, Mapping[str, Any]] | None = None, virtual_machines: Sequence[Mapping[str, Any]] = ()) -> list[ProbeTarget]:

@@ -408,3 +408,41 @@ def test_execute_revalidates_simulation_before_mutation_and_persists_job(tmp_pat
     assert stored["state"] == "succeeded"
     assert [call for call in runner.calls if call == 107] == [107, 107, 107]
     jobs.close()
+
+
+def test_cancel_is_persistent_before_mutation_and_api_requires_confirmation(tmp_path):
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    request = __import__("agent.smart_homelab_maintenance.types", fromlist=["JobRequest"]).JobRequest(
+        target="container:107", operation="update", expected_version=None,
+        idempotency_key="cancel-before-run", confirmation_hash="a" * 64)
+    job_id = jobs.create(request)
+    jobs.transition(job_id, __import__("agent.smart_homelab_maintenance.types", fromlist=["JobState", "JobPhase"]).JobState.PREFLIGHT,
+                    phase=__import__("agent.smart_homelab_maintenance.types", fromlist=["JobPhase"]).JobPhase.PREFLIGHT)
+    updates = UpdateService(lambda: (target(),), runner=Runner(), execution_enabled=True, jobs=jobs)
+    with pytest.raises(ValidationError, match="confirmation"):
+        updates.cancel_job(job_id, confirmed=False)
+    result = updates.cancel_job(job_id, confirmed=True)
+    assert result["accepted"] is True and result["state"] == "cancelled"
+    assert jobs.get(job_id)["cancel_requested"] == 1
+    assert jobs.has_unresolved_target("container:107") is False
+    jobs.close()
+
+
+def test_running_cancellation_is_refused_and_manual_recovery_blocks_new_mutation(tmp_path):
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    request = __import__("agent.smart_homelab_maintenance.types", fromlist=["JobRequest"]).JobRequest(
+        target="container:107", operation="update", expected_version=None,
+        idempotency_key="running-job", confirmation_hash="b" * 64)
+    job_id = jobs.create(request)
+    types = __import__("agent.smart_homelab_maintenance.types", fromlist=["JobState", "JobPhase"])
+    jobs.transition(job_id, types.JobState.PREFLIGHT, phase=types.JobPhase.PREFLIGHT)
+    jobs.transition(job_id, types.JobState.RUNNING, phase=types.JobPhase.EXECUTION)
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    updates = UpdateService(lambda: (authorized,), runner=Runner("Inst curl [1] (2)"), execution_enabled=True, jobs=jobs)
+    result = updates.cancel_job(job_id, confirmed=True)
+    assert result == {"accepted": False, "state": types.JobState.RUNNING, "reason": "running_cancellation_not_safe"}
+    assert jobs.get(job_id)["state"] == "running"
+    jobs.transition(job_id, types.JobState.MANUAL_RECOVERY, phase=types.JobPhase.RECOVERY, message="manual recovery required")
+    blocked = updates.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest="anything")
+    assert blocked["status"] == "manual_recovery_required"
+    jobs.close()

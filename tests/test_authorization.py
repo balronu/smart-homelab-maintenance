@@ -40,7 +40,9 @@ def test_auto_mode_authorizes_only_positive_running_apt_evidence():
 def test_stale_and_invalid_existing_permissions_are_not_retained():
     plan = plan_allowlist([record(201, running=False)], mode=AuthorizationMode.AUTO_AUTHORIZE_SUPPORTED_RUNNING, existing_authorized_ids=[201, 999999, 77])
     assert plan.authorized_ids == frozenset()
-    assert plan.removed_ids == frozenset({77, 999999})
+    # Present stopped/unsupported inventory entries are explicitly removed;
+    # retaining them would leave stale authorization in the allowlist.
+    assert plan.removed_ids == frozenset({77, 201, 999999})
 
 
 def test_render_has_only_concrete_authorized_numeric_entries():

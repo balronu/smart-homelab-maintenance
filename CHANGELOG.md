@@ -1,5 +1,34 @@
 # Changelog
 
+## Stable-readiness candidate after Beta.49
+
+### Deutsch
+
+- Behebt sieben reproduzierte Robustheits-/Sicherheitsfehler (sechs
+  Fehlerklassen) in Probe, Policy-Dateischutz, Reconciliation und
+  Allowlist-Status; fehlende Container werden nicht erfunden.
+- Persistiert Update-Jobs mit Cancel-Anforderung, Prozessidentitätsfeldern und
+  einer Sperre für aktive oder ungeklärte Jobs.
+- Abbruch ist nur vor der Paketmutation erlaubt. Laufende Helper-Updates werden
+  ohne verifizierbare PID/PGID nicht beendet; Unsicherheit führt zu
+  `manual_recovery_required` ohne Retry oder automatische Reparatur.
+- Browser-Regression prüft die zweistufige Installationsbestätigung.
+
+### English
+
+- Fixes seven reproduced regression failures across six probe, policy,
+  reconciliation, and allowlist robustness classes without inventing missing
+  containers.
+- Persists update jobs with cancellation requests, process-identity fields, and
+  a lock for active or unresolved jobs.
+- Cancellation is allowed only before package mutation. Running helper updates
+  are not killed without a verified PID/PGID; uncertainty becomes
+  `manual_recovery_required` with no retry or automatic repair.
+- Browser regression coverage checks the two-step installation confirmation.
+
+This is a PR candidate only. Merge, Stable publication, and productive testing
+require separate approval.
+
 ## 0.1.0-beta.49 – Controlled LXC orchestration
 
 ### Deutsch

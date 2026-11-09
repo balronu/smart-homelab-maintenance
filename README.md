@@ -19,6 +19,22 @@ Debian/Ubuntu LXCs with proven APT; VMs and stopped containers are excluded.
 remain unchanged. Merge, publication and productive installation require
 separate approval.
 
+## Stable-readiness candidate / Stable-Reife-Kandidat
+
+The open PR #77 adds a fail-closed update workflow: a fresh final simulation,
+separate installation confirmation, persistent progress and recovery states,
+and no automatic retry or repair. Cancellation is allowed only before
+mutation. Once a fixed helper update is running, cancellation is refused
+because no verifiable PID/PGID is exposed; the job remains locked for manual
+recovery. Real package actions remain disabled (`execution_enabled=false`).
+
+Der offene PR #77 ergänzt einen fail-closed Update-Workflow mit frischer
+Endsimulation, separater Installationsbestätigung sowie persistentem Fortschritt
+und Recovery. Während eines laufenden Helper-Updates wird ein Abbruch wegen
+fehlender verifizierbarer PID/PGID abgelehnt; der Job bleibt bis zur manuellen
+Recovery gesperrt. Echte Paketaktionen bleiben mit `execution_enabled=false`
+deaktiviert.
+
 ## Beta.48 orchestration-status integrity / Orchestrierungsstatus-Integrität
 
 Der Beta.48-Kandidat korrigiert die read-only Orchestrierungsanzeige: neun
