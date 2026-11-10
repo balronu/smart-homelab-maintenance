@@ -101,13 +101,19 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
 }
 const originalUpdateItems = SmartHomelabMaintenanceCard.prototype._updateItems;
 SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labels, prefix) {
+  // Permission writes invalidate the agent's update cache for every guest.
+  // Keep each guest's last successful snapshot visible during that bounded
+  // readback window, but only while a confirmed permission override exists.
+  // The override itself always wins, so a changed grant is never presented as
+  // the old grant while the backend is converging.
+  const permissionReadbackPending = this._permissionOverrides.size > 0;
   const normalized = items.map((item) => {
     const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id);
     const target = `${kind}:${id}`;
     const base = item.update === null ? { status: "not_checked" } : (item.update || {});
     const override = this._permissionOverrides.get(target);
     const hasPermissionFields = typeof base.simulation_authorized === "boolean" || typeof base.update_authorized === "boolean";
-    const snapshot = hasPermissionFields && override ? this._updateSnapshots.get(target) : null;
+    const snapshot = hasPermissionFields && permissionReadbackPending ? this._updateSnapshots.get(target) : null;
     if (!snapshot) this._updateSnapshots.delete(target);
     if (override && samePermissions(base, override) && ["updates_available", "current"].includes(base.status)) this._permissionOverrides.delete(target);
     const effectiveOverride = hasPermissionFields ? override : null;

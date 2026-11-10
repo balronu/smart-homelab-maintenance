@@ -1,16 +1,19 @@
 # Smart Homelab Maintenance
 
-## v1.0.1 – Stable
+## v1.0.2 – Stable
 
 ### Deutsch
 
-Patchrelease für die Home-Assistant-Karte: Nach einer Berechtigungsänderung
-wird der bestätigte Backend-Readback beider Berechtigungen verlangt und der
-gemeinsame UI-Zustand konsistent aktualisiert. Ein fehlender Readback wird als
-Fehler angezeigt; es gibt keine falsche Erfolgsmeldung und keine Erweiterung
-der Ausführungsberechtigungen.
+Patchrelease für die Home-Assistant-Karte: Eine Berechtigungsänderung für einen
+Container darf den Update- und Simulationszustand anderer Container nicht
+zurücksetzen. Der bestätigte Backend-Readback bleibt zielbezogen; erfolgreiche
+Simulationssnapshots werden während eines kurzzeitigen globalen `not_checked`-
+Readbacks für den jeweiligen Container erhalten. Fehlender Readback wird als
+Warnung angezeigt; alte Berechtigungen werden nicht dauerhaft als bestätigt
+dargestellt.
 
-Der Agent `1.0.0` bleibt mit diesem Patchrelease kompatibel. Der API-Vertrag
+Der Agent behält sein Verhalten unverändert; die Version `1.0.1` bleibt mit diesem
+Patchrelease kompatibel. Der API-Vertrag
 `1.1`, bestehende Config Entries, Grants, Policies und
 `execution_enabled=false` bleiben unverändert. Nach dem HACS-Update muss nur
 die Lovelace-Ressource neu geladen werden; ein Home-Assistant-Neustart ist für
@@ -18,12 +21,15 @@ diesen Frontend-/Integrationspatch nicht erforderlich.
 
 ### English
 
-Patch release for the Home Assistant card: after a permission change, the
-confirmed backend readback of both permissions is required and the combined UI
-state is updated consistently. Missing readback is shown as an error; no false
-success message is emitted and execution permissions are not expanded.
+Patch release for the Home Assistant card: a permission change for one
+container no longer resets another container's update or simulation state. The
+confirmed backend readback remains target-scoped; successful simulation
+snapshots are retained during a brief global `not_checked` readback. Missing
+readback is shown as a warning; old permissions are never presented as
+permanently confirmed.
 
-Agent `1.0.0` remains compatible with this patch release. API contract `1.1`,
+The agent behavior is unchanged; version `1.0.1` remains compatible with this
+patch release. API contract `1.1`,
 existing config entries, grants, policies, and `execution_enabled=false`
 remain unchanged. After the HACS update, reload the Lovelace resource; a Home
 Assistant restart is not required for this frontend/integration patch.

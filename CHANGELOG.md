@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.0.2 – Stable
+
+### Deutsch
+
+- Behebt die containerübergreifende Invalidierung der Lovelace-Karte nach einer
+  `set_permissions`-Änderung: CT107 behält seinen erfolgreichen
+  Simulationssnapshot, wenn CT108 geändert wird.
+- Verwendet bestätigte Berechtigungs-Readbacks ausschließlich für das betroffene
+  Ziel und behandelt den globalen kurzzeitigen `not_checked`-Zustand ohne fremde
+  Containerzustände zu überschreiben.
+- Fehlender Readback bleibt eine sichtbare Warnung; alte Berechtigungen werden
+  nicht dauerhaft als bestätigt dargestellt.
+- Das Agent-Verhalten bleibt unverändert; Agent 1.0.1 bleibt kompatibel.
+  `execution_enabled=false`,
+  Produktiv-Grants und Paketaktionen bleiben unverändert.
+
+### English
+
+- Fixes cross-container invalidation in the Lovelace card after a
+  `set_permissions` change: CT107 retains its successful simulation snapshot
+  when CT108 is changed.
+- Uses confirmed permission readback only for the affected target and handles a
+  brief global `not_checked` state without overwriting another container's
+  state.
+- Missing readback remains a visible warning; old permissions are never shown
+  as permanently confirmed.
+- Agent behavior remains unchanged; agent 1.0.1 remains compatible.
+  `execution_enabled=false`,
+  productive grants, and package actions remain unchanged.
+
+**Compatibility / migration:** no agent upgrade is required. Existing Config
+Entries and authorization state are preserved.
+
+**Post-update:** reload the Lovelace resource/browser cache. A Home Assistant
+restart is not required.
+
+**Known limitation:** live Home Assistant read-only access was unavailable
+during diagnosis; production grants and state were not modified.
+
 ## 1.0.1 – Stable
 
 ### Deutsch
