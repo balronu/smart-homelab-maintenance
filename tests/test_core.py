@@ -412,6 +412,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(evaluate_agent("0.1.0-beta.23", "1.0").status, "incompatible")
         self.assertEqual(evaluate_agent("0.2.0-beta.1", "1.1").status, "incompatible")
         self.assertEqual(evaluate_agent(None, "1.1").status, "unknown")
+        self.assertEqual(evaluate_agent("1.0.1", "1.1").status, "current")
 
     def test_discovery_capabilities_are_explicit_and_execution_off(self) -> None:
         for spec in default_registry().all():
@@ -422,7 +423,7 @@ class CoreTests(unittest.TestCase):
         api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), self.repo, read_token="test-token")
         status, body = api.handle("GET", "/api/v1/health")
         self.assertEqual(status, 200)
-        self.assertEqual(body["data"]["agent_version"], "1.0.1")
+        self.assertEqual(body["data"]["agent_version"], "1.0.2")
         self.assertEqual(body["data"]["api_contract"], "1.1")
         self.assertEqual(api.handle("GET", "/api/v1/containers")[0], 401)
         status, body = api.handle("GET", "/api/v1/containers?limit=2", headers={"Authorization": "Bearer test-token"})
