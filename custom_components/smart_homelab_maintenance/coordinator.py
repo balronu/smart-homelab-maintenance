@@ -88,6 +88,13 @@ class SmartHomelabCoordinator:
                 jdata = jobs.get("data", {})
                 update_items = tuple(updates.get("data", {}).get("items", []))
                 update_by_target = {item.get("target"): item for item in update_items}
+                execution_enabled = bool((capabilities.get("data") or {}).get("execution_enabled", False))
+                active_targets = {job.get("target") for job in jdata.get("items", []) if job.get("state") in {"queued", "preflight", "running", "postcheck", "manual_recovery_required"}}
+                update_by_target = {
+                    target: dict(item, execution_enabled=execution_enabled, backend_connected=True,
+                                 job_conflict=target in active_targets)
+                    for target, item in update_by_target.items()
+                }
                 host_data = dict(host_data, update=update_by_target.get("host"))
                 vm_items = [dict(item, update=update_by_target.get(f"vm:{item.get('vmid')}")) for item in vm_data.get("items", [])]
                 container_items = [dict(item, update=update_by_target.get(f"container:{item.get('container_id')}")) for item in cdata.get("items", [])]

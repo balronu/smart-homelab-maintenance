@@ -41,7 +41,7 @@ const editorCss = `:host{display:block;box-sizing:border-box;color:var(--primary
 const premiumCss = `.card{background:linear-gradient(145deg,var(--ha-card-background,var(--card-background-color)),color-mix(in srgb,var(--ha-card-background,var(--card-background-color)) 86%,var(--primary-color,#03a9f4)));border:1px solid color-mix(in srgb,var(--divider-color,#ddd) 70%,transparent);}.header{padding-bottom:4px}.status{padding:5px 9px;border-radius:999px;background:var(--secondary-background-color);}.status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--success-color,#43a047) 18%,transparent)}.offline .status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--error-color,#db4437) 18%,transparent)}.section{border-top:1px solid color-mix(in srgb,var(--divider-color,#ddd) 55%,transparent);padding-top:14px}.item{background:color-mix(in srgb,var(--card-background-color,#fff) 76%,transparent);transition:border-color .18s ease,background .18s ease}.item[open]{border-color:color-mix(in srgb,var(--primary-color,#03a9f4) 55%,var(--divider-color,#ddd));background:color-mix(in srgb,var(--primary-color,#03a9f4) 5%,var(--card-background-color,#fff))}.item>summary{list-style:none}.item>summary::-webkit-details-marker{display:none}.item-head{cursor:pointer;padding:0}.item-head::after{content:"+";color:var(--secondary-text-color);font-weight:700}.item[open]>.item-head::after{content:"−"}.item-body{padding-top:10px}.metric strong{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){.item{transition:none}}`;
 const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch;margin-top:10px}.action-row button{width:100%;min-width:0;height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.vm-exclusion{margin:10px 0 0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--secondary-background-color);overflow-wrap:anywhere}.simulation-result,.permission-result{margin-top:8px;min-width:0;overflow-wrap:anywhere}.simulation-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.simulation-summary strong{font-size:1.05em}.package-list{margin-top:8px}.package-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:5px 0;border-top:1px solid var(--divider-color,#ddd);min-width:0}.package-name,.package-version{min-width:0;overflow-wrap:anywhere;word-break:break-word}@media(max-width:600px){.simulation-summary{grid-template-columns:1fr}.package-row{grid-template-columns:1fr}.action-row button{font-size:.92em}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
-  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._updateSnapshots = new Map(); this._lastSize = null; this._resizeObserver = null; }
+  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._permissionStates = new Map(); this._lastConfirmedPermissions = new Map(); this._updateSnapshots = new Map(); this._lastSize = null; this._resizeObserver = null; }
   connectedCallback() { this._ensureShell(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
   disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; }
   setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
@@ -101,23 +101,32 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
 }
 const originalUpdateItems = SmartHomelabMaintenanceCard.prototype._updateItems;
 SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labels, prefix) {
-  // Permission writes invalidate the agent's update cache for every guest.
-  // Keep each guest's last successful snapshot visible during that bounded
-  // readback window, but only while a confirmed permission override exists.
-  // The override itself always wins, so a changed grant is never presented as
-  // the old grant while the backend is converging.
-  const permissionReadbackPending = this._permissionOverrides.size > 0;
+  // Permission convergence and update freshness are independent per target.
+  // A matching readback must never acknowledge the next not_checked refresh
+  // for every other guest.
   const normalized = items.map((item) => {
     const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id);
     const target = `${kind}:${id}`;
     const base = item.update === null ? { status: "not_checked" } : (item.update || {});
-    const override = this._permissionOverrides.get(target);
-    const hasPermissionFields = typeof base.simulation_authorized === "boolean" || typeof base.update_authorized === "boolean";
-    const snapshot = hasPermissionFields && permissionReadbackPending ? this._updateSnapshots.get(target) : null;
-    if (!snapshot) this._updateSnapshots.delete(target);
-    if (override && samePermissions(base, override) && ["updates_available", "current"].includes(base.status)) this._permissionOverrides.delete(target);
-    const effectiveOverride = hasPermissionFields ? override : null;
-    return { ...item, __permissionSnapshot: Boolean(base.status === "not_checked" && snapshot && effectiveOverride), __permissionOverridePending: Boolean(effectiveOverride && !samePermissions(base, effectiveOverride)), __permissionOverride: effectiveOverride, update: { ...(base.status === "not_checked" && snapshot ? snapshot : base), ...(effectiveOverride || {}) } };
+    const state = this._permissionStates.get(target);
+    const hasPermissionFields = typeof base.simulation_authorized === "boolean" && typeof base.update_authorized === "boolean";
+    if (hasPermissionFields) this._lastConfirmedPermissions.set(target, { simulation_authorized: base.simulation_authorized, update_authorized: base.update_authorized });
+    if (hasPermissionFields && state?.expected && samePermissions(base, state.expected)) {
+      this._permissionStates.set(target, { ...state, readback: { ...base }, status: "confirmed" });
+      this._permissionOverrides.delete(target);
+    } else if (hasPermissionFields && state?.status === "pending") {
+      this._permissionStates.set(target, { ...state, readback: { ...base }, status: "stale" });
+    }
+    const snapshot = this._updateSnapshots.get(target);
+    const persisted = base.dry_run;
+    if (!snapshot && persisted?.success === true && persisted?.plan_digest) {
+      this._updateSnapshots.set(target, { ...base, plan_digest: persisted.plan_digest, dry_run: persisted, historical: true });
+    }
+    const retainedSnapshot = this._updateSnapshots.get(target);
+    const stale = ["not_checked", "unknown", "error", "unavailable"].includes(base.status) || base.fresh === false;
+    // Historical data is display-only and cannot enable simulation/install.
+    const update = retainedSnapshot && stale ? { ...base, historical_dry_run: retainedSnapshot, historical: true, fresh: false } : { ...base };
+    return { ...item, __permissionSnapshot: Boolean(retainedSnapshot && stale), __permissionOverridePending: state?.status === "pending", __permissionOverride: state?.expected, update };
   });
   originalUpdateItems.call(this, kind, normalized, labels, prefix);
   normalized.forEach((item) => {
@@ -126,12 +135,22 @@ SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labe
     if (!refs || kind === "vm") return;
     const target = `${kind}:${id}`;
     const update = item.update || {};
-    if (item.__permissionSnapshot && this._permissionOverrides.has(`${kind}:${id}`)) this._permissionOverrides.set(`${kind}:${id}`, { ...this._permissionOverrides.get(`${kind}:${id}`) });
+    const localSimulation = this._updateSnapshots.get(target);
+    const simulationVerified = Boolean(localSimulation?.dry_run?.success === true && localSimulation?.dry_run?.safe === true && localSimulation?.plan_digest === update.plan_digest);
+    if (refs.install) {
+      const safeToInstall = kind === "container" && update.update_supported === true && update.execution_enabled === true && update.backend_connected === true && update.status === "updates_available" && update.fresh === true && update.simulation_authorized === true && update.update_authorized === true && simulationVerified && update.job_conflict !== true && !(update.held_packages || []).length && !(update.conflicts || []).length && !(update.removals || []).length && Boolean(update.plan_digest);
+      refs.install.disabled = !safeToInstall;
+      refs.install.setAttribute("aria-disabled", String(!safeToInstall));
+    }
     if (item.__permissionOverridePending && item.__permissionOverride) this._permissionOverrides.set(`${kind}:${id}`, { ...item.__permissionOverride });
     if (["updates_available", "current"].includes(update.status)) this._updateSnapshots.set(target, { ...update });
     if (refs.simulationPermission) {
-      const simulationAuthorized = update.simulation_authorized === true || update.authorized === true;
-      refs.simulationPermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: update.update_authorized === true };
+      const known = this._lastConfirmedPermissions.get(target);
+      const simulationAuthorized = typeof update.simulation_authorized === "boolean" ? update.simulation_authorized : known?.simulation_authorized === true;
+      const updateAuthorized = typeof update.update_authorized === "boolean" ? update.update_authorized === true : known?.update_authorized === true;
+      refs.simulationPermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: updateAuthorized };
+      refs.permissionActions.dataset.state = ["not_checked", "unknown", "error", "unavailable"].includes(update.status) ? "stale" : "confirmed";
+      if (refs.updatePermission) refs.updatePermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: updateAuthorized };
     }
   });
 };
@@ -282,6 +301,8 @@ SmartHomelabMaintenanceCard.prototype._permissionButton = function (target, perm
       const readback = permissionResponseData(response);
       if (!samePermissions(readback, next)) throw new Error(labels.permissionReadbackFailed);
       this._permissionOverrides.set(target, { ...readback });
+      const previous = this._permissionStates.get(target);
+      this._permissionStates.set(target, { expected: { ...readback }, readback: { ...readback }, status: "pending", generation: (previous?.generation || 0) + 1 });
       this.render();
       result.textContent = labels.permissionSuccess;
     } catch (error) {
@@ -309,7 +330,17 @@ SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
     const update = button._update || {};
     const german = resolveLanguage(this._hass) === "de";
     const labels = textFor(german ? "de" : "en");
-    if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(labels.installConfirm)) return;
+    const packages = Array.isArray(update.packages) ? update.packages : [];
+    const packageSummary = packages.length
+      ? packages.map((item) => `${item.name || "?"} ${item.installed_version || "?"} → ${item.available_version || "?"}`).join(", ")
+      : (german ? "keine Paketänderungen" : "no package changes");
+    const risks = update.removals?.length || update.conflicts?.length || update.held_packages?.length
+      ? (german ? "Warnungen: zurückgehaltene, konfliktbehaftete oder zu entfernende Pakete." : "Warnings: held, conflicting, or removing packages.")
+      : (german ? "Keine Paketentfernungen/Konflikte; möglicher Neustartbedarf der Dienste bleibt bestehen." : "No removals/conflicts; services may still require a restart.");
+    const confirmation = german
+      ? `Ziel: ${target}\nPakete (${packages.length}): ${packageSummary}\nRisiken: ${risks}\nNeustartbedarf: möglicherweise.\n\nDieses konkrete Update jetzt installieren?`
+      : `Target: ${target}\nPackages (${packages.length}): ${packageSummary}\nRisks: ${risks}\nRestart need: possible.\n\nInstall this exact update now?`;
+    if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(confirmation)) return;
     const result = button._updateResult || document.createElement("div");
     result.className = "muted simulation-result";
     result.setAttribute("role", "status");

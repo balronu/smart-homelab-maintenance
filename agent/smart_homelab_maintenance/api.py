@@ -68,6 +68,23 @@ class ApiApplication:
             return {"status": "ok", "mode": "offline", "agent_version": __version__, "api_contract": API_CONTRACT_VERSION}
         if path == "/api/v1/capabilities":
             return {"execution_enabled": bool(getattr(self.updates, "execution_enabled", False)), "dry_run_enabled": self.updates is not None, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
+        if path == "/api/v1/execution-preflight" and method == "GET":
+            return {
+                "execution_enabled": bool(getattr(self.updates, "execution_enabled", False)),
+                "activation_requires_explicit_policy_confirmation": True,
+                "productive_activation_performed": False,
+                "requirements": [
+                    "agent_health_and_api_readback",
+                    "helper_integrity_and_private_tls",
+                    "policy_and_root_allowlist_readback",
+                    "running_reachable_debian_or_ubuntu_apt_container",
+                    "simulation_and_update_grants_for_the_same_ctid",
+                    "fresh_safe_simulation_and_matching_plan_digest",
+                    "no_unresolved_or_manual_recovery_job",
+                    "separate_explicit_confirmation_for_execution_enabled",
+                ],
+                "prohibited_automatic_actions": ["package_install", "reboot", "retry", "repair"],
+            }
         if path == "/api/v1/orchestration":
             if self.orchestration_status is None:
                 return {"status": "unavailable", "policy_mode": "discover_only"}
