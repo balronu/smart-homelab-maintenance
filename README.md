@@ -1,5 +1,15 @@
 # Smart Homelab Maintenance
 
+## v1.0.3 – Stable candidate
+
+The Lovelace card now keeps permission convergence and update freshness
+strictly isolated per container. Historical simulations remain visibly
+separate from the current executable plan, and the installation action is
+fail-closed unless the backend, global execution policy, both container grants,
+fresh simulation, matching digest, safety checks, and job state all agree.
+Real package execution remains disabled by default (`execution_enabled=false`)
+and requires a separate administrative policy change.
+
 ## v1.0.2 – Stable
 
 ### Deutsch

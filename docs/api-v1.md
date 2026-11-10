@@ -60,3 +60,9 @@ Preview schreibt niemals Grants. Der Apply akzeptiert ausschließlich einen
 unveränderten Preview-Token, führt die Probe gegen den aktuellen Bestand erneut
 aus und delegiert den atomaren Allowlist-Schreibvorgang an den root-owned Helper.
 Update-Grants werden durch diesen Pfad nie erzeugt.
+## GET `/api/v1/execution-preflight`
+
+Read-only report of the global update-execution gate and the required
+preflight conditions. It never changes `execution_enabled`, grants, policy,
+jobs, packages, or guest state. A `false` value remains fail-closed until a
+separate administrative policy change is explicitly confirmed and read back.

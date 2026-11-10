@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.3 – Stable candidate
+
+### Deutsch
+
+- Trennt Permission-Konvergenz, Update-Frische und historische Simulationen
+  strikt pro CTID; ein später globaler `not_checked`-Refresh kann keinen
+  fremden Containerzustand mehr löschen.
+- Die Installationsfreigabe ist fail-closed und benötigt Backend-Readback,
+  beide Container-Grants, globale Ausführungsfreigabe, frische erfolgreiche
+  Simulation, identischen Plan-Digest, bestandene Sicherheitsprüfung und
+  keinen widersprüchlichen Jobzustand.
+- Historische Simulationen werden nach Refresh/Remount nur als historisch
+  angezeigt und aktivieren niemals einen Installationsbutton.
+- `execution_enabled=false` bleibt unverändert; die produktive Policy wurde
+  nicht aktiviert.
+
+### English
+
+- Separates permission convergence, update freshness, and historical
+  simulations per CTID; a later global `not_checked` refresh cannot delete a
+  different container's state.
+- Installation is fail-closed and requires backend readback, both container
+  grants, global execution enablement, a fresh successful simulation, matching
+  plan digest, passed safety checks, and no conflicting job.
+- Historical simulations remain display-only after refresh/remount and never
+  enable installation.
+- `execution_enabled=false` is unchanged; the productive policy was not
+  enabled.
+
+**Compatibility / migration:** no agent change is required. Existing Config
+Entries and grants are preserved. A Lovelace resource/browser reload is
+required after the frontend update.
+
+**Known limitation:** productive HA readback remained unavailable during this
+work because the HA connector returned `CONNECTION_TIMEOUT`; no productive
+installation was performed.
+
 ## 1.0.2 – Stable
 
 ### Deutsch
