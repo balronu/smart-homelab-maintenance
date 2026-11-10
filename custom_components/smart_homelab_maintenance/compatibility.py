@@ -48,7 +48,7 @@ def evaluate_agent(agent_version: object, api_contract: object) -> Compatibility
         return Compatibility("current", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "legacy beta release line is compatible with the 1.0.0 RC API contract")
     expected_stable = re.fullmatch(r"(\d+\.\d+\.\d+)", VERSION)
     observed_rc = re.fullmatch(r"(\d+\.\d+\.\d+)-rc\.\d+", observed_version)
-    if expected_stable and observed_rc and observed_rc.group(1) == expected_stable.group(1):
+    if expected_stable and observed_rc and observed_rc.group(1) in {"1.0.0", expected_stable.group(1)}:
         return Compatibility("current", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "release-candidate agent is compatible with the stable API contract")
     if expected_stable and observed_beta and expected_stable.group(1) in {"1.0.0", "1.0.1"} and observed_beta.group(1) == "0.1.0":
         return Compatibility("current", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "legacy beta agent is compatible with the stable API contract")
