@@ -1,5 +1,33 @@
 # Smart Homelab Maintenance
 
+## v1.0.1 – Stable
+
+### Deutsch
+
+Patchrelease für die Home-Assistant-Karte: Nach einer Berechtigungsänderung
+wird der bestätigte Backend-Readback beider Berechtigungen verlangt und der
+gemeinsame UI-Zustand konsistent aktualisiert. Ein fehlender Readback wird als
+Fehler angezeigt; es gibt keine falsche Erfolgsmeldung und keine Erweiterung
+der Ausführungsberechtigungen.
+
+Der Agent `1.0.0` bleibt mit diesem Patchrelease kompatibel. Der API-Vertrag
+`1.1`, bestehende Config Entries, Grants, Policies und
+`execution_enabled=false` bleiben unverändert. Nach dem HACS-Update muss nur
+die Lovelace-Ressource neu geladen werden; ein Home-Assistant-Neustart ist für
+diesen Frontend-/Integrationspatch nicht erforderlich.
+
+### English
+
+Patch release for the Home Assistant card: after a permission change, the
+confirmed backend readback of both permissions is required and the combined UI
+state is updated consistently. Missing readback is shown as an error; no false
+success message is emitted and execution permissions are not expanded.
+
+Agent `1.0.0` remains compatible with this patch release. API contract `1.1`,
+existing config entries, grants, policies, and `execution_enabled=false`
+remain unchanged. After the HACS update, reload the Lovelace resource; a Home
+Assistant restart is not required for this frontend/integration patch.
+
 ## v1.0.0 – Stable
 
 ### Deutsch

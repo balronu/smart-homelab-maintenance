@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.1 – Stable
+
+### Deutsch
+
+- Behebt den Berechtigungszustand der Lovelace-Karte nach `set_permissions`:
+  Der Backend-Readback von `simulation_authorized` und `update_authorized`
+  muss beide erwarteten Werte bestätigen.
+- Aktualisiert den gemeinsamen UI-Zustand nach erfolgreichem Readback und
+  behandelt einen kurzzeitigen `not_checked`-Zustand mit dem letzten sicheren
+  Snapshot.
+- Ein fehlender oder widersprüchlicher Readback führt zu einer sichtbaren
+  Fehlermeldung statt zu einer falschen Erfolgsmeldung.
+- Agent `1.0.0` bleibt mit API 1.1 kompatibel; Grants, Policies und
+  `execution_enabled=false` bleiben unverändert.
+
+### English
+
+- Fixes the Lovelace permission state after `set_permissions`: backend readback
+  must confirm both `simulation_authorized` and `update_authorized`.
+- Refreshes the combined UI state after confirmed readback and handles a brief
+  `not_checked` state using the last safe snapshot.
+- Missing or contradictory readback produces a visible error instead of a
+  false success message.
+- Agent `1.0.0` remains compatible with API 1.1; grants, policies, and
+  `execution_enabled=false` remain unchanged.
+
+**Compatibility / migration:** no agent upgrade is required for an installed
+`1.0.0` agent. Existing Config Entries and authorization state are preserved.
+
+**Post-update:** reload the Lovelace resource/browser cache. A Home Assistant
+restart is not required.
+
+**Known limitation:** no productive Home Assistant installation or live device
+actuation was performed as part of this release.
+
 ## 1.0.0 – Stable
 
 ### Deutsch
