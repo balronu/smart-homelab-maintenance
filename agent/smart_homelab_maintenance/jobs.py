@@ -13,15 +13,20 @@ from typing import Any
 from .errors import ConcurrentJobError, DuplicateJobError, InvalidTransitionError, ValidationError
 from .security import redact_secrets, validate_job_request
 from .types import JobPhase, JobRequest, JobState, TERMINAL_STATES, Verification, utc_now
+from .recovery import RecoveryEvidence, classify_recovery
 
 _ACTIVE = (JobState.PREFLIGHT, JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.POSTCHECK)
 _TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     JobState.QUEUED: frozenset({JobState.PREFLIGHT, JobState.CANCELLED, JobState.BLOCKED}),
-    JobState.PREFLIGHT: frozenset({JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.CANCELLED, JobState.BLOCKED, JobState.FAILED, JobState.MANUAL_RECOVERY}),
+    JobState.PREFLIGHT: frozenset({JobState.WAITING_CONFIRMATION, JobState.RUNNING, JobState.CANCELLED, JobState.BLOCKED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.INTERRUPTED}),
     JobState.WAITING_CONFIRMATION: frozenset({JobState.RUNNING, JobState.CANCELLED, JobState.BLOCKED}),
-    JobState.RUNNING: frozenset({JobState.POSTCHECK, JobState.FAILED, JobState.TIMEOUT, JobState.MANUAL_RECOVERY}),
-    JobState.POSTCHECK: frozenset({JobState.SUCCEEDED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.TIMEOUT}),
-    JobState.MANUAL_RECOVERY: frozenset({JobState.RECONCILED_NOT_EXECUTED}),
+    JobState.RUNNING: frozenset({JobState.POSTCHECK, JobState.VERIFYING, JobState.FAILED, JobState.TIMEOUT, JobState.MANUAL_RECOVERY, JobState.INTERRUPTED}),
+    JobState.POSTCHECK: frozenset({JobState.SUCCEEDED, JobState.COMPLETED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.TIMEOUT, JobState.VERIFYING}),
+    JobState.VERIFYING: frozenset({JobState.SUCCEEDED, JobState.COMPLETED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.RECONCILED_COMPLETED, JobState.RECOVERY_BLOCKED}),
+    JobState.MANUAL_RECOVERY: frozenset({JobState.RECONCILED_NOT_EXECUTED, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED, JobState.RECONCILED_COMPLETED}),
+    JobState.RECOVERY_PENDING: frozenset({JobState.RUNNING, JobState.RECONCILED_NOT_EXECUTED, JobState.RECONCILED_COMPLETED, JobState.RECOVERY_BLOCKED}),
+    JobState.RECOVERY_BLOCKED: frozenset({JobState.RECOVERY_PENDING, JobState.RECONCILED_NOT_EXECUTED, JobState.RECONCILED_COMPLETED}),
+    JobState.INTERRUPTED: frozenset({JobState.RECOVERY_PENDING}),
 }
 
 
@@ -76,6 +81,15 @@ class JobRepository:
                     message TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS job_logs_job_sequence ON job_logs(job_id, sequence);
+                CREATE TABLE IF NOT EXISTS job_events (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT NOT NULL REFERENCES jobs(job_id) ON DELETE CASCADE,
+                    created_at TEXT NOT NULL,
+                    event TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS job_events_job_sequence ON job_events(job_id, sequence);
                 CREATE TABLE IF NOT EXISTS job_recovery_audit (
                     recovery_id TEXT PRIMARY KEY,
                     job_id TEXT NOT NULL REFERENCES jobs(job_id),
@@ -98,6 +112,9 @@ class JobRepository:
                 "process_pid": "ALTER TABLE jobs ADD COLUMN process_pid INTEGER",
                 "process_starttime": "ALTER TABLE jobs ADD COLUMN process_starttime TEXT",
                 "process_pgid": "ALTER TABLE jobs ADD COLUMN process_pgid INTEGER",
+                "plan_digest": "ALTER TABLE jobs ADD COLUMN plan_digest TEXT",
+                "baseline_packages": "ALTER TABLE jobs ADD COLUMN baseline_packages TEXT",
+                "last_recovery_at": "ALTER TABLE jobs ADD COLUMN last_recovery_at TEXT",
             }
             for name, statement in migrations.items():
                 if name not in columns:
@@ -117,6 +134,7 @@ class JobRepository:
                         (job_id, request.target, request.operation, request.expected_version, request.idempotency_key,
                          request.confirmation_hash, JobState.QUEUED, JobPhase.DISCOVERY, now),
                     )
+                    self._event(job_id, "created", JobState.QUEUED, {"target": request.target, "operation": request.operation})
             except sqlite3.IntegrityError as exc:
                 if "idempotency" in str(exc).lower():
                     raise DuplicateJobError("idempotency_key already exists") from exc
@@ -135,6 +153,7 @@ class JobRepository:
             (job_id,),
         ).fetchone()
         result["recovery_audit"] = dict(audit) if audit is not None else None
+        result["audit_events"] = self.audit_events(job_id, limit=100)
         return result
 
     def transition(
@@ -168,10 +187,17 @@ class JobRepository:
                         (new_state, phase or row["phase"], progress, message, error_code, error_message,
                          started, finished, job_id),
                     )
+                    self._event(job_id, "state_changed", new_state, {"from": str(current), "message": message, "error_code": error_code})
                 except sqlite3.IntegrityError as exc:
                     if "one_active_job_per_target" in str(exc) or "UNIQUE constraint failed: jobs.target" in str(exc):
                         raise ConcurrentJobError("another job is active for this target") from exc
                     raise
+
+    def _event(self, job_id: str, event: str, state: JobState | str, payload: dict[str, Any]) -> None:
+        self._connection.execute(
+            "INSERT INTO job_events(job_id,created_at,event,state,payload) VALUES(?,?,?,?,?)",
+            (job_id, utc_now(), event, str(state), json.dumps(redact_secrets(payload), sort_keys=True, separators=(",", ":"))[:4000]),
+        )
 
     def append_log(self, job_id: str, message: str, *, level: str = "info") -> None:
         if level not in {"debug", "info", "warning", "error"}:
@@ -196,9 +222,10 @@ class JobRepository:
         """Return true while execution state is active or needs recovery."""
         with self._lock:
             row = self._connection.execute(
-                "SELECT 1 FROM jobs WHERE target=? AND state IN (?, ?, ?, ?, ?)",
+                "SELECT 1 FROM jobs WHERE target=? AND state IN (?, ?, ?, ?, ?, ?, ?)",
                 (target, JobState.PREFLIGHT, JobState.WAITING_CONFIRMATION,
-                 JobState.RUNNING, JobState.POSTCHECK, JobState.MANUAL_RECOVERY),
+                 JobState.RUNNING, JobState.POSTCHECK, JobState.MANUAL_RECOVERY,
+                 JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED),
             ).fetchone()
         return row is not None
 
@@ -287,6 +314,47 @@ class JobRepository:
             if updated != 1:
                 raise ValidationError("unknown job_id")
 
+    def set_execution_context(self, job_id: str, *, plan_digest: str, baseline_packages: dict[str, str]) -> None:
+        """Persist the immutable pre-execution context used during recovery."""
+        if not plan_digest or len(plan_digest) > 128 or not isinstance(baseline_packages, dict):
+            raise ValidationError("execution context is invalid")
+        encoded = json.dumps(baseline_packages, sort_keys=True, separators=(",", ":"))
+        with self._lock, self._connection:
+            updated = self._connection.execute(
+                "UPDATE jobs SET plan_digest=?,baseline_packages=? WHERE job_id=?",
+                (plan_digest, encoded[:20000], job_id),
+            ).rowcount
+            if updated != 1:
+                raise ValidationError("unknown job_id")
+
+    def pending_recovery(self, *, limit: int = 8) -> list[dict[str, Any]]:
+        """Return bounded recovery work without changing any job state."""
+        if limit < 1 or limit > 32:
+            raise ValidationError("invalid recovery limit")
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM jobs WHERE state IN (?, ?, ?) ORDER BY created_at LIMIT ?",
+                (JobState.MANUAL_RECOVERY, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def run_recovery(self, inspector, *, limit: int = 8, actor: str = "automatic-recovery") -> list[dict[str, Any]]:
+        """Inspect a bounded batch; an inspector must never perform package writes."""
+        results = []
+        for job in self.pending_recovery(limit=limit):
+            try:
+                evidence = inspector(job)
+                if not isinstance(evidence, RecoveryEvidence):
+                    raise ValidationError("recovery inspector returned invalid evidence")
+                container_id = int(str(job["target"]).split(":", 1)[1])
+                results.append(self.reconcile_from_evidence(job["job_id"], container_id=container_id,
+                                                            evidence=evidence, actor=actor))
+            except Exception as exc:  # fail closed; never retry installation here
+                results.append({"accepted": False, "job_id": job["job_id"],
+                                "state": JobState.RECOVERY_BLOCKED,
+                                "outcome": "recovery_blocked", "reason": str(exc)[:300]})
+        return results
+
     def cancel_requested(self, job_id: str) -> bool:
         with self._lock:
             row = self._connection.execute("SELECT cancel_requested FROM jobs WHERE job_id=?", (job_id,)).fetchone()
@@ -369,3 +437,48 @@ class JobRepository:
                 (job_id, after, limit),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def audit_events(self, job_id: str, *, after: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+        """Return the append-only lifecycle audit stream separately from logs."""
+        if after < 0 or limit < 1 or limit > 1000:
+            raise ValidationError("invalid audit event pagination")
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT sequence,created_at,event,state,payload FROM job_events WHERE job_id=? AND sequence>? ORDER BY sequence LIMIT ?",
+                (job_id, after, limit),
+            ).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            item["payload"] = json.loads(item["payload"])
+            result.append(item)
+        return result
+
+    def reconcile_from_evidence(self, job_id: str, *, container_id: int, evidence: RecoveryEvidence,
+                                actor: str = "automatic-recovery") -> dict[str, Any]:
+        """Apply a classifier decision and audit it; never retries installation."""
+        decision = classify_recovery(evidence)
+        if decision.outcome == "running":
+            return {"accepted": False, "job_id": job_id, "state": JobState.RECOVERY_PENDING,
+                    "outcome": decision.outcome, "reason": decision.reason}
+        target = f"container:{container_id}"
+        with self._lock:
+            row = self._connection.execute("SELECT state,target FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+            if row is None:
+                raise ValidationError("unknown job_id")
+            if row["target"] != target:
+                raise ValidationError("container_id does not match job target")
+            state = JobState(row["state"])
+            if state not in {JobState.MANUAL_RECOVERY, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED}:
+                raise InvalidTransitionError("job is not awaiting recovery")
+            if decision.outcome == "reconciled_not_executed":
+                return self.reconcile_not_executed(job_id, container_id=container_id,
+                                                   evidence={**evidence.as_dict(), "outcome": "not_executed"}, actor=actor)
+            new_state = JobState.RECONCILED_COMPLETED if decision.outcome == "reconciled_completed" else JobState.RECOVERY_BLOCKED
+            with self._connection:
+                now = utc_now()
+                self._connection.execute("UPDATE jobs SET state=?,phase=?,message=?,error_code=?,error_message=?,last_recovery_at=? WHERE job_id=?",
+                                         (new_state, JobPhase.RECOVERY, decision.reason, decision.outcome, decision.reason, now, job_id))
+                self._event(job_id, "recovery_classified", new_state, {"outcome": decision.outcome, "reason": decision.reason})
+            return {"accepted": decision.outcome == "reconciled_completed", "job_id": job_id,
+                    "state": new_state, "outcome": decision.outcome, "reason": decision.reason}

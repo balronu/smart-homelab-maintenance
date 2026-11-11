@@ -17,7 +17,7 @@ class SensorValue:
 def coordinator_sensors(data: Any) -> tuple[SensorValue, ...]:
     return (
         SensorValue("agent_connection", "Agent-Verbindung", "connected" if data.connected else "offline", {"error": data.error, "update_error": data.update_error}),
-        SensorValue("agent_running_jobs", "Laufende Jobs", len([j for j in data.jobs if j.get("state") in {"preflight", "running", "postcheck"}]), {}),
+        SensorValue("agent_running_jobs", "Laufende Jobs", len([j for j in data.jobs if j.get("state") in {"queued", "preflight", "running", "verifying", "postcheck", "interrupted", "recovery_pending", "recovery_blocked", "manual_recovery_required"}]), {"lifecycle_states": {state: sum(1 for j in data.jobs if j.get("state") == state) for state in sorted({j.get("state") for j in data.jobs})}}),
         SensorValue("agent_last_error", "Letzter Fehler", data.error or data.update_error or "none", {}),
         SensorValue("agent_compatibility", "Agent-Kompatibilität", data.compatibility.status, data.compatibility.as_attributes()),
         SensorValue("agent_helper_status", "LXC-Helper-Status", _helper_status(data.orchestration), _orchestration_attributes(data.orchestration)),
@@ -135,7 +135,7 @@ try:
         coordinator._inventory_entity_manager = inventory
         entities = [
             _ProjectedSensor(coordinator, "agent_connection", "Agent connection", lambda d: "connected" if d.connected else "offline", lambda d: {"error": d.error}),
-            _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"preflight", "running", "postcheck"}])),
+            _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"queued", "preflight", "running", "verifying", "postcheck", "interrupted", "recovery_pending", "recovery_blocked", "manual_recovery_required"}])),
             _ProjectedSensor(coordinator, "agent_last_error", "Last error", lambda d: d.error or "none"),
             _ProjectedSensor(coordinator, "agent_compatibility", "Agent compatibility", lambda d: d.compatibility.status, lambda d: d.compatibility.as_attributes()),
             _ProjectedSensor(coordinator, "agent_helper_status", "LXC helper status", lambda d: _helper_status(d.orchestration), lambda d: _orchestration_attributes(d.orchestration)),
