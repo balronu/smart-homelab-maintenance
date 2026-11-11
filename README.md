@@ -750,6 +750,16 @@ explizit `--apply --confirm`, hält während des Healthchecks einen temporären
 Rollback-Stand vor und stellt ihn bei einem fehlgeschlagenen Healthcheck
 wieder her. Er verändert weder Proxmox, VMs noch LXCs.
 
+Verwaistes Rollback-Staging kann mit
+`--recover-staging PATH --quarantine-root DIR` zunächst read-only geprüft
+werden. Der Recovery-Modus validiert den kanonischen Pfad, Symlinks, aktive
+Upgrade-/Rollback-Prozesse, offene Dateireferenzen, systemd-Verweise,
+alternative Rollback-Kandidaten und Hash-Integrität. Erst `--confirm` darf ein
+positiv geprüftes Staging verlustfrei in die isolierte Quarantäne verschieben;
+es wird nichts gelöscht oder überschrieben. / Orphaned rollback staging can be
+preflighted read-only with the same options. Only `--confirm` permits a
+lossless move into the isolated quarantine; nothing is deleted or overwritten.
+
 ## Status
 
 Beta.22-Prerelease: Der Agent-Updater klassifiziert historisches Rollback-

@@ -15,6 +15,8 @@ health_url=""
 ca_file=""
 apply=0
 confirm=0
+recover_staging=""
+quarantine_root="$STATE_ROOT/staging-quarantine"
 rollback_dir=""
 previous_agent_version=""
 expected_agent_version=""
@@ -26,12 +28,17 @@ usage() {
 Verwendung:
   upgrade-agent.sh --source-dir DIR --expected-commit SHA \
     --health-url https://PRIVATE/api/v1 --ca-file FILE [--apply --confirm]
+  upgrade-agent.sh --recover-staging PATH [--quarantine-root DIR] [--confirm]
 
 Ohne --apply bleibt der Dienst unverändert. --apply benötigt zusätzlich
 --confirm, stoppt ausschließlich den Agent-Dienst, wartet begrenzt auf den
 TLS-Healthcheck und stellt bei einem fehlgeschlagenen Healthcheck den
 vorherigen Code wieder her. Rollback-Staging bleibt zur manuellen Prüfung
 erhalten.
+
+--recover-staging bleibt ohne --confirm rein lesend. Mit --confirm wird nur
+ein zuvor positiv geprüftes, verwaistes Staging atomar in den Quarantänepfad
+verschoben; Dateien werden nicht gelöscht oder überschrieben.
 EOF
 }
 
@@ -41,6 +48,8 @@ while (($#)); do
         --expected-commit) expected_commit="${2:?Wert für --expected-commit fehlt}"; shift 2 ;;
         --health-url) health_url="${2:?Wert für --health-url fehlt}"; shift 2 ;;
         --ca-file) ca_file="${2:?Wert für --ca-file fehlt}"; shift 2 ;;
+        --recover-staging) recover_staging="${2:?Staging-Pfad fehlt}"; shift 2 ;;
+        --quarantine-root) quarantine_root="${2:?Quarantänepfad fehlt}"; shift 2 ;;
         --apply) apply=1; shift ;;
         --confirm) confirm=1; shift ;;
         -h|--help) usage; exit 0 ;;
@@ -54,6 +63,113 @@ require_command systemctl
 require_command curl
 require_command ss
 require_command python3
+if [[ -n "$recover_staging" ]]; then
+    [[ "$apply" -eq 0 ]] || die "--recover-staging kann nicht mit --apply kombiniert werden."
+    [[ "$recover_staging" = /* && "$quarantine_root" = /* ]] || die "Staging- und Quarantänepfad müssen absolut sein."
+    canonical_state_root="$(realpath -e -- "$STATE_ROOT")" || die "State-Root ist nicht kanonisch auflösbar."
+    [[ "$quarantine_root" == "$canonical_state_root"/* ]] || die "Quarantäne muss unter dem kanonischen State-Root liegen."
+    [[ -d "$AGENT_ROOT/agent" ]] || die "Aktiver Agent fehlt; kein sicherer Wiederherstellungspfad."
+    canonical_stage="$(realpath -e -- "$recover_staging")" || die "Staging-Pfad ist nicht kanonisch auflösbar."
+    canonical_root="$(realpath -e -- "$AGENT_ROOT")" || die "Agent-Root ist nicht kanonisch auflösbar."
+    [[ "$canonical_stage" == "$canonical_root"/agent.previous.*.staging ]] || die "Staging-Pfad liegt nicht als exaktes Rollback-Staging unter dem Agent-Root."
+    [[ -d "$canonical_stage" && ! -L "$recover_staging" ]] || die "Staging-Pfad ist kein echtes Verzeichnis oder ein Symlink."
+    [[ ! -e "$quarantine_root" || ! -L "$quarantine_root" ]] || die "Quarantänepfad darf kein Symlink sein."
+    quarantine_parent="$(dirname -- "$quarantine_root")"
+    canonical_quarantine_parent="$(realpath -e -- "$quarantine_parent")" || die "Quarantäne-Elternpfad ist nicht kanonisch auflösbar."
+    [[ "$canonical_quarantine_parent" == "$canonical_state_root"/* || "$canonical_quarantine_parent" == "$canonical_state_root" ]] || die "Quarantäne-Elternpfad liegt nicht unter dem State-Root."
+    quarantine_name="$(basename -- "$canonical_stage")"
+    quarantine_root="$canonical_quarantine_parent/$(basename -- "$quarantine_root")"
+    quarantine_target="$quarantine_root/$quarantine_name"
+    [[ "$quarantine_target" != "$canonical_stage" ]] || die "Quarantäneziel darf nicht das Quellverzeichnis sein."
+    [[ ! -e "$quarantine_target" ]] || die "Quarantäneziel existiert bereits; keine Überschreibung."
+
+    staging_manifest() {
+        python3 - "$1" <<'PY'
+import hashlib
+import os
+import stat
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+rows = []
+for path in sorted(root.rglob("*")):
+    rel = path.relative_to(root).as_posix()
+    if path.is_symlink():
+        raise SystemExit(f"Symlink im Staging: {rel}")
+    if path.is_file():
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        rows.append(f"F {digest} {rel}")
+    elif not path.is_dir():
+        raise SystemExit(f"Nicht unterstützter Dateityp im Staging: {rel}")
+print("\n".join(rows))
+PY
+    }
+
+    staging_process_check() {
+        python3 - "$canonical_stage" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+target = os.path.realpath(sys.argv[1])
+self_pid = os.getpid()
+bad = []
+for entry in Path("/proc").iterdir():
+    if not entry.name.isdigit() or int(entry.name) in {self_pid, os.getppid()}:
+        continue
+    pid = entry.name
+    try:
+        cmd = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+        refs = [os.path.realpath(entry / "cwd"), os.path.realpath(entry / "root")]
+        refs += [os.path.realpath(fd) for fd in (entry / "fd").iterdir() if os.path.islink(fd)]
+    except (PermissionError, FileNotFoundError, OSError):
+        continue
+    if any(ref == target or ref.startswith(target + os.sep) for ref in refs):
+        bad.append(f"PID {pid} referenziert Staging: {cmd.strip()}")
+    if any(word in cmd for word in ("upgrade-agent.sh", "update-agent.sh", "agent.failed.", "rollback")):
+        bad.append(f"aktiver Upgrade/Rollback-Prozess PID {pid}: {cmd.strip()}")
+if bad:
+    raise SystemExit("; ".join(sorted(set(bad))))
+PY
+    }
+
+    systemd_refs="$(grep -R -F -n -- "$canonical_stage" /etc/systemd/system /etc/systemd/system.d /etc/smart-homelab-maintenance 2>/dev/null || true)"
+    [[ -z "$systemd_refs" ]] || die "Systemd-/Konfigurationsreferenz auf Staging gefunden: $systemd_refs"
+    staging_process_check || die "Aktiver Upgrade-, Rollback- oder Dateireferenz-Prozess gefunden."
+    manifest_before="$(mktemp)"
+    active_manifest=""
+    trap 'rm -f -- "$manifest_before" "$active_manifest" "${manifest_before}.after"' EXIT
+    staging_manifest "$canonical_stage" > "$manifest_before" || die "Staging-Integrität konnte nicht erfasst werden."
+    candidate_count=0
+    for candidate in "$AGENT_ROOT"/agent.previous.*.staging; do
+        [[ -d "$candidate" && ! -L "$candidate" && "$(realpath -e -- "$candidate")" != "$canonical_stage" ]] || continue
+        staging_manifest "$candidate" >/dev/null || die "Alternativer Rollback-Kandidat ist nicht verwendbar: $candidate"
+        candidate_count=$((candidate_count + 1))
+    done
+    (( candidate_count > 0 )) || die "Kein alternativer Rollback-Kandidat bleibt erhalten."
+    active_manifest="$(mktemp)"
+    staging_manifest "$AGENT_ROOT/agent" > "$active_manifest" || die "Aktiver Agent ist kein verwendbarer Wiederherstellungspfad."
+    info "Staging-Recovery-Preflight positiv: $canonical_stage"
+    info "Alternativer Rollback-Kandidaten: $candidate_count"
+    if [[ "$confirm" -ne 1 ]]; then
+        info "Keine Quarantäne ausgeführt; --confirm fehlt."
+        exit 0
+    fi
+    [[ ! -e "$quarantine_root" || -d "$quarantine_root" ]] || die "Quarantänepfad ist kein Verzeichnis."
+    install -d -m 0750 -o root -g root -- "$quarantine_root"
+    [[ ! -e "$quarantine_target" ]] || die "Quarantäneziel existiert bereits; keine Überschreibung."
+    mv -T -- "$canonical_stage" "$quarantine_target"
+    staging_manifest "$quarantine_target" > "${manifest_before}.after" || die "Integritätsprüfung nach Quarantäne fehlgeschlagen."
+    cmp -s "$manifest_before" "${manifest_before}.after" || die "Hash-/Strukturvergleich nach Quarantäne fehlgeschlagen."
+    audit="$quarantine_root/audit.log"
+    printf '%s staging_quarantine source=%s target=%s source_sha256=%s active_sha256=%s candidates=%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$canonical_stage" "$quarantine_target" \
+        "$(sha256sum "$manifest_before" | awk '{print $1}')" "$(sha256sum "$active_manifest" | awk '{print $1}')" "$candidate_count" >> "$audit"
+    chmod 0640 -- "$audit"
+    info "Staging in Quarantäne verschoben und Integrität verifiziert: $quarantine_target"
+    exit 0
+fi
 [[ -n "$source_dir" && -n "$expected_commit" && -n "$health_url" && -n "$ca_file" ]] || { usage >&2; die "Pflichtoption fehlt."; }
 [[ "$health_url" == https://* && "$health_url" != *\?* && "$health_url" != *\#* ]] || die "Health-URL muss HTTPS ohne Query/Fragment verwenden."
 [[ -r "$ca_file" && -f "$ca_file" ]] || die "Healthcheck-CA fehlt oder ist nicht lesbar."

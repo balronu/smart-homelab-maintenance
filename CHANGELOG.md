@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.12 – Stable
+
+### Deutsch / English
+
+- Ergänzt einen ausdrücklich bestätigungspflichtigen, fail-closed Recovery-
+  Modus für verwaistes Rollback-Staging. Der Modus prüft kanonische Pfade,
+  Symlinks, laufende Prozesse, offene Referenzen, systemd-Verweise,
+  alternative Rollback-Kandidaten und Hash-Integrität und verschiebt das
+  Staging nur nach Bestätigung verlustfrei in eine isolierte Quarantäne. /
+  Adds an explicitly confirmed, fail-closed recovery mode for orphaned
+  rollback staging. It validates canonical paths, symlinks, active processes,
+  open references, systemd references, alternate rollback candidates and hash
+  integrity, and moves staging losslessly to an isolated quarantine only after
+  confirmation.
+
+**Compatibility / Migration:** API contract 1.1 and existing agent/job state
+remain unchanged. The recovery mode is read-only without `--confirm`; it never
+deletes or overwrites staging. / Der Recovery-Modus ist ohne `--confirm`
+rein lesend und löscht oder überschreibt kein Staging.
+
+**Known limitation / Einschränkung:** Productive quarantine still requires a
+separate administrator confirmation after a positive target-host preflight.
+
 ## 1.0.11 – Stable
 
 ### Deutsch / English
