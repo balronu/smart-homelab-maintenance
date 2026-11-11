@@ -125,7 +125,7 @@ EOF
 sed -i "s#__SMH_PHASE56_ROOTFS__#$ROOTFS#" "$PCT_ADAPTER"
 chmod 0755 "$PCT_ADAPTER"
 
-export ROOT_DIR WORK
+export ROOT_DIR ROOTFS WORK
 mkdir -p "/etc/systemd/system/${AGENT_NAME}-lxc-helper.service.d"
 cat > "/etc/systemd/system/${AGENT_NAME}-lxc-helper.service.d/phase56-rootfs.conf" <<EOF
 [Service]
@@ -135,7 +135,7 @@ systemctl daemon-reload
 "$ROOT_DIR/scripts/install-lxc-helper.sh" --source-dir "$ROOT_DIR" --expected-commit "$(git -C "$ROOT_DIR" rev-parse HEAD)" --apply --start
 
 PYTHONPATH="$ROOT_DIR/agent" python3 - <<'PY'
-import json, os
+import json, os, subprocess, time
 import pwd
 from pathlib import Path
 
@@ -184,16 +184,26 @@ assert status == 200 and dry["success"] and dry["safe"] and dry["plan_digest"] =
 status, missing_confirmation = call("POST", "/api/v1/updates/container:321/execute", {"confirm": True, "install_confirmed": False, "plan_digest": old_digest})
 assert status == 400 and "confirmation" in str(missing_confirmation).lower()
 status, result = call("POST", "/api/v1/updates/container:321/execute", {"confirm": True, "install_confirmed": True, "plan_digest": old_digest})
-assert status == 200 and result["success"] and result["returncode"] == 0, result
-assert result["postcheck"]["performed"] is True and result["postcheck"]["remaining_packages"] == 0, result
-assert result["status"] == "succeeded" and result["job_id"]
-job = call("GET", "/api/v1/jobs/" + result["job_id"])[1]
+assert status == 200 and result["success"] and result["accepted"] and result["status"] == "running", result
+job_id = result["job_id"]
+deadline = time.monotonic() + 30
+while True:
+    job = call("GET", "/api/v1/jobs/" + job_id)[1]
+    if job["state"] in {JobState.SUCCEEDED.value, JobState.FAILED.value, JobState.MANUAL_RECOVERY.value}:
+        break
+    assert time.monotonic() < deadline, job
+    time.sleep(0.1)
 assert job["state"] == JobState.SUCCEEDED.value and job["preflight_verified"] == 1 and job["postcheck_verified"] == 1, job
-events = call("GET", f"/api/v1/jobs/{result['job_id']}/events?after=0&limit=50")[1]
+package_version = subprocess.run(
+    ["systemd-nspawn", "-D", os.environ["ROOTFS"], "--quiet", "dpkg-query", "-W", "-f=${Version}", "smh-e2e-fixture"],
+    check=True, capture_output=True, text=True,
+).stdout.strip()
+assert package_version == "2.0", package_version
+events = call("GET", f"/api/v1/jobs/{job_id}/events?after=0&limit=50")[1]
 assert events["events"]
 status, revoked = call("POST", "/api/v1/updates/container:321/permissions", {"confirm": True, "simulation_authorized": False, "update_authorized": False})
 assert status == 200 and revoked["simulation_authorized"] is False and revoked["update_authorized"] is False, revoked
-print(json.dumps({"agent_api": "PASS", "package": "smh-e2e-fixture", "job_id": result["job_id"], "exit_code": result["returncode"], "postcheck": result["postcheck"], "permission_revoked": True}, sort_keys=True))
+print(json.dumps({"agent_api": "PASS", "package": "smh-e2e-fixture", "job_id": job_id, "state": job["state"], "postcheck_verified": job["postcheck_verified"], "permission_revoked": True}, sort_keys=True))
 PY
 
 systemctl stop "${AGENT_NAME}-lxc-helper.service"
