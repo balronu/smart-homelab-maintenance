@@ -246,6 +246,28 @@ async def test_actions_return_read_only_data_and_diagnostics_are_secret_free(has
     assert "fixture-token" not in str(diagnostics)
 
 
+async def test_read_only_check_refreshes_coordinator_after_permission_readback(hass, patched_transport, monkeypatch):
+    """The card's post-write read-only check must publish a fresh HA state."""
+    from custom_components import smart_homelab_maintenance as integration
+
+    assert await integration.async_setup(hass, {})
+    result = await _create_entry(hass)
+    entry = result["result"]
+    await hass.async_block_till_done()
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    calls = {"count": 0}
+    original = coordinator.async_request_refresh
+
+    async def counted_refresh():
+        calls["count"] += 1
+        return await original()
+
+    monkeypatch.setattr(coordinator, "async_request_refresh", counted_refresh)
+    response = await hass.services.async_call(DOMAIN, "check", {"entry_id": entry.entry_id}, blocking=True, return_response=True)
+    assert response["health"]["schema_version"] == "1"
+    assert calls["count"] == 1
+
+
 async def test_dry_run_without_entry_id_ignores_setup_metadata_and_returns_response(hass, patched_transport):
     from custom_components import smart_homelab_maintenance as integration
 

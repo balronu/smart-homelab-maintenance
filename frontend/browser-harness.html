@@ -5,8 +5,14 @@
 import { resolveLanguage } from "./smart-homelab-maintenance-card.js";
 const card = document.querySelector("#card");
 const errors = [];
-window.addEventListener("error", (event) => errors.push(event.message));
-window.addEventListener("unhandledrejection", (event) => errors.push(String(event.reason)));
+const reportHarnessError = (value) => {
+  const message = value?.stack || value?.message || String(value);
+  errors.push(message);
+  const result = document.querySelector("#result");
+  if (result && !result.textContent) result.textContent = JSON.stringify({ fatal: message, errors });
+};
+window.addEventListener("error", (event) => reportHarnessError(event.error || event.message));
+window.addEventListener("unhandledrejection", (event) => reportHarnessError(event.reason));
 card.setConfig();
 card.hass = { language: "en", locale: { language: "de" }, states: {} };
 const emptyCardSafe = card.shadowRoot.textContent.includes("No virtual machines detected");
@@ -78,12 +84,25 @@ await new Promise((resolve) => setTimeout(resolve, 0));
 const dryRunMissingResponseShownBeforePermission = card.shadowRoot.textContent.includes("Serviceantwort ist leer");
 const permissionStates = { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true, fresh: true } } }, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", running: true, os_name: "Debian", os_version: "12", package_manager: "apt", update: { status: "unauthorized", authorized: false, simulation_authorized: false, update_authorized: false } } } };
 let permissionCall = null;
-card.hass = { language: "en", callService: (...args) => { permissionCall = args; return Promise.resolve({ response: { data: { success: true, simulation_authorized: true, update_authorized: false } } }); }, states: permissionStates };
+const permissionCalls = [];
+card.hass = { language: "en", callService: (...args) => {
+  permissionCalls.push(args);
+  if (args[1] === "set_permissions") {
+    permissionCall = args;
+    return Promise.resolve({ response: { data: { success: true, simulation_authorized: true, update_authorized: false } } });
+  }
+  if (args[1] === "check") {
+    return Promise.resolve({ response: { data: { success: true } } });
+  }
+  return Promise.resolve({ response: { data: { success: true } } });
+}, states: permissionStates };
 const permissionButton = card.shadowRoot.querySelector(".container-grid button.permission");
 permissionButton?.click();
 await new Promise((resolve) => setTimeout(resolve, 0));
+card.hass = { language: "en", states: { ...permissionStates, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { ...permissionStates["sensor.smart_homelab_maintenance_cloudflared"].attributes, update: { status: "updates_available", dry_run_supported: true, fresh: true, simulation_authorized: true, update_authorized: false, authorized: true } } } } };
+await new Promise((resolve) => setTimeout(resolve, 0));
 const permissionResult = card.shadowRoot.querySelector(".permission-result");
-const permissionSuccessShown = Boolean(permissionResult?.textContent.includes("Permission changed successfully") && !permissionResult.classList.contains("warning") && !permissionButton?.disabled);
+const permissionSuccessShown = Boolean(permissionResult?.textContent.includes("Permission changed successfully") && !permissionResult.classList.contains("warning") && !permissionButton?.disabled && permissionCalls.some((args) => args[1] === "check"));
 const permissionCallCorrect = permissionCall?.[0] === "smart_homelab_maintenance" && permissionCall?.[1] === "set_permissions" && permissionCall?.[2]?.target === "container:101" && permissionCall?.[2]?.confirm === true && permissionCall?.[2]?.simulation_authorized === true && permissionCall?.[2]?.update_authorized === false;
 const permissionReadbackRequired = (() => {
   card.hass = { language: "en", callService: () => Promise.resolve({ response: { data: { success: true } } }), states: permissionStates };

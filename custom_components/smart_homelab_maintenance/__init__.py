@@ -93,7 +93,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 preview_token=call.data.get("preview_token"),
                 manual_authorized_ids=list(call.data.get("manual_authorized_ids", [])),
             )
-            if call.service in ("dry_run", "set_permissions", "policy_apply", "orchestration_preview", "orchestration_apply"):
+            if call.service in ("check", "dry_run", "set_permissions", "policy_apply", "orchestration_preview", "orchestration_apply"):
                 if call.service == "dry_run":
                     coordinator.record_dry_run(str(call.data.get("target")), result.get("data", result))
                 await coordinator.async_request_refresh()

@@ -9,7 +9,7 @@ export function resolveLanguage(hass) {
 }
 const textFor = (language) => language === "de" ? { connected: "Verbunden", offline: "Agent nicht erreichbar", hostOffline: "Host offline", overview: "Übersicht", host: "Proxmox-Host", lastUpdated: "Letzte Aktualisierung", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung", running: "laufend", stopped: "gestoppt", unknown: "unbekannt", cpu: "CPU", memory: "RAM", storage: "Speicher", availableMemory: "Freier RAM", freeStorage: "Freier Speicher", version: "Version", kernel: "Kernel", uptime: "Laufzeit", jobs: "Laufende Jobs", noData: "Keine Daten verfügbar", noVms: "Keine VMs erkannt", noContainers: "Keine Container erkannt", error: "Fehler", readOnly: "Nur-Lese-Modus", updates: "Updates", simulate: "Update simulieren", install: "Updates installieren", installConfirm: "Die Simulation ist bestanden. Soll dieses konkrete Paket-Update jetzt wirklich installiert werden?", installDisabled: "Updatefunktion noch nicht freigegeben", simulateDisabled: "Simulation nicht verfügbar", unauthorizedReason: "Simulation nicht verfügbar: Ziel nicht autorisiert", helperUnavailableReason: "Simulation nicht verfügbar: Helper nicht eingerichtet", stoppedReason: "Simulation nicht verfügbar: Container ist gestoppt", unsupportedReason: "Simulation nicht verfügbar: Ziel nicht unterstützt", staleReason: "Simulation nicht verfügbar: Prüfdaten veraltet", notCheckedReason: "Simulation nicht verfügbar: Ziel noch nicht geprüft", vmExclusion: "Updates dieser virtuellen Maschine werden nicht über Smart Homelab Maintenance durchgeführt. Bitte die Updatefunktion des jeweiligen Gastbetriebssystems verwenden.", noUpdatesReason: "Keine verfügbaren Updates für die Simulation", current: "Aktuell", updatesAvailable: "verfügbar", notChecked: "Noch nicht geprüft", unsupported: "Nicht unterstützt", unauthorized: "Nicht autorisiert", failed: "Prüfung fehlgeschlagen", stale: "Daten veraltet", unknownUpdate: "Unbekannt", security: "Sicherheitsupdates", checked: "Letzte Prüfung", simulation: "Simulation", compatibility: "Agent-Kompatibilität", compatibilityCurrent: "Aktuell", compatibilityOutdated: "Veraltet", compatibilityIncompatible: "Inkompatibel", compatibilityUnknown: "Unbekannt" } : { connected: "Connected", offline: "Agent unreachable", hostOffline: "Host offline", overview: "Overview", host: "Proxmox host", lastUpdated: "Last updated", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance", running: "running", stopped: "stopped", unknown: "unknown", cpu: "CPU", memory: "RAM", storage: "Storage", availableMemory: "Free RAM", freeStorage: "Free storage", version: "Version", kernel: "Kernel", uptime: "Uptime", jobs: "Running jobs", noData: "No data available", noVms: "No virtual machines detected", noContainers: "No containers detected", error: "Error", readOnly: "Read-only mode", updates: "Updates", simulate: "Simulate update", install: "Install updates", installConfirm: "The simulation passed. Do you really want to install this specific package update now?", installDisabled: "Update function not released", simulateDisabled: "Simulation unavailable", unauthorizedReason: "Simulation unavailable: target is not authorized", helperUnavailableReason: "Simulation unavailable: helper is not configured", stoppedReason: "Simulation unavailable: container is stopped", unsupportedReason: "Simulation unavailable: target is not supported", staleReason: "Simulation unavailable: check data is stale", notCheckedReason: "Simulation unavailable: target has not been checked", vmExclusion: "Updates for this virtual machine are not performed through Smart Homelab Maintenance. Please use the update function of the respective guest operating system.", noUpdatesReason: "No updates are available for simulation", current: "Up to date", updatesAvailable: "available", notChecked: "Not checked", unsupported: "Not supported", unauthorized: "Not authorized", failed: "Check failed", stale: "Data is stale", unknownUpdate: "Unknown", security: "security updates", checked: "Last checked", simulation: "Simulation", compatibility: "Agent compatibility", compatibilityCurrent: "Current", compatibilityOutdated: "Outdated", compatibilityIncompatible: "Incompatible", compatibilityUnknown: "Unknown" };
 const editorText = (language) => language === "de" ? { title: "Titel", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung" } : { title: "Title", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance" };
-const permissionText = (language) => language === "de" ? { allowSimulation: "Simulation freigeben", revokeSimulation: "Simulation widerrufen", allowUpdates: "Updates freigeben", revokeUpdates: "Updates widerrufen", permissionConfirm: "Berechtigung wirklich ändern?", permissionRunning: "Berechtigung wird geändert …", permissionSuccess: "Berechtigung erfolgreich geändert.", permissionFailed: "Berechtigungsänderung fehlgeschlagen", permissionReadbackFailed: "Berechtigung geändert, aber der bestätigte Rückread fehlt." } : { allowSimulation: "Allow simulation", revokeSimulation: "Revoke simulation", allowUpdates: "Allow updates", revokeUpdates: "Revoke updates", permissionConfirm: "Really change this permission?", permissionRunning: "Changing permission …", permissionSuccess: "Permission changed successfully.", permissionFailed: "Permission change failed", permissionReadbackFailed: "Permission changed, but the confirmed readback is missing." };
+const permissionText = (language) => language === "de" ? { allowSimulation: "Simulation freigeben", revokeSimulation: "Simulation widerrufen", allowUpdates: "Updates freigeben", revokeUpdates: "Updates widerrufen", permissionConfirm: "Berechtigung wirklich ändern?", permissionRunning: "Berechtigung wird geändert …", permissionPending: "Berechtigung geändert; HA-Rückread wird bestätigt …", permissionSuccess: "Berechtigung erfolgreich geändert.", permissionFailed: "Berechtigungsänderung fehlgeschlagen", permissionReadbackFailed: "Berechtigung geändert, aber der bestätigte Rückread fehlt." } : { allowSimulation: "Allow simulation", revokeSimulation: "Revoke simulation", allowUpdates: "Allow updates", revokeUpdates: "Revoke updates", permissionConfirm: "Really change this permission?", permissionRunning: "Changing permission …", permissionPending: "Permission changed; confirming HA readback …", permissionSuccess: "Permission changed successfully.", permissionFailed: "Permission change failed", permissionReadbackFailed: "Permission changed, but the confirmed readback is missing." };
 const esc = (value) => String(value ?? "").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 const bytes = (value) => { if (!Number.isFinite(Number(value))) return null; const units = ["B", "KB", "MB", "GB", "TB"]; let n = Number(value); let i = 0; while (Math.abs(n) >= 1024 && i < units.length - 1) { n /= 1024; i += 1; } return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${units[i]}`; };
 const finiteMetric = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
@@ -104,6 +104,7 @@ SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labe
   // Permission convergence and update freshness are independent per target.
   // A matching readback must never acknowledge the next not_checked refresh
   // for every other guest.
+  const permissions = permissionText(resolveLanguage(this._hass));
   const normalized = items.map((item) => {
     const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id);
     const target = `${kind}:${id}`;
@@ -148,9 +149,39 @@ SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labe
       const known = this._lastConfirmedPermissions.get(target);
       const simulationAuthorized = typeof update.simulation_authorized === "boolean" ? update.simulation_authorized : known?.simulation_authorized === true;
       const updateAuthorized = typeof update.update_authorized === "boolean" ? update.update_authorized === true : known?.update_authorized === true;
+      const permissionState = this._permissionStates.get(target);
+      const pending = permissionState?.status === "pending" && permissionState.expected && !samePermissions(update, permissionState.expected);
       refs.simulationPermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: updateAuthorized };
-      refs.permissionActions.dataset.state = ["not_checked", "unknown", "error", "unavailable"].includes(update.status) ? "stale" : "confirmed";
-      if (refs.updatePermission) refs.updatePermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: updateAuthorized };
+      refs.permissionActions.dataset.state = pending ? "pending" : (["not_checked", "unknown", "error", "unavailable"].includes(update.status) ? "stale" : "confirmed");
+      if (pending) {
+        refs.simulationPermission.textContent = permissions.permissionPending;
+        refs.simulationPermission.disabled = true;
+        refs.simulationPermission.setAttribute("aria-busy", "true");
+        if (refs.updatePermission) {
+          refs.updatePermission.textContent = permissions.permissionPending;
+          refs.updatePermission.disabled = true;
+          refs.updatePermission.setAttribute("aria-busy", "true");
+        }
+        refs.permissionResult.hidden = false;
+        refs.permissionResult.textContent = permissions.permissionPending;
+        refs.permissionResult.classList.add("warning");
+        refs.permissionResult.dataset.pending = "true";
+      } else {
+        refs.simulationPermission.textContent = simulationAuthorized ? permissions.revokeSimulation : permissions.allowSimulation;
+        refs.simulationPermission.disabled = false;
+        refs.simulationPermission.removeAttribute("aria-busy");
+        if (refs.updatePermission) {
+          refs.updatePermission.textContent = updateAuthorized ? permissions.revokeUpdates : permissions.allowUpdates;
+          refs.updatePermission.disabled = !simulationAuthorized && !updateAuthorized;
+          refs.updatePermission.removeAttribute("aria-busy");
+        }
+        if (permissionState?.status === "confirmed" && refs.permissionResult.dataset.pending === "true") {
+          refs.permissionResult.hidden = false;
+          refs.permissionResult.textContent = permissions.permissionSuccess;
+          refs.permissionResult.classList.remove("warning");
+          delete refs.permissionResult.dataset.pending;
+        }
+      }
     }
   });
 };
@@ -304,7 +335,27 @@ SmartHomelabMaintenanceCard.prototype._permissionButton = function (target, perm
       const previous = this._permissionStates.get(target);
       this._permissionStates.set(target, { expected: { ...readback }, readback: { ...readback }, status: "pending", generation: (previous?.generation || 0) + 1 });
       this.render();
-      result.textContent = labels.permissionSuccess;
+      result.textContent = labels.permissionPending;
+      result.classList.add("warning");
+      result.dataset.pending = "true";
+      // The set_permissions service refreshes HA before this handler receives
+      // its response. Trigger one additional read-only coordinator refresh
+      // after the pending generation exists, so the next HA state can confirm
+      // convergence instead of leaving the card on the pre-write snapshot.
+      try {
+        const refresh = this._hass?.callService?.("smart_homelab_maintenance", "check", {}, undefined, true, true);
+        if (refresh && typeof refresh.then === "function") {
+          const refreshTimeout = typeof globalThis !== "undefined" && Number.isFinite(globalThis.__SMART_HOMELAB_PERMISSION_REFRESH_TIMEOUT_MS__)
+            ? globalThis.__SMART_HOMELAB_PERMISSION_REFRESH_TIMEOUT_MS__ : 12000;
+          await Promise.race([
+            refresh,
+            new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("permission readback refresh timed out")), refreshTimeout); }),
+          ]);
+        }
+      } catch (_) {
+        // Keep the pending state fail-closed; a missing HA convergence must
+        // never be reported as a confirmed permission change.
+      }
     } catch (error) {
       result.textContent = `${labels.permissionFailed}: ${error?.message || "unknown error"}`;
       result.classList.add("warning");
