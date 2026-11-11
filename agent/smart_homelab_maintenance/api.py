@@ -192,6 +192,16 @@ class ApiApplication:
             if not isinstance(request["container_id"], int) or isinstance(request["container_id"], bool) or not isinstance(request["evidence"], dict):
                 raise ValidationError("container_id and evidence are invalid")
             return self.jobs.reconcile_not_executed(parts[3], container_id=request["container_id"], evidence=request["evidence"])
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "legacy-reconcile" and method == "POST":
+            if not self._admin_authorized(headers):
+                raise ValidationError("administrator authentication required")
+            request = self._json_object(body, "legacy reconcile")
+            required = {"confirm", "container_id", "evidence", "baseline_packages"}
+            if set(request) != required or request.get("confirm") is not True:
+                raise ValidationError("legacy reconcile requires confirm, container_id, evidence and baseline_packages")
+            if not isinstance(request["container_id"], int) or isinstance(request["container_id"], bool) or not isinstance(request["evidence"], dict) or not isinstance(request["baseline_packages"], dict):
+                raise ValidationError("legacy recovery fields are invalid")
+            return self.jobs.reconcile_legacy_state_verified(parts[3], container_id=request["container_id"], evidence=request["evidence"], baseline_packages=request["baseline_packages"])
         if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "events":
             return {"events": self.jobs.events(parts[3], after=self._int(query, "after", 0), limit=self._int(query, "limit", min(50, self.jobs.max_log_entries)))}
         raise KeyError(path)

@@ -24,9 +24,9 @@ _TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     JobState.RUNNING: frozenset({JobState.POSTCHECK, JobState.VERIFYING, JobState.FAILED, JobState.TIMEOUT, JobState.MANUAL_RECOVERY, JobState.INTERRUPTED}),
     JobState.POSTCHECK: frozenset({JobState.SUCCEEDED, JobState.COMPLETED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.TIMEOUT, JobState.VERIFYING}),
     JobState.VERIFYING: frozenset({JobState.SUCCEEDED, JobState.COMPLETED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.RECONCILED_COMPLETED, JobState.RECOVERY_BLOCKED}),
-    JobState.MANUAL_RECOVERY: frozenset({JobState.RECONCILED_NOT_EXECUTED, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED, JobState.RECONCILED_COMPLETED}),
+    JobState.MANUAL_RECOVERY: frozenset({JobState.RECONCILED_NOT_EXECUTED, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED, JobState.RECONCILED_COMPLETED, JobState.RECONCILED_LEGACY_STATE_VERIFIED}),
     JobState.RECOVERY_PENDING: frozenset({JobState.RUNNING, JobState.RECONCILED_NOT_EXECUTED, JobState.RECONCILED_COMPLETED, JobState.RECOVERY_BLOCKED}),
-    JobState.RECOVERY_BLOCKED: frozenset({JobState.RECOVERY_PENDING, JobState.RECONCILED_NOT_EXECUTED, JobState.RECONCILED_COMPLETED}),
+    JobState.RECOVERY_BLOCKED: frozenset({JobState.RECOVERY_PENDING, JobState.RECONCILED_NOT_EXECUTED, JobState.RECONCILED_COMPLETED, JobState.RECONCILED_LEGACY_STATE_VERIFIED}),
     JobState.INTERRUPTED: frozenset({JobState.RECOVERY_PENDING}),
 }
 
@@ -305,6 +305,67 @@ class JobRepository:
                     (job_id, now, "warning", "administrative reconciliation recorded: " + json.dumps(safe_evidence, sort_keys=True, separators=(",", ":"))[:1800]),
                 )
                 return {"accepted": True, "job_id": job_id, "recovery_id": recovery_id, "state": JobState.RECONCILED_NOT_EXECUTED, "outcome": "not_executed", "evidence_sha256": evidence_hash}
+
+    def reconcile_legacy_state_verified(
+        self, job_id: str, *, container_id: int, evidence: dict[str, Any],
+        baseline_packages: dict[str, str], actor: str = "administrator",
+    ) -> dict[str, Any]:
+        """Administratively close a legacy job after an independent fresh check.
+
+        This explicitly does not classify the historical execution.  It only
+        records that the current package-manager state is safe for a future
+        job.  Every assertion is required and the historical job remains
+        append-only/auditable.
+        """
+        required_true = (
+            "ctid_verified", "job_id_verified", "inspection_complete",
+            "dpkg_audit_clean", "apt_check_clean", "interrupted_transactions_absent",
+            "partial_installation_absent", "logs_checked", "package_inventory_complete",
+            "fresh_simulation_passed", "lock_checks_complete", "administrator_confirmed",
+            "historical_execution_unclear",
+        )
+        required_false = ("active_package_processes", "package_locks", "writable_mutation")
+        if not isinstance(container_id, int) or isinstance(container_id, bool) or not 1 <= container_id <= 999999:
+            raise ValidationError("container_id is invalid")
+        if not isinstance(evidence, dict) or not isinstance(actor, str) or not actor or len(actor) > 128:
+            raise ValidationError("legacy recovery evidence or actor is invalid")
+        if any(evidence.get(name) is not True for name in required_true) or any(evidence.get(name) is not False for name in required_false):
+            raise ValidationError("legacy recovery evidence is incomplete or unsafe")
+        if not isinstance(baseline_packages, dict) or not baseline_packages or any(
+            not isinstance(name, str) or not name or not isinstance(version, str) or not version
+            for name, version in baseline_packages.items()
+        ):
+            raise ValidationError("current package baseline is incomplete")
+        with self._lock:
+            with self._connection:
+                row = self._connection.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+                if row is None:
+                    raise ValidationError("unknown job_id")
+                if row["target"] != f"container:{container_id}":
+                    raise ValidationError("container_id does not match job target")
+                if JobState(row["state"]) not in {JobState.MANUAL_RECOVERY, JobState.RECOVERY_BLOCKED}:
+                    raise InvalidTransitionError("job is not awaiting legacy recovery")
+                if self._connection.execute("SELECT 1 FROM job_recovery_audit WHERE job_id=?", (job_id,)).fetchone() is not None:
+                    raise InvalidTransitionError("job recovery was already recorded")
+                canonical = json.dumps({"evidence": evidence, "baseline_packages": baseline_packages}, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                evidence_hash = hashlib.sha256(canonical).hexdigest()
+                now = utc_now()
+                recovery_id = str(uuid.uuid4())
+                self._connection.execute(
+                    "UPDATE jobs SET state=?,phase=?,progress=100,message=?,finished_at=?,error_code=?,error_message=?,baseline_packages=? WHERE job_id=?",
+                    (JobState.RECONCILED_LEGACY_STATE_VERIFIED, JobPhase.RECOVERY,
+                     "legacy execution unclear; current package state verified for future jobs", now,
+                     "reconciled_legacy_state_verified", "historical execution was not classified as succeeded or not executed",
+                     json.dumps(baseline_packages, sort_keys=True, separators=(",", ":"))[:20000], job_id),
+                )
+                self._connection.execute(
+                    "INSERT INTO job_recovery_audit(recovery_id,job_id,created_at,target,container_id,outcome,evidence_sha256,actor) VALUES(?,?,?,?,?,?,?,?)",
+                    (recovery_id, job_id, now, row["target"], container_id, "legacy_state_verified", evidence_hash, actor),
+                )
+                safe = redact_secrets({"outcome": "legacy_state_verified", "historical_execution_unclear": True, "evidence": evidence, "baseline_sha256": hashlib.sha256(json.dumps(baseline_packages, sort_keys=True, separators=(",", ":")).encode()).hexdigest()})
+                self._connection.execute("INSERT INTO job_logs(job_id,created_at,level,message) VALUES(?,?,?,?)", (job_id, now, "warning", "administrative legacy recovery recorded: " + json.dumps(safe, sort_keys=True, separators=(",", ":"))[:1800]))
+                self._event(job_id, "legacy_recovery_classified", JobState.RECONCILED_LEGACY_STATE_VERIFIED, {"outcome": "legacy_state_verified", "evidence_sha256": evidence_hash, "historical_execution_unclear": True})
+                return {"accepted": True, "job_id": job_id, "recovery_id": recovery_id, "state": JobState.RECONCILED_LEGACY_STATE_VERIFIED, "outcome": "legacy_state_verified", "evidence_sha256": evidence_hash}
 
     def mark_process_identity(self, job_id: str, *, pid: int, starttime: str, pgid: int) -> None:
         if not isinstance(pid, int) or pid <= 1 or not isinstance(pgid, int) or pgid <= 1 or not starttime:

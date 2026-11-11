@@ -63,6 +63,7 @@ class AgentRecoveryInspector:
         package_mutation = any(packages.get(name) != version for name, version in baseline.items())
         history = str(_successful_observation(response, "apt_history").get("stdout", ""))
         dpkg_log = str(_successful_observation(response, "dpkg_log").get("stdout", ""))
+        _successful_observation(response, "apt_check")
         log_checked = True
         # APT history proves that some transaction occurred, but without a
         # job marker it cannot be attributed safely to this job.

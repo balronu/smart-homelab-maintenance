@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.10 – Stable
+
+### Deutsch
+
+- Ergänzt `reconciled_legacy_state_verified` als ausdrücklich administrativen
+  Terminalstatus für historische Jobs ohne Paket-Baseline. Dieser Status
+  behauptet keine erfolgreiche oder nicht erfolgte historische Installation;
+  er bestätigt nur den aktuellen, unabhängigen Zustand für künftige Jobs.
+- Erzwingt CTID-/Jobbindung, vollständige Inspektion, sauberen dpkg-/APT-Zustand,
+  aktive Prozess- und Lockfreiheit, vollständigen Paketbestand, frische
+  Simulation, neue Baseline und Administratorbestätigung. Unverfügbare
+  Lockprüfungen bleiben blockierend.
+
+### English
+
+- Adds `reconciled_legacy_state_verified` as an explicitly administrative
+  terminal state for historical jobs without a package baseline. It does not
+  claim that the historical installation succeeded or did not run; it verifies
+  only the current state for future jobs.
+- Enforces CTID/job binding, complete inspection, clean dpkg/APT state, no
+  active processes or held locks, a complete package inventory, a fresh
+  simulation, a new baseline, and administrator confirmation. Unavailable lock
+  checks remain blocking.
+
+**Compatibility / Migration:** API contract 1.1 and existing job databases are
+preserved through additive state handling. No package installation, retry, or
+automatic legacy release is performed.
+
 ## 1.0.9 – Stable
 
 ### Deutsch

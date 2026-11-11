@@ -1,5 +1,32 @@
 # Smart Homelab Maintenance
 
+## v1.0.10 – Stable
+
+### Deutsch
+
+- Ergänzt einen separat authentifizierten Legacy-Recovery-Pfad für historische
+  Jobs ohne persistierte Paket-Baseline. Er bestätigt ausschließlich den
+  aktuellen, unabhängig geprüften Paketmanagerzustand und markiert die
+  historische Ausführung ausdrücklich als unklar.
+- Verlangt vor der Freigabe CTID-/Jobbindung, Prozess- und Lockfreiheit,
+  `dpkg --audit`, `apt-get check`, vollständigen Paketbestand, frische
+  Simulation und Administratorbestätigung. Fehlende Lock-Utilities bleiben
+  fail-closed.
+
+### English
+
+- Adds a separately authenticated legacy-recovery path for historical jobs
+  without a persisted package baseline. It verifies only the current package
+  manager state and explicitly preserves the historical execution as unknown.
+- Requires CTID/job binding, no active package work or held locks, clean
+  `dpkg --audit` and `apt-get check`, a complete package inventory, a fresh
+  simulation, and explicit administrator confirmation. Missing lock utilities
+  remain fail-closed.
+
+API contract `1.1`, existing jobs, policies, grants, and container isolation
+remain compatible. No package installation or automatic historical release is
+performed.
+
 ## v1.0.9 – Stable
 
 ### Deutsch

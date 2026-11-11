@@ -21,6 +21,7 @@ administrative Recovery verlangt zusätzlich ein separates
 | GET | `/api/v1/jobs/{job_id}` | Jobstatus ohne große Historie |
 | GET | `/api/v1/jobs/{job_id}/events?after=&limit=` | Cursor-basierte Ereignisse |
 | POST | `/api/v1/jobs/{job_id}/reconcile` | Bestätigte, evidenzgebundene Recovery eines nicht gestarteten Jobs |
+| POST | `/api/v1/jobs/{job_id}/legacy-reconcile` | Administratorbestätigte aktuelle Zustandsfreigabe eines historischen Jobs |
 | GET | `/api/v1/updates` | Passive Updateprüfung aller autorisierten Ziele |
 | GET | `/api/v1/policy` | Aktuelle Policy mit Generation |
 | POST | `/api/v1/policy/prepare` | Bestätigungslose Policy-Vorschau |

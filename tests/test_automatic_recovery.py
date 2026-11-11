@@ -8,6 +8,7 @@ from agent.smart_homelab_maintenance.jobs import JobRepository
 from agent.smart_homelab_maintenance.recovery import RecoveryEvidence, classify_recovery
 from agent.smart_homelab_maintenance.agent_recovery import AgentRecoveryInspector
 from agent.smart_homelab_maintenance.types import JobRequest, JobState
+from agent.smart_homelab_maintenance.errors import ValidationError
 
 
 def evidence(**changes):
@@ -23,6 +24,41 @@ def evidence(**changes):
 
 
 class AutomaticRecoveryTests(unittest.TestCase):
+    def test_legacy_recovery_requires_complete_current_evidence_and_persists_baseline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:107", "update", None, "legacy-107-123456"))
+            repo.transition(job, JobState.PREFLIGHT)
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery")
+            evidence = {name: True for name in (
+                "ctid_verified", "job_id_verified", "inspection_complete", "dpkg_audit_clean", "apt_check_clean",
+                "interrupted_transactions_absent", "partial_installation_absent", "logs_checked",
+                "package_inventory_complete", "fresh_simulation_passed", "lock_checks_complete",
+                "administrator_confirmed", "historical_execution_unclear")}
+            evidence.update({"active_package_processes": False, "package_locks": False, "writable_mutation": False})
+            result = repo.reconcile_legacy_state_verified(job, container_id=107, evidence=evidence, baseline_packages={"demo": "1.0"})
+            self.assertTrue(result["accepted"])
+            current = repo.get(job)
+            self.assertEqual(current["state"], JobState.RECONCILED_LEGACY_STATE_VERIFIED)
+            self.assertEqual(current["baseline_packages"], '{"demo":"1.0"}')
+            self.assertEqual(current["recovery_audit"]["outcome"], "legacy_state_verified")
+            repo.close()
+
+    def test_legacy_recovery_rejects_unknown_lock_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:108", "update", None, "legacy-108-123456"))
+            repo.transition(job, JobState.PREFLIGHT)
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery")
+            evidence = {"ctid_verified": True, "job_id_verified": True, "inspection_complete": True,
+                        "dpkg_audit_clean": True, "apt_check_clean": True, "interrupted_transactions_absent": True,
+                        "partial_installation_absent": True, "logs_checked": True, "package_inventory_complete": True,
+                        "fresh_simulation_passed": True, "lock_checks_complete": False, "administrator_confirmed": True,
+                        "historical_execution_unclear": True, "active_package_processes": False, "package_locks": False,
+                        "writable_mutation": False}
+            with self.assertRaises(ValidationError):
+                repo.reconcile_legacy_state_verified(job, container_id=108, evidence=evidence, baseline_packages={"demo": "1.0"})
+            repo.close()
     def test_agent_inspector_blocks_ambiguous_apt_history_without_completion(self):
         class Helper:
             def inspect(self, _container_id):
@@ -30,6 +66,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
                     "processes": {"returncode": 0, "stdout": "", "stderr": ""},
                     "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
                     "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_check": {"returncode": 0, "stdout": "", "stderr": ""},
                     "apt_history": {"returncode": 0, "stdout": "Commandline: apt-get upgrade\n", "stderr": ""},
                     "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
                     "apt_lock": {"returncode": 1}, "dpkg_lock": {"returncode": 1},
@@ -57,6 +94,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
                     "processes": {"returncode": 0, "stdout": "", "stderr": ""},
                     "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
                     "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_check": {"returncode": 0, "stdout": "", "stderr": ""},
                     "apt_history": {"returncode": 0, "stdout": "", "stderr": ""},
                     "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
                     "apt_lock": {"returncode": 1, "stdout": "", "stderr": ""},
@@ -75,6 +113,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
                     "processes": {"returncode": 0, "stdout": "", "stderr": ""},
                     "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
                     "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_check": {"returncode": 0, "stdout": "", "stderr": ""},
                     "apt_history": {"returncode": 0, "stdout": "", "stderr": ""},
                     "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
                     "apt_lock": {"returncode": 127, "stdout": "", "stderr": "fuser missing"},
