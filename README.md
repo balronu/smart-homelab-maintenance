@@ -1,5 +1,15 @@
 # Smart Homelab Maintenance
 
+## v1.0.11 – Stable
+
+### Deutsch / English
+
+Behebt den sicheren Agent-Upgrade-Preflight für nachweislich bytegleiche,
+gleich versionierte Rollback-Staging-Duplikate. Inhaltlich abweichende oder
+unklare Staging-Stände bleiben blockierend. / Fixes the safe agent-upgrade
+preflight for provably byte-identical, same-version rollback staging
+duplicates. Divergent or ambiguous staging remains blocked.
+
 ## v1.0.10 – Stable
 
 ### Deutsch

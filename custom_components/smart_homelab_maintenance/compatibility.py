@@ -56,8 +56,8 @@ def evaluate_agent(agent_version: object, api_contract: object) -> Compatibility
     observed_rc = re.fullmatch(r"(\d+\.\d+\.\d+)-rc\.\d+", observed_version)
     if expected_stable and observed_rc and observed_rc.group(1) in {"1.0.0", expected_stable.group(1)}:
         return Compatibility("current", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "release-candidate agent is compatible with the stable API contract")
-    if expected_stable and observed_beta and expected_stable.group(1) in {"1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5", "1.0.7", "1.0.8", "1.0.9", "1.0.10"} and observed_beta.group(1) == "0.1.0":
+    if expected_stable and observed_beta and expected_stable.group(1) in {"1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5", "1.0.7", "1.0.8", "1.0.9", "1.0.10", "1.0.11"} and observed_beta.group(1) == "0.1.0":
         return Compatibility("current", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "legacy beta agent is compatible with the stable API contract")
-    if expected_stable and observed_version in {"1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5", "1.0.6"} and expected_stable.group(1) in {"1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5", "1.0.7", "1.0.8", "1.0.9", "1.0.10"}:
+    if expected_stable and observed_version in {"1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5", "1.0.6"} and expected_stable.group(1) in {"1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5", "1.0.7", "1.0.8", "1.0.9", "1.0.10", "1.0.11"}:
         return Compatibility("current", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "previous stable agent is compatible with the integration patch release")
     return Compatibility("incompatible", VERSION, observed_version, AGENT_API_CONTRACT, observed_contract, "unsupported agent version")

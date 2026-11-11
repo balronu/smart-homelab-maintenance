@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.11 – Stable
+
+### Deutsch / English
+
+- Der offizielle Agent-Updater akzeptiert nachweislich bytegleiche,
+  gleich versionierte Rollback-Staging-Duplikate; abweichende gleich
+  versionierte Stände bleiben fail-closed blockiert. / The official agent
+  updater accepts provably byte-identical, same-version rollback staging
+  duplicates; divergent same-version staging remains fail-closed.
+
 ## 1.0.10 – Stable
 
 ### Deutsch
