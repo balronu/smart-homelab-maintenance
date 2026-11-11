@@ -13,4 +13,4 @@ proxmox_node = "pve-node"
 proxmox_ca_file = "/etc/smart-homelab-maintenance/proxmox-ca.crt"
 
 # Secrets are supplied only through systemd LoadCredential:
-# api_token and proxmox_api_token.
+# api_token, proxmox_api_token, and optionally recovery_admin_token.

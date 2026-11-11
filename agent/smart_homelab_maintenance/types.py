@@ -28,6 +28,7 @@ class JobState(StrEnum):
     TIMEOUT = "timeout"
     MANUAL_RECOVERY = "manual_recovery_required"
     CANCELLED = "cancelled"
+    RECONCILED_NOT_EXECUTED = "reconciled_not_executed"
 
 
 class JobPhase(StrEnum):
@@ -47,6 +48,7 @@ TERMINAL_STATES = frozenset(
         JobState.TIMEOUT,
         JobState.MANUAL_RECOVERY,
         JobState.CANCELLED,
+        JobState.RECONCILED_NOT_EXECUTED,
     }
 )
 

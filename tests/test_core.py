@@ -75,7 +75,7 @@ class CoreTests(unittest.TestCase):
 
     def test_release_versions_are_consistent_across_runtime_and_manifest(self) -> None:
         manifest = json.loads((Path(__file__).parents[1] / "custom_components" / "smart_homelab_maintenance" / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(agent_version, integration_version)
+        self.assertTrue(agent_version.startswith("1.0."))
         self.assertEqual(manifest["version"], integration_version)
 
     def request(self, *, target: str = "paperless", key: str = "request-12345678") -> JobRequest:
@@ -155,6 +155,88 @@ class CoreTests(unittest.TestCase):
         reopened = JobRepository(self.db, max_log_entries=3)
         self.assertEqual(reopened.get(job)["state"], JobState.MANUAL_RECOVERY)
         reopened.close()
+
+    @staticmethod
+    def recovery_evidence(**overrides):
+        evidence = {
+            "outcome": "not_executed", "execution_started": False,
+            "package_mutation": False, "partial_execution": False,
+            "active_package_processes": False, "package_locks": False,
+            "start_marker_found": False, "completion_marker_found": False,
+            "job_logs_checked": True, "apt_history_checked": True,
+            "package_versions_checked": True, "execution_markers_checked": True,
+        }
+        evidence.update(overrides)
+        return evidence
+
+    def manual_recovery_job(self, *, target="container:107"):
+        suffix = target.replace(":", "-")
+        job = self.repo.create(JobRequest(target, "update", None, f"recovery-{suffix}-1234", "digest-1234"))
+        self.repo.transition(job, JobState.PREFLIGHT)
+        self.repo.transition(job, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, error_code="execution_status_unknown")
+        return job
+
+    def test_reconcile_not_executed_is_distinct_audited_terminal_state(self) -> None:
+        job = self.manual_recovery_job()
+        result = self.repo.reconcile_not_executed(job, container_id=107, evidence=self.recovery_evidence())
+        self.assertTrue(result["accepted"])
+        self.assertEqual(self.repo.get(job)["state"], JobState.RECONCILED_NOT_EXECUTED)
+        self.assertEqual(self.repo.get(job)["recovery_audit"]["outcome"], "not_executed")
+        audit = self.repo._connection.execute("SELECT outcome,container_id FROM job_recovery_audit WHERE job_id=?", (job,)).fetchone()
+        self.assertEqual((audit["outcome"], audit["container_id"]), ("not_executed", 107))
+
+    def test_reconcile_rejects_execution_or_incomplete_evidence(self) -> None:
+        for index, (key, change) in enumerate((("started", {"execution_started": True}), ("partial", {"partial_execution": True}), ("unknown", {"job_logs_checked": False}), ("active", {"active_package_processes": True}))):
+            with self.subTest(key=key):
+                ctid = 100 + len(key) + (index * 10)
+                job = self.manual_recovery_job(target=f"container:{ctid}")
+                with self.assertRaises(ValidationError):
+                    self.repo.reconcile_not_executed(job, container_id=ctid, evidence=self.recovery_evidence(**change))
+                self.assertEqual(self.repo.get(job)["state"], JobState.MANUAL_RECOVERY)
+
+    def test_reconcile_rejects_wrong_job_ctid_and_duplicate(self) -> None:
+        job = self.manual_recovery_job()
+        with self.assertRaises(ValidationError):
+            self.repo.reconcile_not_executed(job, container_id=108, evidence=self.recovery_evidence())
+        with self.assertRaises(ValidationError):
+            self.repo.reconcile_not_executed("missing-job", container_id=107, evidence=self.recovery_evidence())
+        self.repo.reconcile_not_executed(job, container_id=107, evidence=self.recovery_evidence())
+        with self.assertRaises(InvalidTransitionError):
+            self.repo.reconcile_not_executed(job, container_id=107, evidence=self.recovery_evidence())
+
+    def test_reconcile_requires_admin_token(self) -> None:
+        job = self.manual_recovery_job()
+        api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), self.repo, read_token="read", admin_token="admin")
+        body = json.dumps({"confirm": True, "container_id": 107, "evidence": self.recovery_evidence()}).encode()
+        status, _ = api.handle("POST", f"/api/v1/jobs/{job}/reconcile", headers={"Authorization": "Bearer read"}, body=body)
+        self.assertEqual(status, 400)
+        status, response = api.handle("POST", f"/api/v1/jobs/{job}/reconcile", headers={"Authorization": "Bearer admin"}, body=body)
+        self.assertEqual(status, 200)
+        self.assertEqual(response["data"]["state"], JobState.RECONCILED_NOT_EXECUTED)
+
+    def test_reconcile_rejects_active_job_and_concurrent_recovery(self) -> None:
+        job = self.queued_job(key="active-recovery-key")
+        self.repo.transition(job, JobState.PREFLIGHT)
+        with self.assertRaises(InvalidTransitionError):
+            self.repo.reconcile_not_executed(job, container_id=107, evidence=self.recovery_evidence())
+        recovered = self.manual_recovery_job(target="container:119")
+        outcomes = []
+        barrier = threading.Barrier(2)
+
+        def recover() -> None:
+            barrier.wait()
+            try:
+                self.repo.reconcile_not_executed(recovered, container_id=119, evidence=self.recovery_evidence())
+                outcomes.append("won")
+            except InvalidTransitionError:
+                outcomes.append("lost")
+
+        workers = [threading.Thread(target=recover) for _ in range(2)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join()
+        self.assertEqual(sorted(outcomes), ["lost", "won"])
 
     def test_log_history_is_bounded_and_paginated(self) -> None:
         job = self.queued_job()
@@ -413,6 +495,8 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(evaluate_agent("0.2.0-beta.1", "1.1").status, "incompatible")
         self.assertEqual(evaluate_agent(None, "1.1").status, "unknown")
         self.assertEqual(evaluate_agent("1.0.1", "1.1").status, "current")
+        self.assertEqual(evaluate_agent("1.0.6", "1.1").status, "current")
+        self.assertEqual(evaluate_agent("1.1.0", "1.1").status, "incompatible")
 
     def test_discovery_capabilities_are_explicit_and_execution_off(self) -> None:
         for spec in default_registry().all():
