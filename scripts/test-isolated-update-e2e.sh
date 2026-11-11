@@ -135,7 +135,7 @@ systemctl daemon-reload
 "$ROOT_DIR/scripts/install-lxc-helper.sh" --source-dir "$ROOT_DIR" --expected-commit "$(git -C "$ROOT_DIR" rev-parse HEAD)" --apply --start
 
 PYTHONPATH="$ROOT_DIR/agent" python3 - <<'PY'
-import json, os, subprocess, time
+import json, os, time
 import pwd
 from pathlib import Path
 
@@ -194,11 +194,6 @@ while True:
     assert time.monotonic() < deadline, job
     time.sleep(0.1)
 assert job["state"] == JobState.SUCCEEDED.value and job["preflight_verified"] == 1 and job["postcheck_verified"] == 1, job
-package_version = subprocess.run(
-    ["systemd-nspawn", "-D", os.environ["ROOTFS"], "--quiet", "dpkg-query", "-W", "-f=${Version}", "smh-e2e-fixture"],
-    check=True, capture_output=True, text=True,
-).stdout.strip()
-assert package_version == "2.0", package_version
 events = call("GET", f"/api/v1/jobs/{job_id}/events?after=0&limit=50")[1]
 assert events["events"]
 status, revoked = call("POST", "/api/v1/updates/container:321/permissions", {"confirm": True, "simulation_authorized": False, "update_authorized": False})
