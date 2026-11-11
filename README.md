@@ -1,5 +1,29 @@
 # Smart Homelab Maintenance
 
+## v1.0.7 – Stable
+
+### Deutsch
+
+Die automatische Recovery prüft unterbrochene Paketjobs ausschließlich lesend
+über den festen Agent-Helper. Tatsächliche APT-/dpkg-Prozesse und Lock-Besitz
+werden geprüft; vorhandene, aber nicht gehaltene Lockdateien blockieren nicht.
+Fehlende oder widersprüchliche Evidenz bleibt fail-closed in manueller Prüfung.
+Recovery-Zustände, Blockierungsgründe und der letzte Prüfzeitpunkt werden in der
+Lovelace-Karte angezeigt. Paketinstallationen, Reparaturbefehle und automatische
+Wiederholungen bleiben ausgeschlossen.
+
+### English
+
+Automatic recovery inspects interrupted package jobs read-only through the fixed
+agent helper. Actual APT/dpkg processes and lock ownership are checked; an
+existing but unheld lock file does not block recovery. Missing or contradictory
+evidence remains fail-closed and requires manual review. Recovery states,
+blocking reasons, and the last inspection time are shown in the Lovelace card.
+Package installation, repair commands, and automatic retries remain disabled.
+
+API contract `1.1`, existing Config Entries, grants, policies, and container
+isolation are preserved. Existing jobs and databases migrate additively.
+
 ## v1.0.5 – Stable
 
 ### Deutsch
