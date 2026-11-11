@@ -1,6 +1,22 @@
 # Smart Homelab Maintenance
 
-## v1.0.7 – Stable
+## v1.0.8 – Stable
+
+### Deutsch
+
+- Behebt die letzte synchrone APT-/Helper-Prüfung vor der persistenten Jobannahme. Der Execute-Endpunkt persistiert und bestätigt die Job-ID jetzt vor dem langsamen Freshness-Check; die Prüfung bleibt im Worker fail-closed vor jeder Paketmutation.
+- Ergänzt eine Regression für langsames finales Preflight und bewahrt Duplikatschutz, Plan-Digest-Prüfung und Recovery-Semantik.
+
+### English
+
+- Fixes the remaining synchronous APT/helper check before persistent job acceptance. The execute endpoint now persists and acknowledges the job ID before the slow freshness check; the worker remains fail-closed before any package mutation.
+- Adds a regression test for slow final preflight while preserving duplicate protection, plan-digest validation, and recovery semantics.
+
+**Kompatibilität / Compatibility:** API contract 1.1 remains unchanged; existing Config Entries, grants, policies, job databases, and the 1.0.6 agent remain compatible.
+
+**Post-Update:** Reload the Lovelace resource/browser cache. No host/container restart is required.
+
+**Einschränkung / Limitation:** CT108 must remain blocked until its existing manual-recovery job is independently reconciled; this release does not retry or alter that job.
 
 ### Deutsch
 

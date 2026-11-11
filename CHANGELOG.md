@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.8 – Stable
+
+### Deutsch
+
+- Behebt die synchrone Freshness-/Helper-Prüfung vor der persistenten Jobannahme. Der Execute-Endpunkt bestätigt die Job-ID jetzt vor dem langsamen Worker-Preflight; Freshness, finale Simulation und Baseline-Inspektion bleiben vor jeder Paketmutation fail-closed.
+- Ergänzt eine Regression für langsames finales Preflight. Duplikatschutz, Plan-Digest-Prüfung und Recovery-Zustände bleiben erhalten.
+
+### English
+
+- Fixes the synchronous freshness/helper check before persistent job acceptance. The execute endpoint now acknowledges the job ID before the slow worker preflight; freshness, final simulation, and baseline inspection remain fail-closed before any package mutation.
+- Adds a regression for slow final preflight. Duplicate protection, plan-digest validation, and recovery states remain intact.
+
+**Compatibility / Migration:** API contract 1.1 is unchanged. Existing Config Entries, grants, policies, job databases, and the 1.0.6 agent remain compatible.
+
+**Post-update:** Reload the Lovelace resource or browser cache. No host/container restart is required.
+
+**Known limitation:** CT108 remains blocked by its existing manual-recovery job until independently reconciled. This release performs no retry or job-history mutation.
+
 ## 1.0.7 – Stable
 
 ### Deutsch

@@ -44,6 +44,13 @@ class SlowUpdateRunner(Runner):
         return self.code, self.stdout, self.stderr
 
 
+class SlowSimulationRunner(Runner):
+    def simulate(self, vmid=None):
+        self.calls.append(vmid)
+        time.sleep(0.15)
+        return self.code, self.stdout, self.stderr
+
+
 def service(runner, targets=(target(),), clock=None):
     return UpdateService(lambda: targets, runner=runner, clock=clock)
 
@@ -460,6 +467,24 @@ def test_execute_returns_before_slow_update_and_blocks_duplicate_click(tmp_path)
     duplicate = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
     assert duplicate["success"] is False and "another update is active" in duplicate["error"]
     for _ in range(50):
+        if jobs.get(accepted["job_id"])["state"] == "succeeded":
+            break
+        time.sleep(0.01)
+    assert jobs.get(accepted["job_id"])["state"] == "succeeded"
+    jobs.close()
+
+
+def test_execute_returns_before_slow_final_preflight(tmp_path):
+    runner = SlowSimulationRunner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    started = time.monotonic()
+    accepted = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
+    assert time.monotonic() - started < 0.1
+    assert accepted["accepted"] is True and accepted["status"] == "running"
+    for _ in range(80):
         if jobs.get(accepted["job_id"])["state"] == "succeeded":
             break
         time.sleep(0.01)
