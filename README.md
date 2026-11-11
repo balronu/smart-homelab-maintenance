@@ -1,5 +1,28 @@
 # Smart Homelab Maintenance
 
+## v1.0.5 – Stable
+
+### Deutsch
+
+Installationsjobs werden nach erfolgreicher Sicherheits- und Planprüfung
+asynchron gestartet. Der Execute-Aufruf liefert die Job-ID sofort zurück;
+Fortschritt, Abschluss und Fehler kommen über den bestehenden Job-Readback.
+Aktive Jobs sperren erneute Ausführungen pro Container und bleiben nach einem
+Dashboard-Reload sichtbar. Bei unklarem Ausführungsstatus bleibt der Job in
+Manual-Recovery; automatische Wiederholungen finden nicht statt.
+
+### English
+
+After all security and plan checks pass, installation jobs now run
+asynchronously. The execute call returns the job ID immediately; progress,
+completion, and failures are read through the existing job API. Active jobs
+block duplicate execution per container and remain visible after a dashboard
+reload. Uncertain execution stays in manual recovery and is never retried
+automatically.
+
+API contract `1.1`, existing Config Entries, grants, and policies are
+preserved. No automatic updates are enabled by this release.
+
 ## v1.0.4 – Stable
 
 ### Deutsch

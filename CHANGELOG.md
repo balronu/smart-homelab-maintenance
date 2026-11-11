@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.5 – Stable
+
+### Deutsch
+
+- Startet bestätigte Paketjobs nach den unveränderten Sicherheitsprüfungen
+  asynchron und gibt die Job-ID sofort zurück; der kurze HA-HTTP-Timeout kann
+  den APT-Lauf nicht mehr fälschlich als unmittelbaren Fehlschlag darstellen.
+- Nutzt die bestehende persistente Job-Orchestrierung für Polling,
+  Dashboard-Reloads, Container-Isolation und Duplikatschutz.
+- Belässt unklare Ausführungszustände in Manual-Recovery und führt keine
+  automatische Wiederholung durch.
+
+### English
+
+- Starts confirmed package jobs asynchronously after the existing security
+  checks and returns the job ID immediately, so the short HA HTTP timeout no
+  longer masks a running APT operation.
+- Uses the existing persistent job orchestration for polling, dashboard
+  reloads, container isolation, and duplicate protection.
+- Keeps uncertain execution states in manual recovery and never retries them
+  automatically.
+
+**Compatibility / migration:** API contract `1.1`, existing Config Entries,
+grants, and policies are preserved. The v1.0.4 agent remains compatible.
+
+**Post-update:** reload the Lovelace resource or browser cache. A full Home
+Assistant restart is not required.
+
+**Known limitation:** this release does not perform a package installation;
+the first CT107 attempt remains in manual recovery until independently
+reconciled.
+
 ## 1.0.4 – Stable
 
 ### Deutsch
