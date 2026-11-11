@@ -21,11 +21,12 @@ from . import API_CONTRACT_VERSION, __version__
 
 
 class ApiApplication:
-    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None, orchestration: Any | None = None) -> None:
+    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, admin_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None, orchestration: Any | None = None) -> None:
         self.discovery = discovery
         self.jobs = jobs
         self.updates = updates
         self.read_token = read_token
+        self.admin_token = admin_token
         self.max_bytes = max_bytes
         self.orchestration_status = orchestration_status
         self.orchestration = orchestration
@@ -44,9 +45,9 @@ class ApiApplication:
             method = method.upper()
             if method not in {"GET", "POST"}:
                 raise ValidationError("method is not supported")
-            if raw_path != "/api/v1/health" and not self._authorized(headers):
+            if raw_path != "/api/v1/health" and not (self._authorized(headers) or self._admin_authorized(headers)):
                 return 401, self._error("authentication_required", "authentication required", request_id)
-            payload = self._route(raw_path, query, method=method, body=body or b"")
+            payload = self._route(raw_path, query, method=method, body=body or b"", headers=headers)
             body = {"schema_version": "1", "data": payload, "request_id": request_id}
             encoded = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode()
             if len(encoded) > self.max_bytes:
@@ -63,7 +64,11 @@ class ApiApplication:
         supplied = headers.get("authorization", "")
         return bool(self.read_token and secrets.compare_digest(supplied, "Bearer " + self.read_token))
 
-    def _route(self, path: str, query: Mapping[str, list[str]], *, method: str, body: bytes) -> Any:
+    def _admin_authorized(self, headers: Mapping[str, str]) -> bool:
+        supplied = headers.get("authorization", "")
+        return bool(self.admin_token and secrets.compare_digest(supplied, "Bearer " + self.admin_token))
+
+    def _route(self, path: str, query: Mapping[str, list[str]], *, method: str, body: bytes, headers: Mapping[str, str]) -> Any:
         if path == "/api/v1/health":
             return {"status": "ok", "mode": "offline", "agent_version": __version__, "api_contract": API_CONTRACT_VERSION}
         if path == "/api/v1/capabilities":
@@ -175,6 +180,15 @@ class ApiApplication:
             if set(request) - {"confirm"}:
                 raise ValidationError("cancel accepts confirm")
             return self.updates.cancel_job(parts[3], confirmed=request.get("confirm") is True)
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "reconcile" and method == "POST":
+            if not self._admin_authorized(headers):
+                raise ValidationError("administrator authentication required")
+            request = self._json_object(body, "reconcile")
+            if set(request) != {"confirm", "container_id", "evidence"} or request.get("confirm") is not True:
+                raise ValidationError("reconcile requires confirm, container_id and evidence")
+            if not isinstance(request["container_id"], int) or isinstance(request["container_id"], bool) or not isinstance(request["evidence"], dict):
+                raise ValidationError("container_id and evidence are invalid")
+            return self.jobs.reconcile_not_executed(parts[3], container_id=request["container_id"], evidence=request["evidence"])
         if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "events":
             return {"events": self.jobs.events(parts[3], after=self._int(query, "after", 0), limit=self._int(query, "limit", min(50, self.jobs.max_log_entries)))}
         raise KeyError(path)

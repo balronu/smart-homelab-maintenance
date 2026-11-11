@@ -137,7 +137,7 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
     return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets, helper_enabled, policy_mode)
 
 
-def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:
+def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str, recovery_admin_token: str | None = None) -> tuple[ApiApplication, JobRepository]:
     """Construct the live bounded application from validated settings."""
 
     if not agent_token or not proxmox_token:
@@ -178,6 +178,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         repository,
         updates=updates,
         read_token=agent_token,
+        admin_token=recovery_admin_token,
         max_bytes=config.max_response_bytes,
         orchestration_status=lambda: read_installation_status(
             policy_reader=policy_transport.read,
@@ -321,7 +322,12 @@ def main(argv: list[str] | None = None) -> int:
         config = load_runtime_config(args.config)
         agent_token = credential_from_systemd("api_token")
         proxmox_token = credential_from_systemd("proxmox_api_token")
-        application, repository = build_application(config, agent_token=agent_token, proxmox_token=proxmox_token)
+        recovery_admin_token = None
+        try:
+            recovery_admin_token = credential_from_systemd("recovery_admin_token")
+        except (OSError, ValueError):
+            _LOGGER.warning("recovery admin credential is unavailable; job reconciliation remains disabled")
+        application, repository = build_application(config, agent_token=agent_token, proxmox_token=proxmox_token, recovery_admin_token=recovery_admin_token)
         try:
             serve_forever(application, config.server)
         finally:

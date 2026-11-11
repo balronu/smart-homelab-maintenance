@@ -6,6 +6,7 @@ import json
 import sqlite3
 import threading
 import uuid
+import hashlib
 from dataclasses import asdict
 from typing import Any
 
@@ -20,6 +21,7 @@ _TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     JobState.WAITING_CONFIRMATION: frozenset({JobState.RUNNING, JobState.CANCELLED, JobState.BLOCKED}),
     JobState.RUNNING: frozenset({JobState.POSTCHECK, JobState.FAILED, JobState.TIMEOUT, JobState.MANUAL_RECOVERY}),
     JobState.POSTCHECK: frozenset({JobState.SUCCEEDED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.TIMEOUT}),
+    JobState.MANUAL_RECOVERY: frozenset({JobState.RECONCILED_NOT_EXECUTED}),
 }
 
 
@@ -74,6 +76,17 @@ class JobRepository:
                     message TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS job_logs_job_sequence ON job_logs(job_id, sequence);
+                CREATE TABLE IF NOT EXISTS job_recovery_audit (
+                    recovery_id TEXT PRIMARY KEY,
+                    job_id TEXT NOT NULL REFERENCES jobs(job_id),
+                    created_at TEXT NOT NULL,
+                    target TEXT NOT NULL,
+                    container_id INTEGER NOT NULL,
+                    outcome TEXT NOT NULL,
+                    evidence_sha256 TEXT NOT NULL,
+                    actor TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS one_job_recovery ON job_recovery_audit(job_id);
                 CREATE INDEX IF NOT EXISTS jobs_target_created ON jobs(target, created_at);
                 CREATE UNIQUE INDEX IF NOT EXISTS one_active_job_per_target
                     ON jobs(target) WHERE state IN ('preflight','waiting_confirmation','running','postcheck');
@@ -117,6 +130,11 @@ class JobRepository:
             raise ValidationError("unknown job_id")
         result = dict(row)
         result["logs"] = self.logs(job_id, limit=min(50, self.max_log_entries))
+        audit = self._connection.execute(
+            "SELECT recovery_id,created_at,target,container_id,outcome,evidence_sha256,actor FROM job_recovery_audit WHERE job_id=?",
+            (job_id,),
+        ).fetchone()
+        result["recovery_audit"] = dict(audit) if audit is not None else None
         return result
 
     def transition(
@@ -205,6 +223,58 @@ class JobRepository:
             if state is JobState.MANUAL_RECOVERY:
                 return {"accepted": False, "state": state, "reason": "manual_recovery_required"}
             return {"accepted": False, "state": state, "reason": "job_is_terminal"}
+
+    def reconcile_not_executed(
+        self, job_id: str, *, container_id: int, evidence: dict[str, Any], actor: str = "administrator"
+    ) -> dict[str, Any]:
+        """Close an uncertain job only when independent evidence proves no mutation.
+
+        This operation is intentionally narrower than success: it creates a
+        distinct terminal state and an append-only audit row.  Any indication
+        of execution, partial mutation, active work, or missing evidence fails
+        closed.
+        """
+        if not isinstance(container_id, int) or isinstance(container_id, bool) or not 1 <= container_id <= 999999:
+            raise ValidationError("container_id is invalid")
+        if not isinstance(evidence, dict) or not isinstance(actor, str) or not actor or len(actor) > 128:
+            raise ValidationError("recovery evidence or actor is invalid")
+        required_false = ("execution_started", "package_mutation", "partial_execution", "active_package_processes", "package_locks", "start_marker_found", "completion_marker_found")
+        required_true = ("job_logs_checked", "apt_history_checked", "package_versions_checked", "execution_markers_checked")
+        if any(evidence.get(name) is not False for name in required_false) or any(evidence.get(name) is not True for name in required_true):
+            raise ValidationError("recovery evidence is incomplete or indicates execution")
+        if evidence.get("outcome") != "not_executed":
+            raise ValidationError("only not_executed reconciliation is supported")
+        with self._lock:
+            with self._connection:
+                row = self._connection.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+                if row is None:
+                    raise ValidationError("unknown job_id")
+                if JobState(row["state"]) is not JobState.MANUAL_RECOVERY:
+                    raise InvalidTransitionError("only manual_recovery_required jobs may be reconciled")
+                expected_target = f"container:{container_id}"
+                if row["target"] != expected_target:
+                    raise ValidationError("container_id does not match job target")
+                existing = self._connection.execute("SELECT 1 FROM job_recovery_audit WHERE job_id=?", (job_id,)).fetchone()
+                if existing is not None:
+                    raise InvalidTransitionError("job recovery was already recorded")
+                canonical = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                evidence_hash = hashlib.sha256(canonical).hexdigest()
+                now = utc_now()
+                recovery_id = str(uuid.uuid4())
+                self._connection.execute(
+                    "UPDATE jobs SET state=?, phase=?, progress=100, message=?, finished_at=?, error_code=?, error_message=? WHERE job_id=?",
+                    (JobState.RECONCILED_NOT_EXECUTED, JobPhase.RECOVERY, "reconciled: no package execution occurred", now, "reconciled_not_executed", "independent evidence proves the job did not execute", job_id),
+                )
+                self._connection.execute(
+                    "INSERT INTO job_recovery_audit(recovery_id,job_id,created_at,target,container_id,outcome,evidence_sha256,actor) VALUES(?,?,?,?,?,?,?,?)",
+                    (recovery_id, job_id, now, row["target"], container_id, "not_executed", evidence_hash, actor),
+                )
+                safe_evidence = redact_secrets(evidence)
+                self._connection.execute(
+                    "INSERT INTO job_logs(job_id,created_at,level,message) VALUES(?,?,?,?)",
+                    (job_id, now, "warning", "administrative reconciliation recorded: " + json.dumps(safe_evidence, sort_keys=True, separators=(",", ":"))[:1800]),
+                )
+                return {"accepted": True, "job_id": job_id, "recovery_id": recovery_id, "state": JobState.RECONCILED_NOT_EXECUTED, "outcome": "not_executed", "evidence_sha256": evidence_hash}
 
     def mark_process_identity(self, job_id: str, *, pid: int, starttime: str, pgid: int) -> None:
         if not isinstance(pid, int) or pid <= 1 or not isinstance(pgid, int) or pgid <= 1 or not starttime:

@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.6 – Stable Agent
+
+### Deutsch
+
+- Ergänzt eine separat authentifizierte, CTID-gebundene administrative
+  Recovery-Route für Jobs in `manual_recovery_required`.
+- Führt den terminalen Zustand `reconciled_not_executed` mit unveränderlichem
+  Audit-Datensatz und Evidence-Hash ein; ein Job wird niemals nachträglich als
+  erfolgreich ausgeführt markiert.
+- Verweigert Recovery bei gestarteter, teilweiser, aktiver oder unklarer
+  Ausführung, falscher CTID und doppelter Recovery. Paketinstallation,
+  Wiederholung und Neustart bleiben ausgeschlossen.
+
+### English
+
+- Adds separately authenticated, CTID-bound administrative recovery for jobs
+  in `manual_recovery_required`.
+- Adds the terminal `reconciled_not_executed` state with an immutable audit
+  record and evidence hash; a job is never retroactively marked successful.
+- Refuses recovery for started, partial, active, or uncertain execution, wrong
+  CTIDs, and duplicate recovery. Package installation, retry, and restart
+  remain excluded.
+
+**Compatibility / migration:** API contract `1.1` is unchanged. The agent is
+released independently as `1.0.6`; the Home Assistant integration remains at
+`1.0.5` and requires no new integration release. Existing jobs and databases
+are migrated additively on first open.
+
+**Post-update:** provision the optional systemd credential
+`recovery_admin_token` only if administrative recovery is explicitly required;
+otherwise the recovery route remains disabled.
+
+**Known limitation:** only a proven `not_executed` outcome is supported. Jobs
+with any evidence of execution remain blocked for manual investigation.
+
 ## 1.0.5 – Stable
 
 ### Deutsch
