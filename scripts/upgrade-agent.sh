@@ -114,9 +114,18 @@ from pathlib import Path
 
 target = os.path.realpath(sys.argv[1])
 self_pid = os.getpid()
+ancestor_pids = {self_pid}
+cursor = self_pid
+while cursor > 1:
+    try:
+        fields = (Path("/proc") / str(cursor) / "stat").read_text().split()
+        cursor = int(fields[3])
+    except (FileNotFoundError, PermissionError, OSError, ValueError, IndexError):
+        break
+    ancestor_pids.add(cursor)
 bad = []
 for entry in Path("/proc").iterdir():
-    if not entry.name.isdigit() or int(entry.name) in {self_pid, os.getppid()}:
+    if not entry.name.isdigit() or int(entry.name) in ancestor_pids:
         continue
     pid = entry.name
     try:

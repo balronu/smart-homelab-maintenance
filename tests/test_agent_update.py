@@ -141,6 +141,8 @@ def test_staging_recovery_requires_explicit_confirmation_and_isolated_quarantine
     assert 'canonical_quarantine_parent="$(realpath -e -- "$quarantine_parent")"' in script
     assert "! -L \"$recover_staging\"" in script
     assert "staging_process_check" in script
+    assert "ancestor_pids" in script
+    assert "fields = (Path(\"/proc\") / str(cursor) / \"stat\").read_text().split()" in script
     assert "/etc/systemd/system" in script
     assert "Kein alternativer Rollback-Kandidat bleibt erhalten" in script
     assert '[[ "$confirm" -ne 1 ]]' in script
