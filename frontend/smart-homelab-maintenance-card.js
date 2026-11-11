@@ -104,6 +104,7 @@ SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labe
   // Permission convergence and update freshness are independent per target.
   // A matching readback must never acknowledge the next not_checked refresh
   // for every other guest.
+  const permissions = permissionText(resolveLanguage(this._hass));
   const normalized = items.map((item) => {
     const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id);
     const target = `${kind}:${id}`;
