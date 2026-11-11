@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.14 – Stable
+
+### Deutsch / English
+
+- Präzisiert die Erkennung echter laufender Upgrade-/Rollback-Prozesse:
+  Transport-Shells werden nicht anhand beliebiger Textfragmente blockiert,
+  sondern nur bei tatsächlichen Skriptpfaden oder Rollback-Pfaden. / Refines
+  detection of real active upgrade/rollback processes: transport shells are
+  no longer blocked by arbitrary command-text fragments, only by actual script
+  paths or rollback paths.
+
 ## 1.0.13 – Stable
 
 ### Deutsch / English

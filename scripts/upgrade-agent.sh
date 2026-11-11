@@ -109,6 +109,7 @@ PY
     staging_process_check() {
         python3 - "$canonical_stage" <<'PY'
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -136,7 +137,9 @@ for entry in Path("/proc").iterdir():
         continue
     if any(ref == target or ref.startswith(target + os.sep) for ref in refs):
         bad.append(f"PID {pid} referenziert Staging: {cmd.strip()}")
-    if any(word in cmd for word in ("upgrade-agent.sh", "update-agent.sh", "agent.failed.", "rollback")):
+    active_script = re.search(r"(?:^|[\\s\"'])/[^\\s\"']*/(?:upgrade-agent|update-agent)\\.sh(?:$|[\\s\"'])", cmd)
+    active_rollback = re.search(r"(?:^|[\\s\"'])/[^\\s\"']*agent\\.(?:failed|previous)\\.[^\\s\"']*", cmd)
+    if active_script or active_rollback:
         bad.append(f"aktiver Upgrade/Rollback-Prozess PID {pid}: {cmd.strip()}")
 if bad:
     raise SystemExit("; ".join(sorted(set(bad))))
