@@ -629,7 +629,11 @@ class UpdateService:
                     "accepted": True,
                     "safe": True,
                     "job_id": job_id,
-                    "status": "preflight",
+                    # Keep the public response contract stable: accepted is
+                    # the asynchronous running lifecycle even while the
+                    # persisted row remains in preflight until the worker
+                    # completes final validation.
+                    "status": "running",
                     "plan_digest": current.plan_digest,
                     "message": "update job accepted; poll the job endpoint for completion",
                 }
