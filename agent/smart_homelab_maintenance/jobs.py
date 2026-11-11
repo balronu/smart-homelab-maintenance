@@ -7,6 +7,7 @@ import sqlite3
 import threading
 import uuid
 import hashlib
+from datetime import datetime, timedelta, timezone
 from dataclasses import asdict
 from typing import Any
 
@@ -37,6 +38,7 @@ class JobRepository:
         self.database = database
         self.max_log_entries = max_log_entries
         self._lock = threading.RLock()
+        self._recovery_lock = threading.Lock()
         self._connection = sqlite3.connect(database, timeout=5, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA foreign_keys = ON")
@@ -115,6 +117,7 @@ class JobRepository:
                 "plan_digest": "ALTER TABLE jobs ADD COLUMN plan_digest TEXT",
                 "baseline_packages": "ALTER TABLE jobs ADD COLUMN baseline_packages TEXT",
                 "last_recovery_at": "ALTER TABLE jobs ADD COLUMN last_recovery_at TEXT",
+                "recovery_attempts": "ALTER TABLE jobs ADD COLUMN recovery_attempts INTEGER NOT NULL DEFAULT 0",
             }
             for name, statement in migrations.items():
                 if name not in columns:
@@ -333,26 +336,50 @@ class JobRepository:
             raise ValidationError("invalid recovery limit")
         with self._lock:
             rows = self._connection.execute(
-                "SELECT * FROM jobs WHERE state IN (?, ?, ?) ORDER BY created_at LIMIT ?",
+                "SELECT * FROM jobs WHERE state IN (?, ?, ?) AND COALESCE(recovery_attempts, 0) < 3 ORDER BY created_at LIMIT ?",
                 (JobState.MANUAL_RECOVERY, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED, limit),
             ).fetchall()
-        return [dict(row) for row in rows]
+        now = datetime.now(timezone.utc)
+        result = []
+        for row in rows:
+            last = row["last_recovery_at"]
+            if last:
+                try:
+                    if now - datetime.fromisoformat(last) < timedelta(seconds=30):
+                        continue
+                except ValueError:
+                    pass
+            result.append(dict(row))
+        return result
 
     def run_recovery(self, inspector, *, limit: int = 8, actor: str = "automatic-recovery") -> list[dict[str, Any]]:
         """Inspect a bounded batch; an inspector must never perform package writes."""
+        if not self._recovery_lock.acquire(blocking=False):
+            return []
         results = []
-        for job in self.pending_recovery(limit=limit):
-            try:
-                evidence = inspector(job)
-                if not isinstance(evidence, RecoveryEvidence):
-                    raise ValidationError("recovery inspector returned invalid evidence")
-                container_id = int(str(job["target"]).split(":", 1)[1])
-                results.append(self.reconcile_from_evidence(job["job_id"], container_id=container_id,
-                                                            evidence=evidence, actor=actor))
-            except Exception as exc:  # fail closed; never retry installation here
-                results.append({"accepted": False, "job_id": job["job_id"],
-                                "state": JobState.RECOVERY_BLOCKED,
-                                "outcome": "recovery_blocked", "reason": str(exc)[:300]})
+        try:
+            for job in self.pending_recovery(limit=limit):
+                with self._lock, self._connection:
+                    self._connection.execute("UPDATE jobs SET recovery_attempts=COALESCE(recovery_attempts,0)+1,last_recovery_at=? WHERE job_id=?", (utc_now(), job["job_id"]))
+                try:
+                    evidence = inspector(job)
+                    if not isinstance(evidence, RecoveryEvidence):
+                        raise ValidationError("recovery inspector returned invalid evidence")
+                    container_id = int(str(job["target"]).split(":", 1)[1])
+                    results.append(self.reconcile_from_evidence(job["job_id"], container_id=container_id,
+                                                                evidence=evidence, actor=actor))
+                except Exception as exc:  # fail closed; never retry installation here
+                    try:
+                        self.transition(job["job_id"], JobState.RECOVERY_BLOCKED, phase=JobPhase.RECOVERY,
+                                        progress=100, message="automatic recovery is blocked: inspection incomplete",
+                                        error_code="recovery_blocked", error_message=str(exc)[:300])
+                    except (InvalidTransitionError, ValidationError):
+                        pass
+                    results.append({"accepted": False, "job_id": job["job_id"],
+                                    "state": JobState.RECOVERY_BLOCKED,
+                                    "outcome": "recovery_blocked", "reason": str(exc)[:300]})
+        finally:
+            self._recovery_lock.release()
         return results
 
     def cancel_requested(self, job_id: str) -> bool:
@@ -423,7 +450,7 @@ class JobRepository:
             raise ValidationError("invalid job pagination")
         with self._lock:
             rows = self._connection.execute(
-                "SELECT job_id,target,operation,state,phase,progress,message,error_code,created_at,started_at,finished_at FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                "SELECT job_id,target,operation,state,phase,progress,message,error_code,created_at,started_at,finished_at,last_recovery_at,recovery_attempts FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 (limit, offset),
             ).fetchall()
         return [dict(row) for row in rows]

@@ -28,6 +28,26 @@ def test_helper_builds_only_fixed_read_and_simulation_commands() -> None:
     assert all("install" not in item and item != "update" for item in read + simulate)
 
 
+def test_helper_inspection_is_fixed_read_only_and_bounded() -> None:
+    assert helper.build_inspect_argv(101, "packages") == [
+        "/usr/sbin/pct", "exec", "101", "--", "/usr/bin/dpkg-query", "-W",
+        "-f=${Package}\\t${Version}\\n",
+    ]
+    calls = []
+
+    def run(argv, **_kwargs):
+        calls.append(argv)
+        if argv[1] == "status":
+            return 0, "status: running\n", ""
+        return 0, "demo\t1.0\n", ""
+
+    response = helper.handle({"container_id": 101, "operation": "inspect"}, allowed_ids={101}, run=run)
+    assert response["ok"] is True
+    assert len(calls) == 10
+    assert all(call[:4] == ["/usr/sbin/pct", "exec", "101", "--"] for call in calls[1:])
+    assert all("apt-get" not in call and "install" not in call for call in calls[1:])
+
+
 def test_helper_update_is_two_fixed_phases_and_requires_separate_permission() -> None:
     update = helper.build_argv(101, "update")
     assert update == ["/usr/sbin/pct", "exec", "101", "--", "/usr/bin/apt-get", "update"]

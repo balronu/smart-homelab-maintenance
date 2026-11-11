@@ -6,6 +6,7 @@ from pathlib import Path
 
 from agent.smart_homelab_maintenance.jobs import JobRepository
 from agent.smart_homelab_maintenance.recovery import RecoveryEvidence, classify_recovery
+from agent.smart_homelab_maintenance.agent_recovery import AgentRecoveryInspector
 from agent.smart_homelab_maintenance.types import JobRequest, JobState
 
 
@@ -22,6 +23,22 @@ def evidence(**changes):
 
 
 class AutomaticRecoveryTests(unittest.TestCase):
+    def test_agent_inspector_blocks_ambiguous_apt_history_without_completion(self):
+        class Helper:
+            def inspect(self, _container_id):
+                return {"observations": {
+                    "processes": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
+                    "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_history": {"returncode": 0, "stdout": "Commandline: apt-get upgrade\n", "stderr": ""},
+                    "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_lock": {"returncode": 1}, "dpkg_lock": {"returncode": 1},
+                    "apt_archives_lock": {"returncode": 1},
+                    "dpkg_frontend_lock": {"returncode": 1},
+                }}
+        result = AgentRecoveryInspector(Helper())({"target": "container:107", "baseline_packages": '{"demo":"1.0"}'})
+        self.assertEqual(classify_recovery(result).outcome, "recovery_blocked")
+
     def test_classifier_never_uses_versions_alone(self):
         result = classify_recovery(evidence(side_effects_checked=False))
         self.assertEqual(result.outcome, "recovery_blocked")
@@ -32,6 +49,42 @@ class AutomaticRecoveryTests(unittest.TestCase):
                                                      completion_marker_found=True)).outcome, "reconciled_completed")
         self.assertEqual(classify_recovery(evidence(package_mutation=True)).outcome, "recovery_blocked")
         self.assertEqual(classify_recovery(evidence()).outcome, "reconciled_not_executed")
+
+    def test_inspector_accepts_existing_unheld_lock_files(self):
+        class Helper:
+            def inspect(self, _container_id):
+                observations = {
+                    "processes": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
+                    "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_history": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "apt_archives_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "dpkg_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "dpkg_frontend_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                }
+                return {"observations": observations}
+        result = AgentRecoveryInspector(Helper())({"target": "container:107", "baseline_packages": '{"demo":"1.0"}'})
+        self.assertEqual(classify_recovery(result).outcome, "reconciled_not_executed")
+
+    def test_inspector_blocks_unknown_lock_check(self):
+        class Helper:
+            def inspect(self, _container_id):
+                observations = {
+                    "processes": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
+                    "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_history": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_lock": {"returncode": 127, "stdout": "", "stderr": "fuser missing"},
+                    "apt_archives_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "dpkg_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "dpkg_frontend_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                }
+                return {"observations": observations}
+        with self.assertRaises(ValueError):
+            AgentRecoveryInspector(Helper())({"target": "container:107", "baseline_packages": '{"demo":"1.0"}'})
 
     def test_events_are_append_only_and_target_isolated(self):
         with tempfile.TemporaryDirectory() as directory:

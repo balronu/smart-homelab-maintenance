@@ -135,7 +135,7 @@ try:
         coordinator._inventory_entity_manager = inventory
         entities = [
             _ProjectedSensor(coordinator, "agent_connection", "Agent connection", lambda d: "connected" if d.connected else "offline", lambda d: {"error": d.error}),
-            _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"queued", "preflight", "running", "verifying", "postcheck", "interrupted", "recovery_pending", "recovery_blocked", "manual_recovery_required"}])),
+            _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"queued", "preflight", "running", "verifying", "postcheck", "interrupted", "recovery_pending", "recovery_blocked", "manual_recovery_required"}]), lambda d: {"lifecycle_states": {state: sum(1 for j in d.jobs if j.get("state") == state) for state in sorted({j.get("state") for j in d.jobs})}, "last_recovery_at": max((j.get("last_recovery_at") or "" for j in d.jobs), default=None), "recovery_reasons": [j.get("message") for j in d.jobs if j.get("state") in {"recovery_pending", "recovery_blocked", "manual_recovery_required"} and j.get("message")] } ),
             _ProjectedSensor(coordinator, "agent_last_error", "Last error", lambda d: d.error or "none"),
             _ProjectedSensor(coordinator, "agent_compatibility", "Agent compatibility", lambda d: d.compatibility.status, lambda d: d.compatibility.as_attributes()),
             _ProjectedSensor(coordinator, "agent_helper_status", "LXC helper status", lambda d: _helper_status(d.orchestration), lambda d: _orchestration_attributes(d.orchestration)),
