@@ -44,6 +44,13 @@ class SlowUpdateRunner(Runner):
         return self.code, self.stdout, self.stderr
 
 
+class SlowSimulationRunner(Runner):
+    def simulate(self, vmid=None):
+        self.calls.append(vmid)
+        time.sleep(0.15)
+        return self.code, self.stdout, self.stderr
+
+
 def service(runner, targets=(target(),), clock=None):
     return UpdateService(lambda: targets, runner=runner, clock=clock)
 
@@ -305,7 +312,7 @@ def test_real_update_requires_explicit_permission_fresh_plan_and_confirmation():
         with pytest.raises(ValidationError, match="explicit.*confirmation"):
             checked.execute_update("container:107", confirmed=False, plan_digest=result.plan_digest)
         accepted = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=result.plan_digest)
-        assert accepted["success"] is True and accepted["accepted"] is True and accepted["status"] == "running"
+        assert accepted["success"] is True and accepted["accepted"] is True and accepted["status"] == "preflight"
         for _ in range(50):
             if jobs.get(accepted["job_id"])["state"] == "succeeded":
                 break
@@ -338,7 +345,7 @@ def test_api_execute_returns_structured_update_result_after_fresh_check():
         digest = check_body["data"]["plan_digest"]
         status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=(f'{{"confirm":true,"install_confirmed":true,"plan_digest":"{digest}"}}').encode())
         assert status == 200 and body["data"]["success"] is True and body["data"]["accepted"] is True
-        assert body["data"]["status"] == "running"
+        assert body["data"]["status"] == "preflight"
         for _ in range(50):
             if repo.get(body["data"]["job_id"])["state"] == "succeeded":
                 break
@@ -456,10 +463,28 @@ def test_execute_returns_before_slow_update_and_blocks_duplicate_click(tmp_path)
     accepted = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
     elapsed = time.monotonic() - started
     assert elapsed < 0.1
-    assert accepted["accepted"] is True and accepted["status"] == "running"
+    assert accepted["accepted"] is True and accepted["status"] == "preflight"
     duplicate = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
     assert duplicate["success"] is False and "another update is active" in duplicate["error"]
     for _ in range(50):
+        if jobs.get(accepted["job_id"])["state"] == "succeeded":
+            break
+        time.sleep(0.01)
+    assert jobs.get(accepted["job_id"])["state"] == "succeeded"
+    jobs.close()
+
+
+def test_execute_returns_before_slow_final_preflight(tmp_path):
+    runner = SlowSimulationRunner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    started = time.monotonic()
+    accepted = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
+    assert time.monotonic() - started < 0.1
+    assert accepted["accepted"] is True and accepted["status"] == "preflight"
+    for _ in range(80):
         if jobs.get(accepted["job_id"])["state"] == "succeeded":
             break
         time.sleep(0.01)

@@ -582,7 +582,10 @@ class UpdateService:
             return {"target": target_id, "success": False, "safe": False,
                     "error": "another update is active or requires manual recovery",
                     "status": "manual_recovery_required"}
-        current = self.check(target_id, force=True)
+        # Use the already-fetched, user-confirmed plan for the HTTP admission
+        # decision. A fresh helper check here would defeat async acceptance;
+        # the worker repeats it before any mutating operation.
+        current = self.check(target_id)
         if current.status != "updates_available" or not current.is_fresh():
             return {"target": target_id, "success": False, "safe": False, "error": "fresh updates are not available"}
         if current.plan_digest != plan_digest:
@@ -601,37 +604,16 @@ class UpdateService:
                     idempotency_key=f"{target_id}:{current.plan_digest}",
                     confirmation_hash=current.plan_digest,
                 ))
-                # Capture the immutable baseline before any mutating helper
-                # call. Failure to collect it is fail-closed.
-                inspect_method = getattr(self._runner, "inspect", None)
-                inspection = inspect_method(target.vmid) if callable(inspect_method) else {"observations": {}}
-                baseline = _inspection_packages(inspection)
-                self._jobs.set_execution_context(job_id, plan_digest=current.plan_digest or "", baseline_packages=baseline)
                 self._jobs.transition(job_id, JobState.PREFLIGHT, phase=JobPhase.PREFLIGHT, progress=10, message="fresh update plan validated")
                 self._jobs.append_log(job_id, "fresh plan and target authorization validated")
             except Exception as exc:
                 return {"target": target_id, "success": False, "safe": False, "error": "update job could not be created", "job_error": type(exc).__name__}
         self._active_simulations.add(target_id)
         try:
-            # The displayed plan is never the execution proof. Re-run the
-            # fixed simulation immediately before the mutating helper call.
-            simulation_code, simulation_stdout, simulation_stderr = self._runner.simulate(target.vmid)
-            if simulation_code != 0:
-                if job_id and self._jobs:
-                    self._jobs.transition(job_id, JobState.FAILED, phase=JobPhase.PREFLIGHT, progress=20, message="pre-execution simulation failed", error_code="simulation_failed")
-                return {"target": target_id, "success": False, "safe": False, "error": "pre-execution simulation failed", "job_id": job_id}
-            simulated, held, conflicts, removals = _parse_apt(simulation_stdout, simulation_stderr)
-            simulation_digest = _package_digest(simulated) if self._reader is not None else hashlib.sha256((simulation_stdout + "\n" + simulation_stderr).encode("utf-8", "replace")).hexdigest()
-            if simulation_digest != current.plan_digest:
-                if job_id and self._jobs:
-                    self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="plan changed before execution", error_code="stale_plan")
-                return {"target": target_id, "success": False, "safe": False, "error": "update plan changed during final validation", "plan_digest": simulation_digest, "job_id": job_id}
-            if held or conflicts or removals:
-                if job_id and self._jobs:
-                    self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="simulation contains unsafe changes", error_code="unsafe_plan")
-                return {"target": target_id, "success": False, "safe": False, "error": "final simulation contains held, conflicting, or removing packages", "job_id": job_id}
             if job_id and self._jobs:
-                self._jobs.transition(job_id, JobState.RUNNING, phase=JobPhase.EXECUTION, progress=30, message="fixed APT update started")
+                # Persist and acknowledge the job before any guest helper call.
+                # The HA client has a deliberately short transport timeout;
+                # final inspection/simulation belongs to the worker lifetime.
                 self._jobs.append_log(job_id, "update job accepted; APT worker queued")
                 worker = threading.Thread(
                     target=self._run_update_job,
@@ -647,7 +629,7 @@ class UpdateService:
                     "accepted": True,
                     "safe": True,
                     "job_id": job_id,
-                    "status": "running",
+                    "status": "preflight",
                     "plan_digest": current.plan_digest,
                     "message": "update job accepted; poll the job endpoint for completion",
                 }
@@ -670,6 +652,33 @@ class UpdateService:
         target_id = target.target
         try:
             assert self._jobs is not None
+            # All guest inspection and final simulation remain fail-closed, but
+            # run after the persistent job acknowledgement so HA never waits
+            # for a slow helper during the execute request.
+            fresh = self.check(target_id, force=True)
+            if fresh.status != "updates_available" or not fresh.is_fresh():
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="fresh update plan is unavailable", error_code="fresh_plan_unavailable")
+                return
+            if fresh.plan_digest != plan_digest:
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="plan changed before execution", error_code="stale_plan")
+                return
+            inspect_method = getattr(self._runner, "inspect", None)
+            inspection = inspect_method(target.vmid) if callable(inspect_method) else {"observations": {}}
+            baseline = _inspection_packages(inspection)
+            self._jobs.set_execution_context(job_id, plan_digest=plan_digest or "", baseline_packages=baseline)
+            simulation_code, simulation_stdout, simulation_stderr = self._runner.simulate(target.vmid)
+            if simulation_code != 0:
+                self._jobs.transition(job_id, JobState.FAILED, phase=JobPhase.PREFLIGHT, progress=20, message="pre-execution simulation failed", error_code="simulation_failed")
+                return
+            simulated, held, conflicts, removals = _parse_apt(simulation_stdout, simulation_stderr)
+            simulation_digest = _package_digest(simulated) if self._reader is not None else hashlib.sha256((simulation_stdout + "\n" + simulation_stderr).encode("utf-8", "replace")).hexdigest()
+            if simulation_digest != plan_digest:
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="plan changed before execution", error_code="stale_plan")
+                return
+            if held or conflicts or removals:
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="simulation contains unsafe changes", error_code="unsafe_plan")
+                return
+            self._jobs.transition(job_id, JobState.RUNNING, phase=JobPhase.EXECUTION, progress=30, message="fixed APT update started")
             self._jobs.append_log(job_id, "apt update and no-remove upgrade started")
             update_result = self._runner.update(target.vmid)
             code, stdout, stderr = update_result[:3]
