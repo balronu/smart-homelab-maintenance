@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.4 – Stable
+
+### Deutsch
+
+- Wartet nach einer Berechtigungsänderung auf die bestätigte Konvergenz von
+  HA-State und Backend-Readback, bevor Erfolg gemeldet wird.
+- Behandelt fehlende, widersprüchliche oder verspätete Readbacks fail-closed;
+  falsche Erfolgsmeldungen werden verhindert.
+- Bewahrt die containerbezogene Trennung von Berechtigungs-, Update- und
+  Simulationszuständen.
+
+### English
+
+- Waits for confirmed convergence between HA state and backend readback after a
+  permission change before reporting success.
+- Handles missing, contradictory, or delayed readback fail-closed and prevents
+  false success messages.
+- Preserves container-scoped isolation of permission, update, and simulation
+  state.
+
+**Compatibility / migration:** API contract `1.1`, existing Config Entries,
+grants, and policies are preserved. The external Agent 1.0.0 remains compatible.
+
+**Post-update:** reload the Lovelace resource or browser cache. A full Home
+Assistant restart is not required.
+
+**Known limitation:** `execution_enabled=false` remains unchanged and no
+package installation is performed by this release.
+
 ## 1.0.3 – Stable candidate
 
 ### Deutsch

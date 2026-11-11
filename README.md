@@ -1,6 +1,34 @@
 # Smart Homelab Maintenance
 
-## v1.0.3 – Stable candidate
+## v1.0.4 – Stable
+
+### Deutsch
+
+Die Berechtigungsänderung wartet jetzt auf die bestätigte Konvergenz von
+Home-Assistant-State und Backend-Readback, bevor Erfolg gemeldet wird. Fehlende,
+widersprüchliche oder verspätete Readbacks bleiben sichtbar und führen nicht zu
+einer falschen Erfolgsmeldung. Die Zustände bleiben weiterhin strikt pro
+Container getrennt.
+
+Die bestehende API-Kompatibilität `1.1`, Config Entries, Grants und Policies
+bleiben erhalten. `execution_enabled=false` bleibt der sichere Standard; es
+werden keine Pakete automatisch installiert. Nach dem HACS-Update muss nur die
+Lovelace-Ressource beziehungsweise der Browsercache neu geladen werden. Ein
+vollständiger Home-Assistant-Neustart ist nicht erforderlich.
+
+### English
+
+Permission changes now wait for confirmed convergence between Home Assistant
+state and backend readback before reporting success. Missing, contradictory, or
+delayed readback remains visible and cannot produce a false success message.
+State remains strictly isolated per container.
+
+API contract `1.1`, existing Config Entries, grants, and policies are preserved.
+`execution_enabled=false` remains the safe default; no packages are installed
+automatically. After the HACS update, reload the Lovelace resource or browser
+cache. A full Home Assistant restart is not required.
+
+## v1.0.3 – Stable
 
 The Lovelace card now keeps permission convergence and update freshness
 strictly isolated per container. Historical simulations remain visibly
