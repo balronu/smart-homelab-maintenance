@@ -86,12 +86,14 @@ card.hass = { language: "en", callService: (...args) => {
     return Promise.resolve({ response: { data: { success: true, simulation_authorized: true, update_authorized: false } } });
   }
   if (args[1] === "check") {
-    card.hass = { language: "en", states: { ...permissionStates, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { ...permissionStates["sensor.smart_homelab_maintenance_cloudflared"].attributes, update: { status: "updates_available", dry_run_supported: true, fresh: true, simulation_authorized: true, update_authorized: false, authorized: true } } } } };
+    return Promise.resolve({ response: { data: { success: true } } });
   }
   return Promise.resolve({ response: { data: { success: true } } });
 }, states: permissionStates };
 const permissionButton = card.shadowRoot.querySelector(".container-grid button.permission");
 permissionButton?.click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+card.hass = { language: "en", states: { ...permissionStates, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { ...permissionStates["sensor.smart_homelab_maintenance_cloudflared"].attributes, update: { status: "updates_available", dry_run_supported: true, fresh: true, simulation_authorized: true, update_authorized: false, authorized: true } } } } };
 await new Promise((resolve) => setTimeout(resolve, 0));
 const permissionResult = card.shadowRoot.querySelector(".permission-result");
 const permissionSuccessShown = Boolean(permissionResult?.textContent.includes("Permission changed successfully") && !permissionResult.classList.contains("warning") && !permissionButton?.disabled && permissionCalls.some((args) => args[1] === "check"));
