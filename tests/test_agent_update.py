@@ -90,6 +90,13 @@ def test_historical_staging_requires_active_health_and_keeps_ambiguous_state_blo
     assert "Mehrere Rollback-Stände passen" in script
 
 
+def test_historical_staging_version_comparison_supports_stable_agent_releases():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert 're.fullmatch(r"0\\.1\\.0-beta\\.(\\d+)", value)' in script
+    assert 're.fullmatch(r"(\\d+)\\.(\\d+)\\.(\\d+)", value)' in script
+    assert "candidate < current" in script
+
+
 def test_readiness_requires_tls_contract_and_expected_version():
     script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
     assert '--cacert "$ca_file"' in script

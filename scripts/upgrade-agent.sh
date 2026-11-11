@@ -219,12 +219,20 @@ version_is_older() {
 import re
 import sys
 
-pattern = re.compile(r"^0\.1\.0-beta\.(\d+)$")
-candidate = pattern.fullmatch(sys.argv[1])
-current = pattern.fullmatch(sys.argv[2])
-if not candidate or not current:
+def parse(value):
+    beta = re.fullmatch(r"0\.1\.0-beta\.(\d+)", value)
+    if beta:
+        return (0, 1, 0, 0, int(beta.group(1)))
+    stable = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", value)
+    if stable:
+        return (1, int(stable.group(1)), int(stable.group(2)), int(stable.group(3)), 0)
+    return None
+
+candidate = parse(sys.argv[1])
+current = parse(sys.argv[2])
+if candidate is None or current is None:
     raise SystemExit(1)
-raise SystemExit(0 if int(candidate.group(1)) < int(current.group(1)) else 1)
+raise SystemExit(0 if candidate < current else 1)
 PY
 }
 

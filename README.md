@@ -1,5 +1,21 @@
 # Smart Homelab Maintenance
 
+## v1.0.9 – Stable
+
+### Deutsch
+
+- Behebt den offiziellen Agent-Upgrade-Preflight für stabile Agent-Version
+  `1.0.6`, ohne historische Beta-Rollback-Stagings zu löschen oder zu
+  überschreiben.
+
+### English
+
+- Fixes the official agent-upgrade preflight for stable agent version `1.0.6`
+  without deleting or overwriting historical beta rollback staging.
+
+API contract 1.1, TLS-/Healthcheck-Gates, bestehende Grants und Policies sowie
+die fail-closed Recovery bleiben unverändert.
+
 ## v1.0.8 – Stable
 
 ### Deutsch
