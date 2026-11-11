@@ -43,7 +43,7 @@ def test_helper_inspection_is_fixed_read_only_and_bounded() -> None:
 
     response = helper.handle({"container_id": 101, "operation": "inspect"}, allowed_ids={101}, run=run)
     assert response["ok"] is True
-    assert len(calls) == 10
+    assert len(calls) == 11
     assert all(call[:4] == ["/usr/sbin/pct", "exec", "101", "--"] for call in calls[1:])
     assert all("apt-get" not in call and "install" not in call for call in calls[1:])
 

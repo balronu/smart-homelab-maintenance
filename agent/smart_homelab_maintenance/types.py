@@ -35,6 +35,7 @@ class JobState(StrEnum):
     RECOVERY_PENDING = "recovery_pending"
     RECONCILED_COMPLETED = "reconciled_completed"
     RECOVERY_BLOCKED = "recovery_blocked"
+    RECONCILED_LEGACY_STATE_VERIFIED = "reconciled_legacy_state_verified"
 
 
 class JobPhase(StrEnum):

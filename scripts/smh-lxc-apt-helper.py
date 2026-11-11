@@ -274,6 +274,7 @@ def build_inspect_argv(vmid: int, name: str) -> list[str]:
         "processes": ["/usr/bin/ps", "-eo", "pid=,comm=,args="],
         "packages": ["/usr/bin/dpkg-query", "-W", "-f=${Package}\\t${Version}\\n"],
         "dpkg_audit": ["/usr/bin/dpkg", "--audit"],
+        "apt_check": ["/usr/bin/apt-get", "check"],
         "apt_history": ["/usr/bin/tail", "-n", "200", "/var/log/apt/history.log"],
         "dpkg_log": ["/usr/bin/tail", "-n", "200", "/var/log/dpkg.log"],
         "apt_lock": ["/usr/bin/fuser", "-s", "/var/lib/apt/lists/lock"],
@@ -390,7 +391,7 @@ def handle(request: Any, *, allowed_ids: set[int], update_ids: set[int] | None =
                 raise HelperError("not_running", "stopped containers are never started or probed")
             if operation == "inspect":
                 observations: dict[str, Any] = {}
-                for name in ("processes", "packages", "dpkg_audit", "apt_history", "dpkg_log", "apt_lock", "apt_archives_lock", "dpkg_lock", "dpkg_frontend_lock"):
+                for name in ("processes", "packages", "dpkg_audit", "apt_check", "apt_history", "dpkg_log", "apt_lock", "apt_archives_lock", "dpkg_lock", "dpkg_frontend_lock"):
                     code, stdout, stderr = run(build_inspect_argv(vmid, name))
                     observations[name] = {"returncode": code, "stdout": stdout, "stderr": stderr}
                 if len(json.dumps(observations, separators=(",", ":"))) > MAX_OUTPUT_BYTES:
