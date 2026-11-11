@@ -89,7 +89,10 @@ class SmartHomelabCoordinator:
                 update_items = tuple(updates.get("data", {}).get("items", []))
                 update_by_target = {item.get("target"): item for item in update_items}
                 execution_enabled = bool((capabilities.get("data") or {}).get("execution_enabled", False))
-                active_targets = {job.get("target") for job in jdata.get("items", []) if job.get("state") in {"queued", "preflight", "running", "postcheck", "manual_recovery_required"}}
+                active_targets = {job.get("target") for job in jdata.get("items", []) if job.get("state") in {
+                    "queued", "preflight", "running", "verifying", "postcheck",
+                    "interrupted", "recovery_pending", "recovery_blocked", "manual_recovery_required",
+                }}
                 update_by_target = {
                     target: dict(item, execution_enabled=execution_enabled, backend_connected=True,
                                  job_conflict=target in active_targets)

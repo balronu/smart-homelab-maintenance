@@ -200,6 +200,11 @@ class AptCommandRunner:
             raise FileNotFoundError("LXC update helper is unavailable")
         return self._guest_transport.update(vmid)
 
+    def inspect(self, vmid: int) -> dict[str, Any]:
+        if self._guest_transport is None:
+            raise GuestHelperUnavailableError("LXC inspection helper is unavailable")
+        return self._guest_transport.inspect(vmid)
+
 
 class AptUpdateReader:
     """Read the existing APT cache without refreshing indexes or simulating."""
@@ -262,7 +267,7 @@ class RootHelperTransport:
     def _call_response(self, operation: str, vmid: int) -> dict[str, Any]:
         if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
             raise ValidationError("container id is invalid")
-        if operation not in {"read", "simulate", "update", "probe"}:
+        if operation not in {"read", "simulate", "update", "inspect", "probe"}:
             raise ValidationError("guest operation is not allowed")
         request = json.dumps({"container_id": vmid, "operation": operation}, separators=(",", ":"))
         payload = (request + "\n").encode("utf-8")
@@ -319,6 +324,13 @@ class RootHelperTransport:
             raise ValidationError(str(response.get("stderr", "eligibility probe failed")))
         return response
 
+    def inspect(self, vmid: int) -> dict[str, Any]:
+        """Collect fixed, read-only package forensic observations."""
+        response = self._call_response("inspect", vmid)
+        if response.get("ok") is not True:
+            raise GuestHelperUnavailableError(str(response.get("stderr", "guest inspection failed")))
+        return response
+
 
 def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     packages: list[PackageChange] = []
@@ -342,6 +354,19 @@ def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tup
             conflicts.append(stripped[:240])
     unique = {item.name: item for item in packages}
     return tuple(unique.values()), tuple(sorted(set(held))), tuple(sorted(set(conflicts))), tuple(sorted(set(removals)))
+
+
+def _inspection_packages(response: Mapping[str, Any]) -> dict[str, str]:
+    observations = response.get("observations") if isinstance(response, Mapping) else None
+    package_observation = observations.get("packages", {}) if isinstance(observations, Mapping) else {}
+    if not isinstance(package_observation, Mapping) or package_observation.get("returncode") != 0:
+        return {}
+    result: dict[str, str] = {}
+    for line in str(package_observation.get("stdout", "")).splitlines():
+        name, separator, version = line.partition("\t")
+        if separator and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9+_.:-]*", name) and version:
+            result[name] = version[:256]
+    return result
 
 
 _APT_UPGRADABLE = re.compile(
@@ -576,6 +601,12 @@ class UpdateService:
                     idempotency_key=f"{target_id}:{current.plan_digest}",
                     confirmation_hash=current.plan_digest,
                 ))
+                # Capture the immutable baseline before any mutating helper
+                # call. Failure to collect it is fail-closed.
+                inspect_method = getattr(self._runner, "inspect", None)
+                inspection = inspect_method(target.vmid) if callable(inspect_method) else {"observations": {}}
+                baseline = _inspection_packages(inspection)
+                self._jobs.set_execution_context(job_id, plan_digest=current.plan_digest or "", baseline_packages=baseline)
                 self._jobs.transition(job_id, JobState.PREFLIGHT, phase=JobPhase.PREFLIGHT, progress=10, message="fresh update plan validated")
                 self._jobs.append_log(job_id, "fresh plan and target authorization validated")
             except Exception as exc:

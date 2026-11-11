@@ -21,7 +21,7 @@ from . import API_CONTRACT_VERSION, __version__
 
 
 class ApiApplication:
-    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, admin_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None, orchestration: Any | None = None) -> None:
+    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, admin_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None, orchestration: Any | None = None, recovery_runner: Any | None = None) -> None:
         self.discovery = discovery
         self.jobs = jobs
         self.updates = updates
@@ -30,6 +30,7 @@ class ApiApplication:
         self.max_bytes = max_bytes
         self.orchestration_status = orchestration_status
         self.orchestration = orchestration
+        self.recovery_runner = recovery_runner
 
     def handle(self, method: str, path: str, *, headers: Mapping[str, str] | None = None, body: bytes | None = None) -> tuple[int, dict[str, Any]]:
         request_id = secrets.token_hex(8)
@@ -108,6 +109,8 @@ class ApiApplication:
         if path == "/api/v1/containers":
             return self._page([item.as_dict() for item in self.discovery.containers()], query)
         if path == "/api/v1/jobs":
+            if callable(self.recovery_runner):
+                self.recovery_runner()
             return self._page(self.jobs.list(offset=self._int(query, "offset", 0), limit=self._int(query, "limit", 50)), query)
         if path == "/api/v1/updates" and method == "GET":
             if self.updates is None:

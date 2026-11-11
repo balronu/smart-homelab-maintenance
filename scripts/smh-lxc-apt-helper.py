@@ -30,7 +30,7 @@ from typing import Any, Mapping
 DEFAULT_ALLOWLIST = Path("/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml")
 MAX_OUTPUT_BYTES = 256_000
 COMMAND_TIMEOUT_SECONDS = 10
-ALLOWED_OPERATIONS = {"read", "simulate", "update"}
+ALLOWED_OPERATIONS = {"read", "simulate", "update", "inspect"}
 PROBE_OPERATION = "probe"
 POLICY_OPERATIONS = {"policy_read", "policy_set"}
 EXPECTED_CLIENT_USER = "smart-homelab-maintenance"
@@ -266,6 +266,26 @@ def build_argv(vmid: int, operation: str) -> list[str]:
     return ["/usr/sbin/pct", "exec", str(vmid), "--", *guest_command]
 
 
+def build_inspect_argv(vmid: int, name: str) -> list[str]:
+    """Build one fixed read-only forensic command; no guest input is accepted."""
+    if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
+        raise HelperError("invalid_container", "container id is invalid")
+    commands = {
+        "processes": ["/usr/bin/ps", "-eo", "pid=,comm=,args="],
+        "packages": ["/usr/bin/dpkg-query", "-W", "-f=${Package}\\t${Version}\\n"],
+        "dpkg_audit": ["/usr/bin/dpkg", "--audit"],
+        "apt_history": ["/usr/bin/tail", "-n", "200", "/var/log/apt/history.log"],
+        "dpkg_log": ["/usr/bin/tail", "-n", "200", "/var/log/dpkg.log"],
+        "apt_lock": ["/usr/bin/fuser", "-s", "/var/lib/apt/lists/lock"],
+        "apt_archives_lock": ["/usr/bin/fuser", "-s", "/var/cache/apt/archives/lock"],
+        "dpkg_lock": ["/usr/bin/fuser", "-s", "/var/lib/dpkg/lock"],
+        "dpkg_frontend_lock": ["/usr/bin/fuser", "-s", "/var/lib/dpkg/lock-frontend"],
+    }
+    if name not in commands:
+        raise HelperError("invalid_inspection", "inspection command is not allowed")
+    return ["/usr/sbin/pct", "exec", str(vmid), "--", *commands[name]]
+
+
 def _parse_os_release(raw: str) -> tuple[str, str]:
     values: dict[str, str] = {}
     for line in raw.splitlines():
@@ -350,7 +370,7 @@ def _run(argv: list[str]) -> tuple[int, str, str]:
     return int(returncode), bytes(output["stdout"]).decode("utf-8", "replace"), bytes(output["stderr"]).decode("utf-8", "replace")
 
 
-_UPDATE_LOCK = threading.Lock()
+_PACKAGE_OPERATION_LOCK = threading.Lock()
 
 
 def handle(request: Any, *, allowed_ids: set[int], update_ids: set[int] | None = None, run=_run) -> dict[str, Any]:
@@ -358,13 +378,24 @@ def handle(request: Any, *, allowed_ids: set[int], update_ids: set[int] | None =
         if isinstance(request, dict) and request.get("operation") == PROBE_OPERATION:
             return probe_target(request, run=run)
         vmid, operation = validate_request(request, allowed_ids, update_ids)
-        lock = _UPDATE_LOCK if operation == "update" else threading.Lock()
+        # Inspection must not race an update: otherwise a lock/process check
+        # could describe the state immediately before a package mutation.
+        # Read-only operations unrelated to package execution remain concurrent.
+        lock = _PACKAGE_OPERATION_LOCK if operation in {"update", "inspect"} else threading.Lock()
         with lock:
             status_code, status_out, status_err = run(["/usr/sbin/pct", "status", str(vmid)])
             if status_code != 0:
                 raise HelperError("status_failed", "container status could not be read")
             if status_out.strip() != "status: running":
                 raise HelperError("not_running", "stopped containers are never started or probed")
+            if operation == "inspect":
+                observations: dict[str, Any] = {}
+                for name in ("processes", "packages", "dpkg_audit", "apt_history", "dpkg_log", "apt_lock", "apt_archives_lock", "dpkg_lock", "dpkg_frontend_lock"):
+                    code, stdout, stderr = run(build_inspect_argv(vmid, name))
+                    observations[name] = {"returncode": code, "stdout": stdout, "stderr": stderr}
+                if len(json.dumps(observations, separators=(",", ":"))) > MAX_OUTPUT_BYTES:
+                    raise HelperError("output_limit", "inspection output exceeded the limit")
+                return {"ok": True, "container_id": vmid, "operation": operation, "observations": observations}
             steps = []
             code, stdout, stderr = run(build_argv(vmid, operation))
             steps.append({"name": "apt-update" if operation == "update" else operation, "returncode": code})
