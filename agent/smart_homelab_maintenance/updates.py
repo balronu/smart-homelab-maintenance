@@ -14,6 +14,7 @@ import os
 import socket
 import re
 import shutil
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -600,7 +601,45 @@ class UpdateService:
                 return {"target": target_id, "success": False, "safe": False, "error": "final simulation contains held, conflicting, or removing packages", "job_id": job_id}
             if job_id and self._jobs:
                 self._jobs.transition(job_id, JobState.RUNNING, phase=JobPhase.EXECUTION, progress=30, message="fixed APT update started")
-                self._jobs.append_log(job_id, "apt update and no-remove upgrade started")
+                self._jobs.append_log(job_id, "update job accepted; APT worker queued")
+                worker = threading.Thread(
+                    target=self._run_update_job,
+                    args=(job_id, target, current.plan_digest),
+                    name=f"smh-update-{target.vmid}",
+                    daemon=True,
+                )
+                worker.start()
+                return {
+                    "target": target_id,
+                    "operation": "update",
+                    "success": True,
+                    "accepted": True,
+                    "safe": True,
+                    "job_id": job_id,
+                    "status": "running",
+                    "plan_digest": current.plan_digest,
+                    "message": "update job accepted; poll the job endpoint for completion",
+                }
+            # A persistent job repository is required for real execution.  It
+            # provides duplicate protection and restart-safe recovery.
+            return {"target": target_id, "success": False, "safe": False, "error": "persistent job tracking is required for update execution", "job_id": job_id}
+        except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
+            if job_id and self._jobs:
+                self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="execution status is uncertain; manual recovery required", error_code="execution_status_unknown")
+                self._jobs.append_log(job_id, "preflight transport or timeout failure; no automatic retry was attempted", level="warning")
+            return {"target": target_id, "operation": "update", "success": False, "safe": False, "error": type(exc).__name__, "status": "manual_recovery_required", "job_id": job_id}
+        finally:
+            # The worker owns this guard after dispatch; failed preflight must
+            # release it here so a safe retry is not falsely blocked.
+            if not job_id or not self._jobs or not self._jobs.has_unresolved_target(target_id):
+                self._active_simulations.discard(target_id)
+
+    def _run_update_job(self, job_id: str, target: ProbeTarget, plan_digest: str | None) -> None:
+        """Run the mutating helper outside the HTTP request lifetime."""
+        target_id = target.target
+        try:
+            assert self._jobs is not None
+            self._jobs.append_log(job_id, "apt update and no-remove upgrade started")
             update_result = self._runner.update(target.vmid)
             code, stdout, stderr = update_result[:3]
             steps = list(update_result[3]) if len(update_result) > 3 else [{"name": "apt-update"}, {"name": "apt-upgrade"}]
@@ -615,19 +654,19 @@ class UpdateService:
                 except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
                     postcheck = {"performed": True, "returncode": None, "error": type(exc).__name__}
                     postcheck_passed = False
-            if job_id and self._jobs:
-                if code == 0 and postcheck_passed:
-                    self._jobs.transition(job_id, JobState.POSTCHECK, phase=JobPhase.POSTCHECK, progress=90, message="update command completed; postcheck required")
-                    self._jobs.complete(job_id, Verification(True, True, message="fixed APT update completed"), message="fixed APT update completed")
-                else:
-                    self._jobs.transition(job_id, JobState.MANUAL_RECOVERY if code == 0 else JobState.FAILED, phase=JobPhase.RECOVERY, progress=100, message="postcheck failed" if code == 0 else "APT update failed", error_code="postcheck_failed" if code == 0 else "apt_failed")
-            success = code == 0 and postcheck_passed
-            return {"target": target_id, "operation": "update", "success": success, "safe": success, "returncode": code, "stdout": stdout, "stderr": stderr, "steps": steps, "postcheck": postcheck, "plan_digest": current.plan_digest, "job_id": job_id, "status": "succeeded" if success else ("manual_recovery_required" if code == 0 else "failed"), "error": None if success else ("post-update verification failed" if code == 0 else "apt update or upgrade failed")}
+            if code == 0 and postcheck_passed:
+                self._jobs.transition(job_id, JobState.POSTCHECK, phase=JobPhase.POSTCHECK, progress=90, message="update command completed; postcheck required")
+                self._jobs.complete(job_id, Verification(True, True, message="fixed APT update completed"), message="fixed APT update completed")
+                self._jobs.append_log(job_id, "update completed and postcheck passed")
+            else:
+                self._jobs.transition(job_id, JobState.MANUAL_RECOVERY if code == 0 else JobState.FAILED, phase=JobPhase.RECOVERY, progress=100, message="postcheck failed" if code == 0 else "APT update failed", error_code="postcheck_failed" if code == 0 else "apt_failed")
+                self._jobs.append_log(job_id, "postcheck failed" if code == 0 else "APT update failed", level="error")
         except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
-            if job_id and self._jobs:
-                self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="execution status is uncertain; manual recovery required", error_code="execution_status_unknown")
-                self._jobs.append_log(job_id, "transport or timeout failure; no automatic retry was attempted", level="warning")
-            return {"target": target_id, "operation": "update", "success": False, "safe": False, "error": type(exc).__name__, "status": "manual_recovery_required", "job_id": job_id}
+            self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="execution status is uncertain; manual recovery required", error_code="execution_status_unknown")
+            self._jobs.append_log(job_id, "transport or timeout failure; no automatic retry was attempted", level="warning")
+        except Exception as exc:  # pragma: no cover - defensive worker boundary
+            self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="worker failed; manual recovery required", error_code="worker_failed", error_message=type(exc).__name__)
+            self._jobs.append_log(job_id, "unexpected worker failure; no automatic retry was attempted", level="error")
         finally:
             self._active_simulations.discard(target_id)
 
