@@ -5,8 +5,14 @@
 import { resolveLanguage } from "./smart-homelab-maintenance-card.js";
 const card = document.querySelector("#card");
 const errors = [];
-window.addEventListener("error", (event) => errors.push(event.message));
-window.addEventListener("unhandledrejection", (event) => errors.push(String(event.reason)));
+const reportHarnessError = (value) => {
+  const message = value?.stack || value?.message || String(value);
+  errors.push(message);
+  const result = document.querySelector("#result");
+  if (result && !result.textContent) result.textContent = JSON.stringify({ fatal: message, errors });
+};
+window.addEventListener("error", (event) => reportHarnessError(event.error || event.message));
+window.addEventListener("unhandledrejection", (event) => reportHarnessError(event.reason));
 card.setConfig();
 card.hass = { language: "en", locale: { language: "de" }, states: {} };
 const emptyCardSafe = card.shadowRoot.textContent.includes("No virtual machines detected");
