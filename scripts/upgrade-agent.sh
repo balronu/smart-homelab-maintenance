@@ -252,6 +252,13 @@ check_historical_staging() {
         if ! staged_version="$(read_agent_version "$dir")"; then
             die "Rollback-Staging enthält keine gültige Agent-Version. Manuelle Prüfung erforderlich."
         fi
+        if [[ "$staged_version" == "$current_version" ]]; then
+            if diff -qr --exclude='__pycache__' "$dir" "$AGENT_ROOT/agent" >/dev/null 2>&1; then
+                info "Identisches Rollback-Staging bleibt erhalten: $dir ($staged_version)"
+                continue
+            fi
+            die "Rollback-Staging ist gleich versioniert, aber inhaltlich abweichend ($staged_version). Manuelle Prüfung erforderlich."
+        fi
         if ! version_is_older "$staged_version" "$current_version"; then
             die "Rollback-Staging ist nicht eindeutig historisch ($staged_version vs. $current_version). Manuelle Prüfung erforderlich."
         fi
