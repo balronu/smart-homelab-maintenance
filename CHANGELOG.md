@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.7 – Stable
+
+### Deutsch
+
+- Verbindet den produktiven Agent-Inspector mit dem festen, ausschließlich
+  lesenden LXC-Helper und persistiert bounded Recovery-Prüfungen nach Start,
+  Timeout und Agent-Polling.
+- Prüft tatsächliche APT-/dpkg-Prozesse, Paketmanager-Konsistenz, Versionen,
+  Logs und Lock-Besitz. `fuser`-Code 1 bedeutet „nicht gehalten“; fehlende oder
+  fehlerhafte Lock-Prüfungen bleiben UNKNOWN und blockieren fail-closed.
+- Ergänzt Recovery-Status, Blockierungsgrund und letzten Prüfzeitpunkt in der
+  Lovelace-Karte. CT107 bleibt bei unklarer historischer Evidenz gesperrt; der
+  administrative Abschlussworkflow bleibt separat authentifiziert.
+
+### English
+
+- Connects the production agent inspector to the fixed read-only LXC helper and
+  persists bounded recovery checks after startup, timeout, and agent polling.
+- Checks actual APT/dpkg processes, package-manager consistency, versions, logs,
+  and lock ownership. `fuser` exit code 1 means “not held”; missing or failed
+  lock checks remain UNKNOWN and block fail-closed.
+- Adds recovery status, blocking reason, and last inspection time to the
+  Lovelace card. CT107 stays blocked when historical evidence is ambiguous; the
+  administrative completion workflow remains separately authenticated.
+
+**Compatibility / migration:** API contract `1.1`, existing Config Entries,
+grants, policies, and container isolation are preserved. Job databases migrate
+additively on first open.
+
+**Post-update:** reload the Lovelace resource or browser cache. No package
+installation, repair command, automatic retry, host/container restart, backup,
+or snapshot is performed by this release.
+
+**Known limitation:** a real Proxmox LXC acceptance guest is required for
+production transport verification; ambiguous package-manager evidence remains
+manual recovery.
+
 ## 1.0.6 – Stable Agent
 
 ### Deutsch
