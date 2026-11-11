@@ -14,8 +14,26 @@ jobs:
           fetch-depth: 0
       - name: Install disposable-environment prerequisites
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y debootstrap dpkg-dev systemd-container
+          # ubuntu-24.04 currently provisions a mirrorlist which can resolve
+          # azure.archive.ubuntu.com intermittently.  This lane must fail
+          # closed on an incomplete index refresh, but it may use the official
+          # Ubuntu archive when the runner mirror is unavailable.
+          sudo cp --preserve=mode,ownership /etc/apt/apt-mirrors.txt "$RUNNER_TEMP/apt-mirrors.txt.orig"
+          sudo sed -i \
+            's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g; \
+             s#https://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' \
+            /etc/apt/apt-mirrors.txt
+          echo 'DNS resolution:'
+          getent ahosts archive.ubuntu.com
+          getent ahosts deb.debian.org
+          apt_opts=(
+            -o Acquire::Retries=3
+            -o Acquire::http::Timeout=15
+            -o Acquire::https::Timeout=15
+          )
+          sudo apt-get "${apt_opts[@]}" update --error-on=any
+          sudo apt-get "${apt_opts[@]}" install --no-install-recommends -y \
+            debootstrap dpkg-dev systemd-container
       - name: Run isolated RC1 acceptance
         env:
           GITHUB_STEP_SUMMARY: ${{ github.step_summary }}
