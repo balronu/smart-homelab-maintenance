@@ -20,8 +20,10 @@ jobs:
           # Ubuntu archive when the runner mirror is unavailable.
           sudo cp --preserve=mode,ownership /etc/apt/apt-mirrors.txt "$RUNNER_TEMP/apt-mirrors.txt.orig"
           sudo sed -i \
-            's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g; \
-             s#https://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' \
+            's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' \
+            /etc/apt/apt-mirrors.txt
+          sudo sed -i \
+            's#https://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' \
             /etc/apt/apt-mirrors.txt
           echo 'DNS resolution:'
           getent ahosts archive.ubuntu.com
