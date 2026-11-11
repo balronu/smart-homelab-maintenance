@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.13 – Stable
+
+### Deutsch / English
+
+- Korrigiert die Prozessprüfung des bestätigten Staging-Recovery-Modus, damit
+  übergeordnete Transport-/SSH-Shells nicht wegen eines enthaltenen
+  Skriptnamens fälschlich als aktiver Upgradeprozess blockieren. Die echte
+  Elternprozesskette bleibt ausgeschlossen; unabhängige Upgrade-/Rollback-
+  Prozesse bleiben blockierend. / Fixes the confirmed staging-recovery process
+  check so parent transport/SSH shells are not falsely classified as active
+  upgrade processes merely because their command text contains the script name.
+  The real ancestor chain remains excluded; independent upgrade/rollback
+  processes remain blocking.
+
 ## 1.0.12 – Stable
 
 ### Deutsch / English
