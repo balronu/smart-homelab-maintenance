@@ -128,3 +128,33 @@ def test_upgrade_help_is_non_mutating():
     assert "-h|--help) usage; exit 0" in script
     assert "--apply" in script
     assert "--confirm" in script
+
+
+def test_staging_recovery_requires_explicit_confirmation_and_isolated_quarantine():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "--recover-staging" in script
+    assert "--quarantine-root" in script
+    assert 'recover_staging=""' in script
+    assert '[[ "$apply" -eq 0 ]] || die "--recover-staging kann nicht mit --apply kombiniert werden."' in script
+    assert "realpath -e" in script
+    assert 'canonical_state_root="$(realpath -e -- "$STATE_ROOT")"' in script
+    assert 'canonical_quarantine_parent="$(realpath -e -- "$quarantine_parent")"' in script
+    assert "! -L \"$recover_staging\"" in script
+    assert "staging_process_check" in script
+    assert "/etc/systemd/system" in script
+    assert "Kein alternativer Rollback-Kandidat bleibt erhalten" in script
+    assert '[[ "$confirm" -ne 1 ]]' in script
+    assert 'mv -T -- "$canonical_stage" "$quarantine_target"' in script
+    assert "cmp -s \"$manifest_before\"" in script
+    assert '>> "$audit"' in script
+    assert 'rm -rf' not in script
+
+
+def test_staging_recovery_rejects_unsafe_paths_and_collision():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "Staging-Pfad liegt nicht als exaktes Rollback-Staging unter dem Agent-Root" in script
+    assert "Staging-Pfad ist kein echtes Verzeichnis oder ein Symlink" in script
+    assert "Quarantäneziel existiert bereits; keine Überschreibung" in script
+    assert "Aktiver Upgrade-/Rollback- oder Dateireferenz-Prozess gefunden" in script or "Aktiver Upgrade-, Rollback- oder Dateireferenz-Prozess gefunden" in script
+    assert "Symlink im Staging" in script
+    assert "Hash-/Strukturvergleich nach Quarantäne fehlgeschlagen" in script

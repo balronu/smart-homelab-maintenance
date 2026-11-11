@@ -53,7 +53,7 @@ jobs:
           from pathlib import Path
           manifest = json.loads(Path('custom_components/smart_homelab_maintenance/manifest.json').read_text())
           from custom_components.smart_homelab_maintenance.const import VERSION
-          assert manifest['version'] == VERSION == '1.0.11'
+          assert manifest['version'] == VERSION == '1.0.12'
           init = Path('custom_components/smart_homelab_maintenance/__init__.py').read_text()
           assert 'StaticPathConfig' in init and 'add_extra_js_url' in init
           card = Path('custom_components/smart_homelab_maintenance/frontend/smart-homelab-maintenance-card.js').read_text()
