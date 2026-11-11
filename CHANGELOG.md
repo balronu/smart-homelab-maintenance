@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.9 – Stable
+
+### Deutsch
+
+- Behebt den offiziellen Agent-Upgrade-Preflight für einen stabilen Agenten
+  `1.0.6`: historische Beta-Rollback-Stagings werden korrekt als älter erkannt,
+  statt den sicheren Upgradeweg fälschlich zu blockieren.
+- Die fail-closed Prüfung, TLS-/Healthcheck-Gates und der Erhalt historischer
+  Rollback-Stagings bleiben unverändert.
+
+### English
+
+- Fixes the official agent-upgrade preflight for a stable `1.0.6` agent:
+  historical beta rollback staging is correctly recognized as older instead
+  of incorrectly blocking the safe upgrade path.
+- Fail-closed checks, TLS/health gates, and preservation of historical rollback
+  staging remain unchanged.
+
+**Compatibility / Migration:** API contract 1.1, existing Config Entries,
+grants, policies, job databases, and agent 1.0.6 remain compatible.
+
+**Post-update:** Reload the Lovelace resource or browser cache. No host or
+container restart is required by the integration update.
+
+**Known limitation:** CT107 and CT108 remain blocked until their existing
+manual-recovery evidence is independently reconciled; this release does not
+retry or alter job history.
+
 ## 1.0.8 – Stable
 
 ### Deutsch
