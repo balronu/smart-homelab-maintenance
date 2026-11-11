@@ -26,6 +26,12 @@ jobs:
             's#https://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' \
             /etc/apt/apt-mirrors.txt
           echo 'DNS resolution:'
+          if ! getent ahosts archive.ubuntu.com >/dev/null; then
+            resolver_iface="$(ip -o route show default | awk 'NR == 1 {print $5}')"
+            test -n "$resolver_iface"
+            sudo resolvectl dns "$resolver_iface" 1.1.1.1 8.8.8.8
+            sudo resolvectl flush-caches
+          fi
           getent ahosts archive.ubuntu.com
           getent ahosts deb.debian.org
           apt_opts=(
