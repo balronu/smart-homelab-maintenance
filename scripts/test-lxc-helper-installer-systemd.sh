@@ -84,8 +84,27 @@ systemctl enable "$AGENT_NAME-agent.service" >/dev/null
 python3 -m py_compile "$ROOT_DIR/scripts/smh-lxc-apt-helper.py" "$ROOT_DIR/scripts/smh-lxc-discovery.py"
 bash -n "$INSTALLER"
 PREFLIGHT_JSON="$(mktemp /tmp/smh-lxc-helper-preflight.XXXXXX.json)"
+set +e
 python3 "$ROOT_DIR/scripts/lxc-helper-preflight.py" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" >"$PREFLIGHT_JSON"
-grep -q '"decision":"GO"' "$PREFLIGHT_JSON"
+preflight_rc=$?
+set -e
+if [[ "$preflight_rc" -ne 0 ]]; then
+  [[ "$systemd_state" == "starting" ]] || die "installer preflight failed"
+  python3 - "$PREFLIGHT_JSON" <<'PY'
+import json
+import sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+if result.get("failed_checks") != ["systemd"]:
+    raise SystemExit("installer preflight has failures beyond transient systemd startup")
+check = next(item for item in result["checks"] if item["name"] == "systemd")
+if check["detail"] != "systemd state: starting":
+    raise SystemExit("unexpected systemd preflight state")
+print("PASS: installer preflight has no failure other than runner systemd startup state")
+PY
+else
+  grep -q '"decision":"GO"' "$PREFLIGHT_JSON"
+fi
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only
 if "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply; then
