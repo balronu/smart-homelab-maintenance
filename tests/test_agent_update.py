@@ -198,3 +198,24 @@ def test_historical_preflight_inspects_failed_staging_instead_of_ignoring_it():
     assert '"$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging' in historical
     assert "read_release_version" in historical
     assert "Manuelle Prüfung erforderlich" in historical
+
+
+def test_rollback_binds_to_active_release_identity_and_new_staging_path():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "read_release_identity()" in script
+    assert 'previous_release_identity="$(read_release_identity "$AGENT_ROOT/agent")"' in script
+    assert "snapshot_staging_paths" in script
+    assert "path_was_present_before_swap" in script
+    assert 'candidate_identity="$(read_release_identity "$candidate_dir")"' in script
+    assert 'candidate_identity" == "$previous_release_identity"' in script
+    assert "new_rollback_candidates" in script
+    assert "Kein eindeutig gebundener Rollback-Staging-Pfad" in script
+
+
+def test_rollback_does_not_select_candidates_by_compatibility_version():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    apply_start = script.index('bash "$SCRIPT_DIR/update-agent.sh"')
+    apply_end = script.index('if ! wait_for_port_free', apply_start)
+    apply_resolution = script[apply_start:apply_end]
+    assert 'read_agent_version "$candidate_dir"' not in apply_resolution
+    assert 'read_release_identity "$candidate_dir"' in apply_resolution
