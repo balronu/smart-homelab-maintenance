@@ -259,7 +259,31 @@ SmartHomelabMaintenanceCard.prototype._renderJobStatus = function () {
     refs.jobActions.append(detail);
     if (recoverable.has(job.state)) {
       const repair = document.createElement("button"); repair.type = "button"; repair.textContent = labels.repairCheck;
-      repair.addEventListener("click", async (event) => { event.preventDefault(); event.stopPropagation(); repair.disabled = true; try { const response = await this._hass.callService("smart_homelab_maintenance", "repair_check", { job_id: job.job_id }, undefined, true, true); const result = response?.response?.data || response?.data || response; const current = result?.job || result; const safe = current?.state === "blocked" && String(current?.error_code || "").startsWith("preflight_"); if (safe && window.confirm(labels.repair + "?")) await this._hass.callService("smart_homelab_maintenance", "repair", { job_id: job.job_id, confirm: true }, undefined, true, true); } catch (error) { refs.jobText.textContent = `${labels.error}: ${error?.message || "repair inspection failed"}`; } finally { repair.disabled = false; } });
+      repair.addEventListener("click", async (event) => {
+        event.preventDefault(); event.stopPropagation(); repair.disabled = true;
+        try {
+          const response = await this._hass.callService("smart_homelab_maintenance", "repair_check", { job_id: job.job_id }, undefined, true, true);
+          const result = response?.response?.data || response?.data || response;
+          const inspection = result?.inspection || {};
+          if (inspection.repairable === true) {
+            const perform = document.createElement("button"); perform.type = "button"; perform.textContent = labels.repair;
+            perform.addEventListener("click", async (repairEvent) => {
+              repairEvent.preventDefault(); repairEvent.stopPropagation(); perform.disabled = true;
+              try {
+                if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(`${labels.repair}?`)) return;
+                await this._hass.callService("smart_homelab_maintenance", "repair", { job_id: job.job_id, confirm: true }, undefined, true, true);
+                refs.jobText.textContent = `${labels.repair}: ${job.job_id}`;
+                perform.remove();
+              } catch (error) { refs.jobText.textContent = `${labels.error}: ${error?.message || "repair failed"}`; }
+              finally { perform.disabled = false; }
+            });
+            repair.replaceWith(perform);
+          } else {
+            refs.jobText.textContent = `${labels.error}: ${inspection.reason || "repair is not safe"}`;
+          }
+        } catch (error) { refs.jobText.textContent = `${labels.error}: ${error?.message || "repair inspection failed"}`; }
+        finally { repair.disabled = false; }
+      });
       refs.jobActions.append(repair);
     }
   }
