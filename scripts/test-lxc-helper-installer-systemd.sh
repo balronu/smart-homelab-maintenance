@@ -162,40 +162,38 @@ systemd-analyze verify "$HELPER_UNIT" "$DISCOVERY_UNIT"
 # output; it is not a production command or a guest and is removed by cleanup.
 [[ ! -e "$PCT_FIXTURE_PATH" ]] || die "refusing to replace pre-existing pct: $PCT_FIXTURE_PATH"
 cat > "$PCT_FIXTURE_PATH" <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf 'pct argv:' >> /run/smart-homelab-maintenance/pct-fixture.log
-printf ' %q' "$@" >> /run/smart-homelab-maintenance/pct-fixture.log
-printf '\n' >> /run/smart-homelab-maintenance/pct-fixture.log
-[[ "${1:-}" == exec && "${2:-}" =~ ^[0-9]+$ && "${3:-}" == -- ]] || exit 2
-python3 -c 'import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(("127.0.0.1", 0)); s.close()' 2>>/run/smart-homelab-maintenance/pct-fixture.log || {
-  rc=$?
-  printf 'AF_INET fixture failed rc=%s\n' "$rc" >> /run/smart-homelab-maintenance/pct-fixture.log
-  exit "$rc"
-}
-shift 3
-case "${1:-}" in
-  /usr/bin/test)
-    if [[ "${2:-}" == -r && "${3:-}" == /etc/os-release ]] || [[ "${2:-}" == -x && "${3:-}" =~ ^/usr/bin/(apt-get|dpkg-query)$ ]]; then exit 0; fi
-    exit 2
-    ;;
-  /usr/bin/cat)
-    [[ "${2:-}" == /etc/os-release ]] || exit 2
-    printf 'ID=debian\nVERSION_ID="13"\n'
-    exit 0
-    ;;
-  /usr/bin/apt-get)
-    [[ "${2:-}" == --version ]] || exit 2
-    printf 'apt 3.0.4 (amd64)\n'
-    exit 0
-    ;;
-  /usr/bin/dpkg-query)
-    [[ "${2:-}" == --version ]] || exit 2
-    printf 'Debian dpkg-query fixture\n'
-    exit 0
-    ;;
-  *) exit 2 ;;
-esac
+#!/usr/bin/python3
+import socket
+import sys
+from pathlib import Path
+
+log = Path("/run/smart-homelab-maintenance/pct-fixture.log")
+with log.open("a", encoding="utf-8") as handle:
+    handle.write("pct argv: " + repr(sys.argv[1:]) + "\n")
+if len(sys.argv) < 5 or sys.argv[1] != "exec" or not sys.argv[2].isdigit() or sys.argv[3] != "--":
+    raise SystemExit(2)
+try:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as channel:
+        channel.bind(("127.0.0.1", 0))
+except OSError as exc:
+    with log.open("a", encoding="utf-8") as handle:
+        handle.write(f"AF_INET fixture failed: {exc!r}\n")
+    raise SystemExit(1)
+command = sys.argv[4:]
+if command == ["/usr/bin/test", "-r", "/etc/os-release"]:
+    raise SystemExit(0)
+if command == ["/usr/bin/cat", "/etc/os-release"]:
+    print('ID=debian\nVERSION_ID="13"')
+    raise SystemExit(0)
+if command == ["/usr/bin/apt-get", "--version"]:
+    print("apt 3.0.4 (amd64)")
+    raise SystemExit(0)
+if command == ["/usr/bin/dpkg-query", "--version"]:
+    print("Debian dpkg-query fixture")
+    raise SystemExit(0)
+if command in (["/usr/bin/test", "-x", "/usr/bin/apt-get"], ["/usr/bin/test", "-x", "/usr/bin/dpkg-query"]):
+    raise SystemExit(0)
+raise SystemExit(2)
 EOF
 chmod 0755 "$PCT_FIXTURE_PATH"
 PCT_FIXTURE_CREATED=1
