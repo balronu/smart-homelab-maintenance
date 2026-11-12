@@ -374,6 +374,13 @@ def test_discovery_unit_shares_helper_runtime_group() -> None:
     assert "os.chown(socket_path, 0, agent_gid)" in helper_source
     assert "RuntimeDirectory=smart-homelab-maintenance" in unit
     assert "RuntimeDirectoryMode=0750" in unit
+    assert "RuntimeDirectoryPreserve=yes" in unit
+
+
+def test_helper_unit_preserves_shared_runtime_directory_on_restart() -> None:
+    unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-helper.service").read_text(encoding="utf-8")
+    assert "RuntimeDirectory=smart-homelab-maintenance" in unit
+    assert "RuntimeDirectoryPreserve=yes" in unit
 
 
 def test_official_helper_installer_is_preflight_only_by_default_and_never_wildcards() -> None:

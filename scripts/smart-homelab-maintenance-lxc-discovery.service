@@ -10,6 +10,7 @@ Group=root
 ExecStart=/usr/bin/python3 /usr/libexec/smart-homelab-maintenance/lxc-discovery.py
 RuntimeDirectory=smart-homelab-maintenance
 RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
 UMask=0007
 # pct exec needs root namespace setup for unprivileged LXCs; all other
 # filesystem, network and fixed-probe restrictions remain enforced below.
