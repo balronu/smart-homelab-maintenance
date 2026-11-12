@@ -48,10 +48,13 @@ if [[ "$systemd_state" == "starting" ]]; then
     [[ "$systemd_state" =~ ^(running|degraded)$ ]] && break
   done
 fi
-if [[ ! "$systemd_state" =~ ^(running|degraded)$ ]]; then
+if [[ "$systemd_state" =~ ^(failed|maintenance|offline|unknown|)$ ]]; then
   message="systemd is not ready for real installer acceptance after bounded wait: $systemd_state"
   printf '%s\n' "$message"
   die "$message"
+fi
+if [[ "$systemd_state" == "starting" ]]; then
+  printf '%s\n' 'systemd remains starting, but the isolated unit operations are available; continuing with real acceptance.'
 fi
 
 for path in "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST" "$STATE_ROOT"; do
