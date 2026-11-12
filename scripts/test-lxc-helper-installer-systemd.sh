@@ -94,15 +94,34 @@ fi
 # Discovery-only apply must not install or start the helper, and must migrate
 # a detached legacy socket without touching the helper contract.
 install -d -m 0750 -o root -g "$SERVICE_USER" "/run/$AGENT_NAME"
-python3 - <<'PY'
+seed_detached_discovery_socket() {
+  python3 - <<'PY'
 import os
 import socket
+import stat
 
 path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+try:
+    metadata = os.lstat(path)
+except FileNotFoundError:
+    pass
+else:
+    if not stat.S_ISSOCK(metadata.st_mode) or metadata.st_uid != 0 or stat.S_IMODE(metadata.st_mode) != 0o660:
+        raise SystemExit("existing discovery path is not a safe fixture socket")
+    live = {
+        int(line.split()[6])
+        for line in open("/proc/net/unix", encoding="ascii").read().splitlines()[1:]
+        if len(line.split()) >= 7 and line.split()[6].isdigit()
+    }
+    if metadata.st_ino in live:
+        raise SystemExit("existing discovery socket is active")
+    os.unlink(path)
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stale:
     stale.bind(path)
 os.chmod(path, 0o660)
 PY
+}
+seed_detached_discovery_socket
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply --confirm --start-discovery
 systemctl is-active --quiet "${AGENT_NAME}-lxc-discovery.service"
 [[ ! -e "$HELPER_UNIT" ]] || die "discovery-only mode installed helper unit"
@@ -157,15 +176,7 @@ helper_hash_after="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
 # Seed only a kernel-detached, legacy-owned discovery socket to verify that
 # the installer/start path migrates it safely instead of treating it as live.
 install -d -m 0750 -o root -g "$SERVICE_USER" "/run/$AGENT_NAME"
-python3 - <<'PY'
-import os
-import socket
-
-path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
-with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stale:
-    stale.bind(path)
-os.chmod(path, 0o660)
-PY
+seed_detached_discovery_socket
 
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --apply --start
 for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"; do
