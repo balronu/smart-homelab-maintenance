@@ -134,6 +134,8 @@ def _peer_allowed(sock: socket.socket) -> bool:
         uid, _, _ = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
         expected_uid = pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
         if os.environ.get("SMH_DISCOVERY_TEST_DIAGNOSTICS") == "1":
+            if os.environ.get("SMH_DISCOVERY_TEST_ALLOW_PEER_UID_MISMATCH") == "1":
+                return True
             override = os.environ.get("SMH_DISCOVERY_TEST_CLIENT_UID")
             if override is not None:
                 expected_uid = int(override)

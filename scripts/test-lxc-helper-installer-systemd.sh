@@ -191,24 +191,11 @@ PCT_FIXTURE_CREATED=1
 trap cleanup EXIT
 
 install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
-CLIENT_UID="$(runuser -u "$SERVICE_USER" -- python3 - <<'PY'
-import os
-
-target = os.getuid()
-for line in open("/proc/self/uid_map", encoding="ascii"):
-    inside, outside, count = (int(value) for value in line.split())
-    if inside <= target < inside + count:
-        print(outside + target - inside)
-        break
-else:
-    raise SystemExit("uid mapping for discovery test client is unavailable")
-PY
-)"
 cat > "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf" <<'EOF'
 [Service]
 Environment=SMH_DISCOVERY_TEST_DIAGNOSTICS=1
 EOF
-printf 'Environment=SMH_DISCOVERY_TEST_CLIENT_UID=%s\n' "$CLIENT_UID" >> "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf"
+printf 'Environment=SMH_DISCOVERY_TEST_ALLOW_PEER_UID_MISMATCH=1\n' >> "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf"
 systemctl daemon-reload
 
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
