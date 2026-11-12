@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.0.27 – Stable
+
+### Deutsch
+
+- Behebt die Klassifizierung von Helper-Timeouts vor der Paketmutation: Der Job
+  bleibt nachvollziehbar blockiert und wird nicht als erfolgreicher oder
+  unbekannter Paketlauf ausgegeben.
+- Ergänzt eine read-only Reparaturprüfung und eine ausdrücklich bestätigte,
+  zweistufige Reparatur sicherer Preflight-Fehler ohne APT/dpkg-Mutation.
+- Ergänzt globale und containerbezogene Updateprüfung, Live-Jobstatus,
+  Jobdetails und deutsche Bedienbeschriftungen im Dashboard.
+- Integration, Frontend und Agent werden gemeinsam als Version `1.0.27`
+  ausgeliefert.
+
+### English
+
+- Fixes classification of helper timeouts before package mutation: the job
+  remains audibly blocked and is never reported as a successful or unknown
+  package run.
+- Adds a read-only repair inspection and an explicitly confirmed two-step
+  repair for safe preflight failures without APT/dpkg mutation.
+- Adds global and per-container update checks, live job status, job details and
+  German dashboard action labels.
+- Integration, frontend and agent are released together as version `1.0.27`.
+
+**Compatibility/Migration:** API 1.1, existing Config Entries, permissions,
+allowlists, job data and helper socket paths remain compatible. / API 1.1,
+existing Config Entries, permissions, allowlists, job data and helper socket
+paths remain compatible.
+
+**Post-update:** Update the HA integration through HACS/Marketplace and run the
+official agent upgrade to `1.0.27`. No managed-container package update is
+performed by this release.
+
+**Limitations:** Authenticated HA-iOS WebView validation was unavailable;
+automated iPhone/iPad browser profiles passed, but real HA-app touch behavior
+remains a documented limitation.
+
 ## 1.0.26 – Stable
 
 ### Deutsch
