@@ -228,6 +228,22 @@ assert_socket() {
   [[ "$actual" == "$expected" ]] || die "socket ownership/mode drifted: $socket_path (actual=$actual expected=$expected)"
 }
 
+record_lifecycle_state() {
+  local label="$1"
+  printf 'LIFECYCLE %s\n' "$label"
+  for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+    if [[ -e "$socket_path" ]]; then
+      stat -c 'SOCKET path=%n inode=%i uid=%u gid=%g mode=%a' "$socket_path"
+    else
+      printf 'SOCKET path=%s absent\n' "$socket_path"
+    fi
+  done
+  systemctl show "${AGENT_NAME}-lxc-helper.service" \
+    -p MainPID -p NRestarts -p ActiveState -p SubState -p RuntimeDirectory -p RuntimeDirectoryMode
+  systemctl show "${AGENT_NAME}-lxc-discovery.service" \
+    -p MainPID -p NRestarts -p ActiveState -p SubState -p RuntimeDirectory -p RuntimeDirectoryMode
+}
+
 wait_for_socket_ready() {
   local socket_path="$1"
   for _ in 1 2 3 4 5 6 7 8 9 10; do
@@ -299,6 +315,7 @@ probe_discovery
 # The two services share the directory but must preserve it independently.
 # Restart each service while the other remains running and require both paths
 # to remain reachable after every transition.
+record_lifecycle_state before-lifecycle
 assert_socket "/run/$AGENT_NAME/lxc-apt-helper.sock"
 assert_socket "/run/$AGENT_NAME/lxc-discovery.sock"
 systemctl restart "${AGENT_NAME}-lxc-helper.service"
@@ -307,6 +324,7 @@ for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-
   assert_socket "$socket_path"
 done
 systemctl restart "${AGENT_NAME}-lxc-discovery.service"
+record_lifecycle_state after-discovery-restart
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
   wait_for_socket_ready "$socket_path"
   assert_socket "$socket_path"
