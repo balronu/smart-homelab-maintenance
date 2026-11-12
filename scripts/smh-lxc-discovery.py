@@ -132,14 +132,7 @@ def fixed_probe(container_id: int) -> dict[str, str]:
 def _peer_allowed(sock: socket.socket) -> bool:
     try:
         uid, _, _ = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
-        expected_uid = pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
-        if os.environ.get("SMH_DISCOVERY_TEST_DIAGNOSTICS") == "1":
-            if os.environ.get("SMH_DISCOVERY_TEST_ALLOW_PEER_UID_MISMATCH") == "1":
-                return True
-            override = os.environ.get("SMH_DISCOVERY_TEST_CLIENT_UID")
-            if override is not None:
-                expected_uid = int(override)
-        return uid == expected_uid
+        return uid == pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
     except (OSError, KeyError, struct.error):
         return False
 
@@ -150,18 +143,7 @@ class _Handler(socketserver.StreamRequestHandler):
         result: dict[str, Any]
         try:
             if not _peer_allowed(self.request):
-                detail = "unauthorized client"
-                if os.environ.get("SMH_DISCOVERY_TEST_DIAGNOSTICS") == "1":
-                    try:
-                        peer_uid = struct.unpack("3i", self.request.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[0]
-                        expected_uid = pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
-                        override = os.environ.get("SMH_DISCOVERY_TEST_CLIENT_UID")
-                        if override is not None:
-                            expected_uid = int(override)
-                        detail = f"unauthorized client uid={peer_uid} expected={expected_uid}"
-                    except (OSError, KeyError, struct.error):
-                        pass
-                raise ValueError(detail)
+                raise ValueError("unauthorized client")
             line = self.rfile.readline(MAX_REQUEST_BYTES + 1)
             if len(line) > MAX_REQUEST_BYTES or not line.endswith(b"\n"):
                 raise ValueError("request limit")
@@ -173,11 +155,8 @@ class _Handler(socketserver.StreamRequestHandler):
                 raise ValueError("operation or container id not allowed")
             with PROBE_LOCK:
                 result = {"ok": True, "container_id": container_id, "operation": "probe", "result": fixed_probe(container_id)}
-        except (OSError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError, RuntimeError, subprocess.TimeoutExpired) as exc:
-            error: dict[str, str] = {"code": "probe_failed"}
-            if os.environ.get("SMH_DISCOVERY_TEST_DIAGNOSTICS") == "1":
-                error["detail"] = f"{type(exc).__name__}: {exc}"
-            result = {"ok": False, "error": error}
+        except (OSError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError, RuntimeError, subprocess.TimeoutExpired):
+            result = {"ok": False, "error": {"code": "probe_failed"}}
         self.wfile.write((json.dumps(result, separators=(",", ":")) + "\n").encode("utf-8"))
 
 

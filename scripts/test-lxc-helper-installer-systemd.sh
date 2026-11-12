@@ -194,9 +194,8 @@ trap cleanup EXIT
 install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
 cat > "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf" <<'EOF'
 [Service]
-Environment=SMH_DISCOVERY_TEST_DIAGNOSTICS=1
 EOF
-printf 'Environment=SMH_DISCOVERY_TEST_ALLOW_PEER_UID_MISMATCH=1\n' >> "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf"
+printf 'User=%s\nGroup=%s\n' "$SERVICE_USER" "$SERVICE_USER" >> "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf"
 systemctl daemon-reload
 
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
