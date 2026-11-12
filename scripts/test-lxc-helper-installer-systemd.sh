@@ -221,7 +221,10 @@ done
 assert_socket() {
   local socket_path="$1"
   [[ -S "$socket_path" ]] || die "socket missing after lifecycle operation: $socket_path"
-  [[ "$(stat -c '%u:%g:%a' "$socket_path")" == "0:$(id -g "$SERVICE_USER"):660" ]] || die "socket ownership/mode drifted: $socket_path"
+  local actual expected
+  actual="$(stat -c '%u:%g:%a' "$socket_path")"
+  expected="0:$(id -g "$SERVICE_USER"):660"
+  [[ "$actual" == "$expected" ]] || die "socket ownership/mode drifted: $socket_path (actual=$actual expected=$expected)"
 }
 
 wait_for_socket_ready() {
