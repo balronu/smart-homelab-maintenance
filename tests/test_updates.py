@@ -598,6 +598,34 @@ def test_execute_returns_before_slow_final_preflight(tmp_path):
     jobs.close()
 
 
+def test_preflight_timeout_is_blocked_without_manual_recovery_or_update(tmp_path):
+    class InspectTimeoutRunner(Runner):
+        def inspect(self, vmid):
+            self.calls.append(("inspect", vmid))
+            raise TimeoutError("helper inspection exceeded timeout")
+
+    runner = InspectTimeoutRunner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = updates.check("container:107")
+    accepted = updates.execute_update(
+        "container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest,
+        attempt_id="preflight-timeout-1",
+    )
+    assert accepted["accepted"] is True
+    for _ in range(80):
+        if jobs.get(accepted["job_id"])["state"] == JobState.BLOCKED:
+            break
+        time.sleep(0.01)
+    job = jobs.get(accepted["job_id"])
+    assert job["state"] == JobState.BLOCKED
+    assert job["phase"] == JobPhase.PREFLIGHT.value
+    assert job["error_code"] == "preflight_helper_timeout"
+    assert not any(call == ("update", 107) for call in runner.calls)
+    jobs.close()
+
+
 def test_cancel_is_persistent_before_mutation_and_api_requires_confirmation(tmp_path):
     jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
     request = __import__("agent.smart_homelab_maintenance.types", fromlist=["JobRequest"]).JobRequest(

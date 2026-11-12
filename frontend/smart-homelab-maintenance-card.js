@@ -101,6 +101,49 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   static getConfigElement() { return document.createElement("smart-homelab-maintenance-card-editor"); }
   static getStubConfig() { return { title: "Smart Homelab Maintenance", show_vms: true, show_containers: true }; }
 }
+
+function scrollDiagnosticForCard(card) {
+  const style = (node) => {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return null;
+    const computed = getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    return {
+      tag: node.tagName.toLowerCase(), id: node.id || null, className: typeof node.className === "string" ? node.className : null,
+      rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+      clientHeight: node.clientHeight, scrollHeight: node.scrollHeight, scrollTop: node.scrollTop,
+      overflowY: computed.overflowY, overflow: computed.overflow, height: computed.height,
+      maxHeight: computed.maxHeight, position: computed.position, touchAction: computed.touchAction,
+    };
+  };
+  const ancestors = [];
+  let node = card;
+  while (node && node.nodeType === Node.ELEMENT_NODE && ancestors.length < 12) {
+    ancestors.push(style(node));
+    node = node.parentElement;
+  }
+  const root = card.shadowRoot;
+  const items = root ? [...root.querySelectorAll(".container-grid .item")] : [];
+  const last = items.at(-1);
+  return {
+    generatedAt: new Date().toISOString(),
+    element: style(card),
+    shadowRoot: root ? {
+      host: style(card),
+      card: style(root.querySelector(".card")),
+      containerGrid: style(root.querySelector(".container-grid")),
+      itemCount: items.length,
+      lastItem: style(last),
+    } : null,
+    ancestors,
+  };
+}
+
+// Read-only console probe for authenticated mobile/WebView diagnosis. It is
+// intentionally opt-in and does not change layout, focus, or scroll position.
+if (typeof window !== "undefined") {
+  window.smartHomelabMaintenanceScrollDiagnostics = () =>
+    [...document.querySelectorAll("smart-homelab-maintenance-card")].map(scrollDiagnosticForCard);
+}
 const originalUpdateItems = SmartHomelabMaintenanceCard.prototype._updateItems;
 SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labels, prefix) {
   // Permission convergence and update freshness are independent per target.
