@@ -364,40 +364,87 @@ raise SystemExit(0 if candidate < current else 1)
 PY
 }
 
+read_release_version() {
+    local package_root="$1"
+    python3 - "$package_root" <<'PY'
+import json
+import hashlib
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+path = root / ".release-identity"
+data = json.loads(path.read_text(encoding="utf-8"))
+version = data.get("release_version")
+commit = data.get("source_commit")
+tree_sha256 = data.get("tree_sha256")
+if data.get("schema") != 1 or not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    raise SystemExit("Release-Identität fehlt oder ist ungültig")
+if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+    raise SystemExit("Release-Commit fehlt oder ist ungültig")
+if not isinstance(tree_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", tree_sha256):
+    raise SystemExit("Release-Inhaltsdigest fehlt oder ist ungültig")
+rows = []
+for child in sorted(root.rglob("*")):
+    rel = child.relative_to(root).as_posix()
+    if child == path:
+        continue
+    if child.is_symlink():
+        raise SystemExit(f"Symlink im Rollback-Staging: {rel}")
+    if child.is_file():
+        rows.append(f"F {hashlib.sha256(child.read_bytes()).hexdigest()} {rel}")
+    elif not child.is_dir():
+        raise SystemExit(f"Nicht unterstützter Dateityp im Rollback-Staging: {rel}")
+actual = hashlib.sha256(("\n".join(rows) + "\n").encode()).hexdigest()
+if actual != tree_sha256:
+    raise SystemExit("Release-Inhaltsdigest stimmt nicht mit dem Rollback-Staging überein")
+print(version)
+PY
+}
+
+read_source_release_version() {
+    local source="$1"
+    python3 - "$source/custom_components/smart_homelab_maintenance/manifest.json" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+version = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")).get("version")
+if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    raise SystemExit("Quell-Release-Version fehlt oder ist ungültig")
+print(version)
+PY
+}
+
 check_historical_staging() {
-    local dirs=() dir staged_version
+    local source="$1" _expected_commit="$2" dirs=() dir staged_version source_release current_agent_version
+    source_release="$(read_source_release_version "$source")"
     for dir in "$AGENT_ROOT"/agent.previous.*.staging; do
         [[ -d "$dir" ]] || continue
         dirs+=("$dir")
     done
     ((${#dirs[@]} == 0)) && return 0
     systemctl is-active --quiet "$SERVICE_NAME" || die "Rollback-Staging vorhanden, aber Agent-Dienst ist nicht aktiv. Manuelle Prüfung erforderlich."
-    local current_version
-    if ! current_version="$(read_agent_version "$AGENT_ROOT/agent")"; then
+    for dir in "${dirs[@]}"; do
+        if ! staged_version="$(read_release_version "$dir")"; then
+            die "Rollback-Staging enthält keine verifizierte Release-Identität. Manuelle Prüfung erforderlich."
+        fi
+        if ! version_is_older "$staged_version" "$source_release"; then
+            die "Rollback-Staging ist nicht älter als der Ziel-Release ($staged_version vs. $source_release). Manuelle Prüfung erforderlich."
+        fi
+        info "Historisches Rollback-Staging bleibt erhalten: $dir (Release $staged_version; Agent-Kompatibilität bleibt separat)"
+    done
+    if ! current_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"; then
         die "Aktive Agent-Version ist bei vorhandenem Rollback-Staging nicht lesbar. Manuelle Prüfung erforderlich."
     fi
-    for dir in "${dirs[@]}"; do
-        if ! staged_version="$(read_agent_version "$dir")"; then
-            die "Rollback-Staging enthält keine gültige Agent-Version. Manuelle Prüfung erforderlich."
-        fi
-        if [[ "$staged_version" == "$current_version" ]]; then
-            if diff -qr --exclude='__pycache__' "$dir" "$AGENT_ROOT/agent" >/dev/null 2>&1; then
-                info "Identisches Rollback-Staging bleibt erhalten: $dir ($staged_version)"
-                continue
-            fi
-            die "Rollback-Staging ist gleich versioniert, aber inhaltlich abweichend ($staged_version). Manuelle Prüfung erforderlich."
-        fi
-        if ! version_is_older "$staged_version" "$current_version"; then
-            die "Rollback-Staging ist nicht eindeutig historisch ($staged_version vs. $current_version). Manuelle Prüfung erforderlich."
-        fi
-        info "Historisches Rollback-Staging bleibt erhalten: $dir ($staged_version)"
-    done
-    if ! wait_for_health "$current_version"; then
+    if ! wait_for_health "$current_agent_version"; then
         die "Aktiver Agent konnte bei vorhandenem Rollback-Staging nicht TLS-validiert bestätigt werden."
     fi
 }
 
-check_historical_staging
+check_historical_staging "$source_dir" "$expected_commit"
 
 if [[ "$apply" -ne 1 ]]; then
     info "Vorprüfung erfolgreich. Quelle, Commit, Dienst, Health-URL, CA und historisches Rollback-Staging sind plausibel. Kein Update ausgeführt."
