@@ -270,6 +270,12 @@ def build_inspect_argv(vmid: int, name: str) -> list[str]:
     """Build one fixed read-only forensic command; no guest input is accepted."""
     if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
         raise HelperError("invalid_container", "container id is invalid")
+    lock_paths = {
+        "apt_lock": "/var/lib/apt/lists/lock",
+        "apt_archives_lock": "/var/cache/apt/archives/lock",
+        "dpkg_lock": "/var/lib/dpkg/lock",
+        "dpkg_frontend_lock": "/var/lib/dpkg/lock-frontend",
+    }
     commands = {
         "processes": ["/usr/bin/ps", "-eo", "pid=,comm=,args="],
         "packages": ["/usr/bin/dpkg-query", "-W", "-f=${Package}\\t${Version}\\n"],
@@ -277,11 +283,26 @@ def build_inspect_argv(vmid: int, name: str) -> list[str]:
         "apt_check": ["/usr/bin/apt-get", "check"],
         "apt_history": ["/usr/bin/tail", "-n", "200", "/var/log/apt/history.log"],
         "dpkg_log": ["/usr/bin/tail", "-n", "200", "/var/log/dpkg.log"],
-        "apt_lock": ["/usr/bin/fuser", "-s", "/var/lib/apt/lists/lock"],
-        "apt_archives_lock": ["/usr/bin/fuser", "-s", "/var/cache/apt/archives/lock"],
-        "dpkg_lock": ["/usr/bin/fuser", "-s", "/var/lib/dpkg/lock"],
-        "dpkg_frontend_lock": ["/usr/bin/fuser", "-s", "/var/lib/dpkg/lock-frontend"],
     }
+    if name in lock_paths:
+        # /proc/locks is the kernel's lock table and does not require fuser in
+        # the guest.  Missing lock files are unheld (rc 1); an unavailable
+        # table, stat failure, or parse failure is unknown (rc 2) and remains
+        # fail-closed in the agent.
+        path = lock_paths[name]
+        commands[name] = [
+            "/bin/sh", "-c",
+            "path=$1; if [ ! -e \"$path\" ]; then exit 1; fi; "
+            "if [ ! -r /proc/locks ]; then exit 2; fi; "
+            "set -- $(/usr/bin/stat -c '%D %i' \"$path\") || exit 2; "
+            "[ $# -eq 2 ] || exit 2; device=$1; inode=$2; "
+            "/usr/bin/awk -v device=\"$device\" -v inode=\"$inode\" '"
+            "{ candidate=$5; gsub(\":\", \"\", candidate); "
+            "if (candidate == device && $6 == inode) found=1 } "
+            "END { exit found ? 0 : 1 }' /proc/locks; "
+            "rc=$?; [ $rc -eq 0 ] && exit 0; [ $rc -eq 1 ] && exit 1; exit 2",
+            "lock", path,
+        ]
     if name not in commands:
         raise HelperError("invalid_inspection", "inspection command is not allowed")
     return ["/usr/sbin/pct", "exec", str(vmid), "--", *commands[name]]
