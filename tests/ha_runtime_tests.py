@@ -32,7 +32,13 @@ async def hass(tmp_path):
     frame.async_setup(instance)
     instance.config_entries = ConfigEntries(instance, {"components": {}})
     await instance.config_entries.async_initialize()
-    dr.async_setup(instance)
+    # HA 2026.2 removed the public module-level setup helper in favor of the
+    # singleton accessor; newer HA releases expose async_setup again. Keep the
+    # fixture compatible with both the local HA runtime and the CI pin.
+    if hasattr(dr, "async_setup"):
+        dr.async_setup(instance)
+    else:
+        dr.async_get(instance)
     instance.auth = await auth.auth_manager_from_config(instance, [], [])
     await http.async_setup(instance, {"http": {"server_port": http_port}})
     instance.data[DATA_EXTRA_MODULE_URL] = UrlManager(lambda _action, _url: None, [])
