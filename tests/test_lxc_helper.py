@@ -383,6 +383,12 @@ def test_helper_unit_preserves_shared_runtime_directory_on_restart() -> None:
     assert "RuntimeDirectoryPreserve=yes" in unit
 
 
+def test_discovery_removes_its_socket_on_shutdown() -> None:
+    source = (Path(__file__).parents[1] / "scripts" / "smh-lxc-discovery.py").read_text(encoding="utf-8")
+    assert "finally:" in source
+    assert "os.unlink(DISCOVERY_SOCKET)" in source
+
+
 def test_official_helper_installer_is_preflight_only_by_default_and_never_wildcards() -> None:
     installer = (Path(__file__).parents[1] / "scripts" / "install-lxc-helper.sh").read_text(encoding="utf-8")
     assert "--apply" in installer

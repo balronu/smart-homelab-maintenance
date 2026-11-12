@@ -130,6 +130,19 @@ for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.serv
   done
 done
 
+# A complete stop must remove both application-owned sockets even though the
+# shared runtime directory is preserved. A subsequent clean start must recreate
+# both paths without stale-socket failures.
+systemctl stop "${AGENT_NAME}-lxc-discovery.service" "${AGENT_NAME}-lxc-helper.service"
+for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+  [[ ! -e "$socket_path" ]] || die "stale socket survived complete stop: $socket_path"
+done
+systemctl start "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"
+for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+  assert_socket "$socket_path"
+done
+
 # Exercise policy_set through the real helper socket while ProtectSystem=strict
 # is active. The client is the exact unprivileged agent user; no guest command
 # or package operation is involved.
