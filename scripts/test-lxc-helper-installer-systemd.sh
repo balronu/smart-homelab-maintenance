@@ -39,6 +39,7 @@ cleanup() {
 trap cleanup EXIT
 
 [[ "$EUID" -eq 0 ]] || die "root is required"
+command -v setpriv >/dev/null || die "setpriv is required for the systemd UID-mapped peer test"
 [[ "$(readlink /proc/1/exe)" == */systemd ]] || { printf '%s\n' 'SKIP: PID1 is not systemd; no real installer test claimed.'; exit 0; }
 systemd_state="$(systemctl is-system-running 2>/dev/null || true)"
 if [[ "$systemd_state" == "starting" ]]; then
@@ -243,7 +244,7 @@ for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-
 done
 
 probe_discovery() {
-  if runuser -u "$SERVICE_USER" -- python3 - "$@" <<'PY'
+  if setpriv --reuid="$CLIENT_UID" --regid="$(stat -c '%g' /run/$AGENT_NAME/lxc-discovery.sock)" --clear-groups -- python3 - "$@" <<'PY'
 import json
 import socket
 import sys
@@ -265,7 +266,7 @@ PY
   systemctl show "${AGENT_NAME}-lxc-discovery.service" -p ActiveState -p SubState -p MainPID -p RestrictAddressFamilies -p Environment >&2 || true
   journalctl --no-pager -u "${AGENT_NAME}-lxc-discovery.service" -n 30 >&2 || true
   ls -l "$PCT_FIXTURE_PATH" "/run/$AGENT_NAME/lxc-discovery.sock" >&2 || true
-  runuser -u "$SERVICE_USER" -- "$PCT_FIXTURE_PATH" exec 321 -- /usr/bin/test -r /etc/os-release >&2 || true
+  setpriv --reuid="$CLIENT_UID" --regid="$(stat -c '%g' /run/$AGENT_NAME/lxc-discovery.sock)" --clear-groups -- "$PCT_FIXTURE_PATH" exec 321 -- /usr/bin/test -r /etc/os-release >&2 || true
   return 1
 }
 
