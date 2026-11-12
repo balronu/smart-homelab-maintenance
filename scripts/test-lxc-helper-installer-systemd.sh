@@ -287,8 +287,6 @@ systemctl start "${AGENT_NAME}-lxc-discovery.service"
 wait_for_socket_ready "/run/$AGENT_NAME/lxc-discovery.sock"
 probe_discovery expect-failure
 rm -f "$DISCOVERY_DROPIN_DIR/10-negative-af-unix-only.conf"
-rm -f "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf"
-rmdir "$DISCOVERY_DROPIN_DIR"
 systemctl daemon-reload
 systemctl restart "${AGENT_NAME}-lxc-discovery.service"
 wait_for_socket_ready "/run/$AGENT_NAME/lxc-discovery.sock"
