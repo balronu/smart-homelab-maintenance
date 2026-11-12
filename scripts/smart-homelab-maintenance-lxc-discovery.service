@@ -8,9 +8,10 @@ Type=simple
 User=root
 Group=root
 ExecStart=/usr/bin/python3 /usr/libexec/smart-homelab-maintenance/lxc-discovery.py
-RuntimeDirectory=smart-homelab-maintenance
-RuntimeDirectoryMode=0750
-RuntimeDirectoryPreserve=yes
+# The helper unit is the sole systemd owner of the shared runtime directory.
+# Discovery creates and owns only its socket inside that directory; declaring
+# the same RuntimeDirectory here would re-apply systemd ownership to the
+# helper socket whenever Discovery starts.
 UMask=0007
 # pct exec needs root namespace setup for unprivileged LXCs; all other
 # filesystem, network and fixed-probe restrictions remain enforced below.
