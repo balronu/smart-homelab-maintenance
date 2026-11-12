@@ -1,5 +1,42 @@
 # Smart Homelab Maintenance
 
+## v1.0.23 – Stable
+
+### Deutsch / English
+
+Der offizielle Installer unterstützt jetzt einen expliziten Discovery-only-
+Modus: Der Standard ist ein unverändernder Preflight; ein Apply benötigt
+`--discovery-only --apply --confirm`, und ein kontrollierter Discovery-Start
+zusätzlich `--start-discovery`. Agent, Helper, Helper-Socket, Jobs, Policies,
+Grants und Credentials bleiben dabei außerhalb des Scopes. / The official
+installer now supports an explicit Discovery-only mode: the default is a
+read-only preflight; apply requires `--discovery-only --apply --confirm`, and
+an intentionally controlled Discovery start additionally requires
+`--start-discovery`. Agent, helper, helper socket, jobs, policies, grants and
+credentials remain outside the scope.
+
+Der Apply aktualisiert ausschließlich Discovery-relevante Dateien, führt bei
+Fehlern einen sicheren Rollback aus und behandelt aktive oder mehrdeutige
+Zustände fail-closed. Wiederholte Ausführung sowie die Migration eines
+verwaisten Discovery-Sockets sind durch Installer-/systemd-Akzeptanztests
+abgedeckt. / Apply updates only Discovery-related files, rolls back safely on
+errors, and fails closed for active or ambiguous states. Repeated execution
+and migration from a stale Discovery socket are covered by installer/systemd
+acceptance tests.
+
+**Compatibility / Migration:** API 1.1, Agent-Kompatibilität `1.0.6`,
+Agent-/Helper-Code und der Helper-Socket bleiben unverändert. Vor einem
+produktiven Discovery-only-Apply sind der offizielle read-only Preflight und
+eine separate administrative Freigabe erforderlich. / API 1.1, agent
+compatibility `1.0.6`, agent/helper code and the helper socket remain
+unchanged. A read-only official preflight and separate administrative approval
+are required before a productive Discovery-only apply.
+
+**Limitations:** Dieses Release startet Discovery nicht automatisch und führt
+keine CT107/CT108-Recovery, Paketupdates, Agent-Swaps oder Socket-Löschungen
+aus. / This release does not start Discovery automatically and performs no
+CT107/CT108 recovery, package updates, agent swaps or blanket socket deletion.
+
 ## v1.0.22 – Stable
 
 ### Deutsch / English
