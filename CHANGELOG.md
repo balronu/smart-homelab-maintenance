@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.25 – Stable
+
+### Deutsch / English
+
+- Behebt die fehlerhafte Auswertung von Linux-`SO_PEERCRED` im Discovery-
+  Socket: Die Credentials werden korrekt als `(pid, uid, gid)` gelesen.
+  Dadurch werden berechtigte Discovery-Clients nicht mehr vor dem
+  read-only-`pct exec` als `probe_failed` abgewiesen. / Fixes incorrect Linux
+  `SO_PEERCRED` handling in the Discovery socket: credentials are now read as
+  `(pid, uid, gid)`, so authorized Discovery clients are no longer rejected
+  as `probe_failed` before the read-only `pct exec` probe.
+- Ergänzt Regressionstests für UID/PID/GID-Verwechslungen, unberechtigte
+  Clients und generische Fehlerantworten sowie echte systemd-Socket-
+  Acceptance-Tests für die Discovery-Probes. / Adds regression tests for
+  UID/PID/GID confusion, unauthorized clients and generic error responses,
+  plus real systemd socket acceptance tests for Discovery probes.
+
+**Kompatibilität/Migration / Compatibility/Migration:** API 1.1,
+Kompatibilitätsversion `1.0.6`, Socket-Pfade sowie Agent und Helper bleiben
+unverändert. Der Discovery-only-Installer bleibt der vorgesehene Weg für
+einen späteren administrativ freigegebenen Rollout. / API 1.1, compatibility
+version `1.0.6`, socket paths, agent and helper remain unchanged. The
+Discovery-only installer remains the supported path for a later separately
+authorized rollout.
+
+**Einschränkungen / Limitations:** Dieses Release führt keinen produktiven
+Dienstneustart, keine CT-Recovery und keine Paketänderung aus. / This release
+performs no productive service restart, CT recovery or package change.
+
 ## 1.0.23 – Stable
 
 ### Deutsch / English
