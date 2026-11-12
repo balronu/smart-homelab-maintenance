@@ -16,7 +16,6 @@ ALLOWLIST="$ETC_ROOT/lxc-apt-allowlist.toml"
 HELPER_PATH="$HELPER_ROOT/lxc-apt-helper"
 DISCOVERY_PATH="$HELPER_ROOT/lxc-discovery.py"
 PCT_FIXTURE_PATH="/usr/sbin/pct"
-PCT_FIXTURE_LOG="/run/$AGENT_NAME/pct-fixture.log"
 DISCOVERY_DROPIN_DIR="/etc/systemd/system/${AGENT_NAME}-lxc-discovery.service.d"
 PCT_FIXTURE_CREATED=0
 CREATED_GROUP=0
@@ -31,7 +30,6 @@ cleanup() {
   systemctl disable "${AGENT_NAME}-agent.service" >/dev/null 2>&1 || true
   rm -f "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST"
   if [[ "$PCT_FIXTURE_CREATED" -eq 1 ]]; then rm -f "$PCT_FIXTURE_PATH"; fi
-  rm -f "$PCT_FIXTURE_LOG"
   rmdir "$DISCOVERY_DROPIN_DIR" 2>/dev/null || true
   rmdir "$HELPER_ROOT" "$ETC_ROOT" "$STATE_ROOT" 2>/dev/null || true
   systemctl daemon-reload >/dev/null 2>&1 || true
@@ -165,19 +163,12 @@ cat > "$PCT_FIXTURE_PATH" <<'EOF'
 #!/usr/bin/python3
 import socket
 import sys
-from pathlib import Path
-
-log = Path("/run/smart-homelab-maintenance/pct-fixture.log")
-with log.open("a", encoding="utf-8") as handle:
-    handle.write("pct argv: " + repr(sys.argv[1:]) + "\n")
 if len(sys.argv) < 5 or sys.argv[1] != "exec" or not sys.argv[2].isdigit() or sys.argv[3] != "--":
     raise SystemExit(2)
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as channel:
         channel.bind(("127.0.0.1", 0))
 except OSError as exc:
-    with log.open("a", encoding="utf-8") as handle:
-        handle.write(f"AF_INET fixture failed: {exc!r}\n")
     raise SystemExit(1)
 command = sys.argv[4:]
 if command == ["/usr/bin/test", "-r", "/etc/os-release"]:
@@ -197,8 +188,6 @@ raise SystemExit(2)
 EOF
 chmod 0755 "$PCT_FIXTURE_PATH"
 PCT_FIXTURE_CREATED=1
-: > "$PCT_FIXTURE_LOG"
-chmod 0666 "$PCT_FIXTURE_LOG"
 trap cleanup EXIT
 
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
@@ -266,9 +255,8 @@ PY
   fi
   systemctl show "${AGENT_NAME}-lxc-discovery.service" -p ActiveState -p SubState -p MainPID -p RestrictAddressFamilies >&2 || true
   journalctl --no-pager -u "${AGENT_NAME}-lxc-discovery.service" -n 30 >&2 || true
-  ls -l "$PCT_FIXTURE_PATH" "$PCT_FIXTURE_LOG" "/run/$AGENT_NAME/lxc-discovery.sock" >&2 || true
+  ls -l "$PCT_FIXTURE_PATH" "/run/$AGENT_NAME/lxc-discovery.sock" >&2 || true
   runuser -u "$SERVICE_USER" -- "$PCT_FIXTURE_PATH" exec 321 -- /usr/bin/test -r /etc/os-release >&2 || true
-  cat "$PCT_FIXTURE_LOG" >&2 || true
   return 1
 }
 
