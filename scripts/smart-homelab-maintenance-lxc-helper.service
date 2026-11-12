@@ -9,6 +9,9 @@ Type=simple
 User=root
 Group=root
 ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve
+# Let Python unwind through serve()'s finally block so the fixed socket is
+# removed before a controlled restart can bind it again.
+KillSignal=SIGINT
 RuntimeDirectory=smart-homelab-maintenance
 RuntimeDirectoryMode=0750
 RuntimeDirectoryPreserve=yes
