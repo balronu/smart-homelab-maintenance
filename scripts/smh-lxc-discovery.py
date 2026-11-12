@@ -16,6 +16,7 @@ import grp
 import socket
 import socketserver
 import stat
+import signal
 import struct
 import subprocess
 import threading
@@ -167,9 +168,15 @@ class _Handler(socketserver.StreamRequestHandler):
         self.wfile.write((json.dumps(result, separators=(",", ":")) + "\n").encode("utf-8"))
 
 
+def _raise_interrupt(_signum: int, _frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
 if __name__ == "__main__":
     if os.geteuid() != 0:
         raise SystemExit("root required")
+    signal.signal(signal.SIGTERM, _raise_interrupt)
+    signal.signal(signal.SIGINT, _raise_interrupt)
     path = Path(DISCOVERY_SOCKET)
     path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
     agent_gid = grp.getgrnam(EXPECTED_CLIENT_USER).gr_gid
