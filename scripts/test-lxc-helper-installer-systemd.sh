@@ -16,6 +16,7 @@ ALLOWLIST="$ETC_ROOT/lxc-apt-allowlist.toml"
 HELPER_PATH="$HELPER_ROOT/lxc-apt-helper"
 DISCOVERY_PATH="$HELPER_ROOT/lxc-discovery.py"
 PCT_FIXTURE_PATH="/usr/sbin/pct"
+PCT_FIXTURE_LOG="/run/$AGENT_NAME/pct-fixture.log"
 DISCOVERY_DROPIN_DIR="/etc/systemd/system/${AGENT_NAME}-lxc-discovery.service.d"
 PCT_FIXTURE_CREATED=0
 CREATED_GROUP=0
@@ -30,6 +31,7 @@ cleanup() {
   systemctl disable "${AGENT_NAME}-agent.service" >/dev/null 2>&1 || true
   rm -f "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST"
   if [[ "$PCT_FIXTURE_CREATED" -eq 1 ]]; then rm -f "$PCT_FIXTURE_PATH"; fi
+  rm -f "$PCT_FIXTURE_LOG"
   rmdir "$DISCOVERY_DROPIN_DIR" 2>/dev/null || true
   rmdir "$HELPER_ROOT" "$ETC_ROOT" "$STATE_ROOT" 2>/dev/null || true
   systemctl daemon-reload >/dev/null 2>&1 || true
@@ -162,8 +164,15 @@ systemd-analyze verify "$HELPER_UNIT" "$DISCOVERY_UNIT"
 cat > "$PCT_FIXTURE_PATH" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
+printf 'pct argv:' >> /run/smart-homelab-maintenance/pct-fixture.log
+printf ' %q' "$@" >> /run/smart-homelab-maintenance/pct-fixture.log
+printf '\n' >> /run/smart-homelab-maintenance/pct-fixture.log
 [[ "${1:-}" == exec && "${2:-}" =~ ^[0-9]+$ && "${3:-}" == -- ]] || exit 2
-python3 -c 'import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(("127.0.0.1", 0)); s.close()'
+python3 -c 'import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(("127.0.0.1", 0)); s.close()' 2>>/run/smart-homelab-maintenance/pct-fixture.log || {
+  rc=$?
+  printf 'AF_INET fixture failed rc=%s\n' "$rc" >> /run/smart-homelab-maintenance/pct-fixture.log
+  exit "$rc"
+}
 shift 3
 case "${1:-}" in
   /usr/bin/test)
@@ -229,7 +238,7 @@ for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-
 done
 
 probe_discovery() {
-  runuser -u "$SERVICE_USER" -- python3 - "$@" <<'PY'
+  if runuser -u "$SERVICE_USER" -- python3 - "$@" <<'PY'
 import json
 import socket
 import sys
@@ -245,6 +254,13 @@ if len(sys.argv) > 1 and sys.argv[1] == "expect-failure":
     raise SystemExit(0 if response.get("ok") is False else 1)
 raise SystemExit(0 if response.get("ok") is True else 1)
 PY
+  then
+    return 0
+  fi
+  systemctl show "${AGENT_NAME}-lxc-discovery.service" -p ActiveState -p SubState -p MainPID -p RestrictAddressFamilies >&2 || true
+  journalctl --no-pager -u "${AGENT_NAME}-lxc-discovery.service" -n 30 >&2 || true
+  cat "$PCT_FIXTURE_LOG" >&2 || true
+  return 1
 }
 
 # This is the regression proof: the actual service process invokes the actual
