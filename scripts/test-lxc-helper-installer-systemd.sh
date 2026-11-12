@@ -192,6 +192,8 @@ esac
 EOF
 chmod 0755 "$PCT_FIXTURE_PATH"
 PCT_FIXTURE_CREATED=1
+: > "$PCT_FIXTURE_LOG"
+chmod 0666 "$PCT_FIXTURE_LOG"
 trap cleanup EXIT
 
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
