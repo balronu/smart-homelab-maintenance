@@ -30,7 +30,7 @@ LockPersonality=true
 RestrictAddressFamilies=AF_UNIX AF_INET
 ReadOnlyPaths=/usr/libexec/smart-homelab-maintenance/lxc-discovery.py
 Restart=on-failure
-RestartPreventExitStatus=SIGINT
+RestartPreventExitStatus=SIGINT 130
 RestartSec=5
 
 [Install]
