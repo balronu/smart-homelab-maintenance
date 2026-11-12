@@ -262,7 +262,7 @@ PY
   then
     return 0
   fi
-  systemctl show "${AGENT_NAME}-lxc-discovery.service" -p ActiveState -p SubState -p MainPID -p RestrictAddressFamilies >&2 || true
+  systemctl show "${AGENT_NAME}-lxc-discovery.service" -p ActiveState -p SubState -p MainPID -p RestrictAddressFamilies -p Environment >&2 || true
   journalctl --no-pager -u "${AGENT_NAME}-lxc-discovery.service" -n 30 >&2 || true
   ls -l "$PCT_FIXTURE_PATH" "/run/$AGENT_NAME/lxc-discovery.sock" >&2 || true
   runuser -u "$SERVICE_USER" -- "$PCT_FIXTURE_PATH" exec 321 -- /usr/bin/test -r /etc/os-release >&2 || true
