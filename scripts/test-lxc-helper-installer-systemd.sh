@@ -80,6 +80,20 @@ grep -q '"decision":"GO"' "$PREFLIGHT_JSON"
 [[ "$(stat -c '%u:%a' "$ALLOWLIST")" == "0:600" ]]
 systemd-analyze verify "$HELPER_UNIT" "$DISCOVERY_UNIT"
 
+# RuntimeDirectoryPreserve keeps the directory between service lifecycles.
+# Seed only a kernel-detached, legacy-owned discovery socket to verify that
+# the installer/start path migrates it safely instead of treating it as live.
+install -d -m 0750 -o root -g "$SERVICE_USER" "/run/$AGENT_NAME"
+python3 - <<'PY'
+import os
+import socket
+
+path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stale:
+    stale.bind(path)
+os.chmod(path, 0o660)
+PY
+
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --apply --start
 for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"; do
   systemctl is-active --quiet "$unit" || {
