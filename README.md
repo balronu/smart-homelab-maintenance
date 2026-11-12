@@ -1,5 +1,21 @@
 # Smart Homelab Maintenance
 
+## v1.0.16 – Stable
+
+### Deutsch / English
+
+Der Agent-Updater trennt jetzt die interne Agent-Kompatibilitätsversion von
+der verifizierten Stable-Release-Identität. Rollback-Staging enthält Release-
+Version, Quell-Commit und Inhaltsdigest; fehlende oder manipulierte Identität
+bleibt fail-closed blockiert. / The agent updater now separates the internal
+agent compatibility version from verified Stable release identity. Rollback
+staging records release version, source commit and content digest; missing or
+tampered identity remains fail-closed.
+
+**Migration:** Vorhandenes Legacy-Staging ohne Identität benötigt weiterhin
+den administrativ bestätigten Quarantänepfad. / Existing legacy staging
+without identity still requires the administrator-confirmed quarantine path.
+
 ## v1.0.11 – Stable
 
 ### Deutsch / English
