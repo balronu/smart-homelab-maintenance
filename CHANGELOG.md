@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.0.21 – Stable
+
+### Deutsch / English
+
+- Behebt den Rollback-Resolver-Fehler, bei dem mehrere Staging-Bäume mit der
+  gleichen Agent-Kompatibilitätsversion `1.0.6` zu einer falschen Auswahl
+  führen konnten. Der Updater bindet den unmittelbar vorher aktiven Baum jetzt
+  an Release-Identität, Inhalts-Tree-Hash und den neu erzeugten konkreten
+  Staging-Pfad; Mehrdeutigkeiten und Integritätsabweichungen bleiben
+  fail-closed. / Fixes the rollback resolver defect where multiple staging
+  trees sharing agent compatibility version `1.0.6` could cause the wrong
+  rollback selection. The updater now binds the immediately previous tree to
+  its release identity, content tree digest, and the concrete staging path
+  created by the current transaction; ambiguity and integrity mismatches fail
+  closed.
+- Enthält den systemd-Socket-Lifecycle-Fix für unabhängige Helper- und
+  Discovery-Neustarts mit unveränderten Socket-Pfaden und Berechtigungen. /
+  Includes the systemd socket lifecycle fix for independent helper and
+  discovery restarts with unchanged socket paths and permissions.
+
+**Compatibility / Migration:** API 1.1, Agent-Kompatibilität `1.0.6` und
+historische CT107/CT108-Recovery-Jobs bleiben unverändert. Historische
+Staging-Bäume werden nicht automatisch bereinigt. Vor einem Produktivupgrade
+ist der offizielle read-only Preflight erforderlich; anschließend muss der
+Installer den neuen Updater und die beiden systemd-Units bereitstellen. /
+API 1.1, agent compatibility `1.0.6`, and historical CT107/CT108 recovery
+jobs are unchanged. Historical staging trees are not cleaned up automatically.
+The official read-only preflight is required before a productive upgrade, and
+the installer must deploy the new updater and both systemd units first.
+
+**Limitations:** Dieses Release führt keine produktive Wiederherstellung,
+keine Container-Recovery und keine Paketupdates aus. / This release performs
+no productive restoration, container recovery, or package updates.
+
 ## 1.0.20 – Stable
 
 ### Deutsch / English
