@@ -33,6 +33,7 @@ RestrictAddressFamilies=AF_UNIX
 # writable mount limited to this root-owned policy directory.
 ReadWritePaths=/etc/smart-homelab-maintenance
 Restart=on-failure
+RestartPreventExitStatus=SIGINT
 RestartSec=5
 
 [Install]
