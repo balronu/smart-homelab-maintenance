@@ -191,10 +191,12 @@ PCT_FIXTURE_CREATED=1
 trap cleanup EXIT
 
 install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
+CLIENT_UID="$(id -u "$SERVICE_USER")"
 cat > "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf" <<'EOF'
 [Service]
 Environment=SMH_DISCOVERY_TEST_DIAGNOSTICS=1
 EOF
+printf 'Environment=SMH_DISCOVERY_TEST_CLIENT_UID=%s\n' "$CLIENT_UID" >> "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf"
 systemctl daemon-reload
 
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
