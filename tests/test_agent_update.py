@@ -37,7 +37,7 @@ def test_update_transaction_has_interrupted_swap_recovery():
 
 def test_current_stable_update_does_not_create_legacy_evidence():
     script = (ROOT / "scripts" / "update-agent.sh").read_text(encoding="utf-8")
-    assert '[[ -e "$AGENT_ROOT/agent/.release-identity" ]]' in script
+    assert '[[ -e "$AGENT_ROOT/agent/.release-identity" || -L "$AGENT_ROOT/agent/.release-identity" ]]' in script
     assert '[[ ! -e "$AGENT_ROOT/agent/.legacy-rollback-evidence.json" ]]' in script
 
 
