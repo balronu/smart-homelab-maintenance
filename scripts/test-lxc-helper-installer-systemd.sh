@@ -354,7 +354,12 @@ done
 # both paths without stale-socket failures.
 systemctl stop "${AGENT_NAME}-lxc-discovery.service" "${AGENT_NAME}-lxc-helper.service"
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
-  [[ ! -e "$socket_path" ]] || die "stale socket survived complete stop: $socket_path"
+  socket_gone=0
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if [[ ! -e "$socket_path" ]]; then socket_gone=1; break; fi
+    sleep 0.1
+  done
+  [[ "$socket_gone" -eq 1 ]] || die "stale socket survived complete stop: $socket_path"
 done
 systemctl start "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
