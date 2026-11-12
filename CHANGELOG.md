@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Deutsch / English
+
+- Trennt die Agent-Kompatibilitätsversion `1.0.6` von der verifizierten
+  Stable-Release-Identität. Offizielle Rollback-Stagings speichern jetzt
+  Release-Version, Quell-Commit und einen deterministischen Inhaltsdigest;
+  der Updater prüft diese Identität und blockiert fehlende oder manipulierte
+  Metadaten weiterhin fail-closed. / Separates the agent compatibility
+  version `1.0.6` from verified Stable release identity. Official rollback
+  staging now records release version, source commit and a deterministic
+  content digest; the updater verifies that identity and continues to fail
+  closed on missing or tampered metadata.
+
+**Compatibility / Migration:** Existing legacy staging without release
+identity remains blocked and requires the existing administrator-approved
+quarantine path. No historical staging is deleted or rewritten. / Vorhandenes
+Legacy-Staging ohne Release-Identität bleibt blockiert und benötigt den
+bestehenden administrativ bestätigten Quarantänepfad. Historisches Staging
+wird weder gelöscht noch überschrieben.
+
 ## 1.0.15 – Stable
 
 ### Deutsch / English

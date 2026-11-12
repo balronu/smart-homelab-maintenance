@@ -28,6 +28,8 @@ def test_update_transaction_has_interrupted_swap_recovery():
     assert "trap rollback ERR" in script
     assert 'mv -T "$AGENT_ROOT/agent" "$previous_dir"' in script
     assert 'mv -T "$next_dir" "$AGENT_ROOT/agent"' in script
+    assert ".release-identity" in script
+    assert 'source_commit' in script
 
 
 def test_upgrade_recovers_from_explicit_exit_and_bounds_restart_race():
@@ -80,14 +82,17 @@ def test_upgrade_does_not_delete_existing_rollback_staging():
     assert "Manuelle Prüfung erforderlich" in script
     assert 'rm -rf -- "$rollback_dir"' not in script
     assert "Rollback-Staging bleibt erhalten" in script
+    assert "read_release_version" in script
+    assert "verifizierte Release-Identität" in script
 
 
 def test_historical_staging_requires_active_health_and_keeps_ambiguous_state_blocked():
     script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
     assert 'systemctl is-active --quiet "$SERVICE_NAME"' in script
-    assert 'wait_for_health "$current_version"' in script
-    assert "nicht eindeutig historisch" in script
-    assert "Mehrere Rollback-Stände passen" in script
+    assert 'current_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"' in script
+    assert 'wait_for_health "$current_agent_version"' in script
+    assert "Release-Inhaltsdigest stimmt nicht" in script
+    assert "nicht älter als der Ziel-Release" in script
 
 
 def test_historical_staging_version_comparison_supports_stable_agent_releases():
@@ -95,6 +100,8 @@ def test_historical_staging_version_comparison_supports_stable_agent_releases():
     assert 're.fullmatch(r"0\\.1\\.0-beta\\.(\\d+)", value)' in script
     assert 're.fullmatch(r"(\\d+)\\.(\\d+)\\.(\\d+)", value)' in script
     assert "candidate < current" in script
+    assert "read_source_release_version" in script
+    assert 'check_historical_staging "$source_dir" "$expected_commit"' in script
 
 
 def test_readiness_requires_tls_contract_and_expected_version():
