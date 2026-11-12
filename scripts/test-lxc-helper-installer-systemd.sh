@@ -191,32 +191,17 @@ PCT_FIXTURE_CREATED=1
 trap cleanup EXIT
 
 install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
-CLIENT_UID="$(python3 - "$SERVICE_USER" <<'PY'
+CLIENT_UID="$(runuser -u "$SERVICE_USER" -- python3 - <<'PY'
 import os
-import socket
-import struct
-import subprocess
-import sys
-import tempfile
 
-user = sys.argv[1]
-with tempfile.TemporaryDirectory(prefix="smh-peer-") as directory:
-    os.chmod(directory, 0o755)
-    path = os.path.join(directory, "peer.sock")
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
-        server.bind(path)
-        server.listen(1)
-        child = subprocess.Popen([
-            "runuser", "-u", user, "--", "python3", "-c",
-            "import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); s.close()",
-            path,
-        ])
-        channel, _ = server.accept()
-        uid = struct.unpack("3i", channel.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[0]
-        channel.close()
-        if child.wait() != 0:
-            raise SystemExit("peer UID fixture client failed")
-print(uid)
+target = os.getuid()
+for line in open("/proc/self/uid_map", encoding="ascii"):
+    inside, outside, count = (int(value) for value in line.split())
+    if inside <= target < inside + count:
+        print(outside + target - inside)
+        break
+else:
+    raise SystemExit("uid mapping for discovery test client is unavailable")
 PY
 )"
 cat > "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf" <<'EOF'
