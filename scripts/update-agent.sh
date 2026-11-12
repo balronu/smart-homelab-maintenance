@@ -68,6 +68,12 @@ Path(sys.argv[2], ".release-identity").write_text(
     encoding="utf-8",
 )
 PY
+if [[ -e "$AGENT_ROOT/agent/.release-identity" || -L "$AGENT_ROOT/agent/.release-identity" ]]; then
+    [[ ! -e "$AGENT_ROOT/agent/.legacy-rollback-evidence.json" ]] || die "Aktiver Agentbaum enthält widersprüchliche Release-/Legacy-Identitäten."
+else
+    python3 "$SCRIPT_DIR/legacy_rollback_evidence.py" --create "$AGENT_ROOT/agent" >/dev/null \
+        || die "Legacy-Rollback-Nachweis konnte vor dem Swap nicht sicher erstellt werden."
+fi
 rollback() {
     if [[ -d "$previous_dir" && ! -e "$AGENT_ROOT/agent" ]]; then
         mv -T "$previous_dir" "$AGENT_ROOT/agent" || true

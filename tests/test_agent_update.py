@@ -30,6 +30,15 @@ def test_update_transaction_has_interrupted_swap_recovery():
     assert 'mv -T "$next_dir" "$AGENT_ROOT/agent"' in script
     assert ".release-identity" in script
     assert 'source_commit' in script
+    assert "legacy_rollback_evidence.py" in script
+    assert "--create" in script
+    assert "--legacy-rollback-evidence.json" in script
+
+
+def test_current_stable_update_does_not_create_legacy_evidence():
+    script = (ROOT / "scripts" / "update-agent.sh").read_text(encoding="utf-8")
+    assert '[[ -e "$AGENT_ROOT/agent/.release-identity" ]]' in script
+    assert '[[ ! -e "$AGENT_ROOT/agent/.legacy-rollback-evidence.json" ]]' in script
 
 
 def test_upgrade_recovers_from_explicit_exit_and_bounds_restart_race():
@@ -93,6 +102,9 @@ def test_historical_staging_requires_active_health_and_keeps_ambiguous_state_blo
     assert 'wait_for_health "$current_agent_version"' in script
     assert "Release-Inhaltsdigest stimmt nicht" in script
     assert "nicht älter als der Ziel-Release" in script
+    assert "read_legacy_rollback_evidence" in script
+    assert "gültigen Legacy-Nachweis" in script
+    assert "nur Inhaltsnachweis; Release-Zuordnung unbekannt" in script
 
 
 def test_historical_staging_version_comparison_supports_stable_agent_releases():

@@ -422,6 +422,10 @@ print(version)
 PY
 }
 
+read_legacy_rollback_evidence() {
+    python3 "$SCRIPT_DIR/legacy_rollback_evidence.py" --verify "$1" >/dev/null
+}
+
 check_historical_staging() {
     local source="$1" _expected_commit="$2" dirs=() dir staged_version source_release current_agent_version
     source_release="$(read_source_release_version "$source")"
@@ -433,12 +437,15 @@ check_historical_staging() {
     systemctl is-active --quiet "$SERVICE_NAME" || die "Rollback-Staging vorhanden, aber Agent-Dienst ist nicht aktiv. Manuelle Prüfung erforderlich."
     for dir in "${dirs[@]}"; do
         if ! staged_version="$(read_release_version "$dir")"; then
-            die "Rollback-Staging enthält keine verifizierte Release-Identität. Manuelle Prüfung erforderlich."
+            read_legacy_rollback_evidence "$dir" \
+                || die "Rollback-Staging enthält weder eine verifizierte Release-Identität noch einen gültigen Legacy-Nachweis. Manuelle Prüfung erforderlich."
+            info "Legacy-Rollback-Staging bleibt erhalten: $dir (nur Inhaltsnachweis; Release-Zuordnung unbekannt)"
+        else
+            if ! version_is_older "$staged_version" "$source_release"; then
+                die "Rollback-Staging ist nicht älter als der Ziel-Release ($staged_version vs. $source_release). Manuelle Prüfung erforderlich."
+            fi
+            info "Historisches Rollback-Staging bleibt erhalten: $dir (Release $staged_version; Agent-Kompatibilität bleibt separat)"
         fi
-        if ! version_is_older "$staged_version" "$source_release"; then
-            die "Rollback-Staging ist nicht älter als der Ziel-Release ($staged_version vs. $source_release). Manuelle Prüfung erforderlich."
-        fi
-        info "Historisches Rollback-Staging bleibt erhalten: $dir (Release $staged_version; Agent-Kompatibilität bleibt separat)"
     done
     if ! current_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"; then
         die "Aktive Agent-Version ist bei vorhandenem Rollback-Staging nicht lesbar. Manuelle Prüfung erforderlich."
