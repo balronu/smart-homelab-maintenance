@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.18 – Stable
+
+### Deutsch / English
+
+- Behebt die Legacy-Batch-Migration für ausdrücklich geprüfte
+  `agent.failed.*.staging`-Verzeichnisse. Der bestehende Recovery- und
+  historische Preflight prüft jetzt beide Legacy-Namensformen, während die
+  exakte Kandidatenliste, Manifest-Locking, Quarantäne, Auditierung und
+  Wiederaufnahme unverändert fail-closed bleiben. /
+  Fixes legacy batch migration for explicitly verified
+  `agent.failed.*.staging` directories. Existing recovery and historical
+  preflight now inspect both legacy name forms while exact candidate lists,
+  manifest locking, quarantine, audit, and resume remain fail-closed.
+
+**Compatibility / Migration:** No automatic migration or package/container
+change is performed. The administrative batch still requires explicit
+confirmation and aborts on active upgrade/rollback references, changed
+manifests, symlinks, unusual file types, missing recovery paths, or collisions.
+The agent upgrade remains a separate confirmed step. /
+Keine automatische Migration oder Paket-/Containeränderung; die administrative
+Batch-Operation benötigt weiterhin eine ausdrückliche Bestätigung und bricht
+bei Abweichungen ab. Das Agent-Upgrade bleibt ein separater Bestätigungsschritt.
+
 ## 1.0.17 – Stable
 
 ### Deutsch / English

@@ -71,7 +71,11 @@ if [[ -n "$recover_staging" ]]; then
     [[ -d "$AGENT_ROOT/agent" ]] || die "Aktiver Agent fehlt; kein sicherer Wiederherstellungspfad."
     canonical_stage="$(realpath -e -- "$recover_staging")" || die "Staging-Pfad ist nicht kanonisch auflösbar."
     canonical_root="$(realpath -e -- "$AGENT_ROOT")" || die "Agent-Root ist nicht kanonisch auflösbar."
-    [[ "$canonical_stage" == "$canonical_root"/agent.previous.*.staging ]] || die "Staging-Pfad liegt nicht als exaktes Rollback-Staging unter dem Agent-Root."
+    case "$(basename -- "$canonical_stage")" in
+        agent.previous.*.staging|agent.failed.*.staging) ;;
+        *) die "Staging-Pfad liegt nicht als exaktes Rollback-Staging unter dem Agent-Root (agent.previous.*.staging oder agent.failed.*.staging)." ;;
+    esac
+    [[ "$(dirname -- "$canonical_stage")" == "$canonical_root" ]] || die "Staging-Pfad liegt nicht direkt unter dem Agent-Root."
     [[ -d "$canonical_stage" && ! -L "$recover_staging" ]] || die "Staging-Pfad ist kein echtes Verzeichnis oder ein Symlink."
     [[ ! -e "$quarantine_root" || ! -L "$quarantine_root" ]] || die "Quarantänepfad darf kein Symlink sein."
     quarantine_parent="$(dirname -- "$quarantine_root")"
@@ -154,7 +158,7 @@ PY
     trap 'rm -f -- "$manifest_before" "$active_manifest" "${manifest_before}.after"' EXIT
     staging_manifest "$canonical_stage" > "$manifest_before" || die "Staging-Integrität konnte nicht erfasst werden."
     candidate_count=0
-    for candidate in "$AGENT_ROOT"/agent.previous.*.staging; do
+    for candidate in "$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging; do
         [[ -d "$candidate" && ! -L "$candidate" && "$(realpath -e -- "$candidate")" != "$canonical_stage" ]] || continue
         staging_manifest "$candidate" >/dev/null || die "Alternativer Rollback-Kandidat ist nicht verwendbar: $candidate"
         candidate_count=$((candidate_count + 1))
@@ -421,7 +425,7 @@ PY
 check_historical_staging() {
     local source="$1" _expected_commit="$2" dirs=() dir staged_version source_release current_agent_version
     source_release="$(read_source_release_version "$source")"
-    for dir in "$AGENT_ROOT"/agent.previous.*.staging; do
+    for dir in "$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging; do
         [[ -d "$dir" ]] || continue
         dirs+=("$dir")
     done

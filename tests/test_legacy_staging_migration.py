@@ -90,3 +90,79 @@ def test_identity_or_symlink_is_rejected(tmp_path):
     result = run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--candidate", candidates[0])
     assert result.returncode != 0
     assert "Legacy-Staging" in result.stderr or "Identität" in result.stderr
+
+
+def test_previous_and_failed_batch_is_supported(tmp_path):
+    agent_root, state_root, candidates = fixture(tmp_path)
+    plan = tmp_path / "plan.json"
+    args = sum((["--candidate", item] for item in candidates), [])
+    result = run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), *args)
+    assert result.returncode == 0, result.stderr
+    names = {item["name"] for item in json.loads(plan.read_text())["candidates"]}
+    assert names == {"agent.previous.1.staging", "agent.failed.2.staging"}
+
+
+def test_previous_only_batch_is_supported(tmp_path):
+    agent_root, state_root, candidates = fixture(tmp_path, ("agent.previous.1.staging",))
+    plan = tmp_path / "plan.json"
+    result = run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--candidate", candidates[0])
+    assert result.returncode == 0, result.stderr
+
+
+def test_failed_only_batch_is_supported(tmp_path):
+    agent_root, state_root, candidates = fixture(tmp_path, ("agent.failed.2.staging",))
+    plan = tmp_path / "plan.json"
+    result = run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--candidate", candidates[0])
+    assert result.returncode == 0, result.stderr
+
+
+def test_active_failed_upgrade_is_rejected_without_mutation(tmp_path):
+    agent_root, state_root, candidates = fixture(tmp_path)
+    plan = tmp_path / "plan.json"
+    with patch.object(MIGRATION, "global_upgrade_refs", return_value=[{"pid": "123", "command": "agent.failed.2.staging"}]):
+        result = run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--candidate", candidates[0])
+    assert result.returncode != 0
+    assert not plan.exists()
+    assert all(Path(item).exists() for item in candidates)
+
+
+def test_missing_administrator_confirmation_is_rejected(tmp_path):
+    agent_root, state_root, candidates = fixture(tmp_path)
+    plan = tmp_path / "plan.json"
+    assert run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--candidate", candidates[0]).returncode == 0
+    result = run(tmp_path, "--apply", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--quarantine-root", str(state_root / "staging-quarantine"))
+    assert result.returncode != 0
+    assert Path(candidates[0]).exists()
+
+
+def test_symlink_and_path_attacks_are_rejected(tmp_path):
+    agent_root, state_root, candidates = fixture(tmp_path)
+    link = agent_root / "agent.failed.9.staging"
+    link.symlink_to(Path(candidates[0]))
+    plan = tmp_path / "plan.json"
+    result = run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--candidate", str(link))
+    assert result.returncode != 0 and not plan.exists()
+
+
+def test_missing_restore_path_is_rejected(tmp_path):
+    agent_root, state_root, candidates = fixture(tmp_path)
+    for child in list((agent_root / "agent").iterdir()):
+        if child.is_dir():
+            for nested in child.iterdir():
+                nested.unlink()
+            child.rmdir()
+    plan = tmp_path / "plan.json"
+    result = run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--candidate", candidates[0])
+    assert result.returncode != 0 and not plan.exists()
+
+
+def test_repeated_execution_is_safe_and_audited(tmp_path):
+    agent_root, state_root, candidates = fixture(tmp_path, ("agent.failed.2.staging",))
+    plan = tmp_path / "plan.json"
+    assert run(tmp_path, "--preflight", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--candidate", candidates[0]).returncode == 0
+    quarantine = state_root / "staging-quarantine"
+    apply_args = ("--apply", "--confirm", "--plan-file", str(plan), "--agent-root", str(agent_root), "--state-root", str(state_root), "--quarantine-root", str(quarantine))
+    assert run(tmp_path, *apply_args).returncode == 0
+    assert run(tmp_path, *apply_args).returncode == 0
+    events = [json.loads(line)["event"] for line in (quarantine / "audit.log").read_text().splitlines()]
+    assert events == ["quarantined", "resume_verified"]

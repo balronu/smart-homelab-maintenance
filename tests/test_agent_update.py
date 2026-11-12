@@ -169,3 +169,20 @@ def test_staging_recovery_rejects_unsafe_paths_and_collision():
     assert "Aktiver Upgrade-/Rollback- oder Dateireferenz-Prozess gefunden" in script or "Aktiver Upgrade-, Rollback- oder Dateireferenz-Prozess gefunden" in script
     assert "Symlink im Staging" in script
     assert "Hash-/Strukturvergleich nach Quarantäne fehlgeschlagen" in script
+
+
+def test_staging_recovery_accepts_failed_staging_only_as_explicit_candidate():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "agent.previous.*.staging|agent.failed.*.staging" in script
+    assert 'dirname -- "$canonical_stage"' in script
+    assert 'for candidate in "$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging' in script
+
+
+def test_historical_preflight_inspects_failed_staging_instead_of_ignoring_it():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    start = script.index("check_historical_staging()")
+    end = script.index('if [[ "$apply" -ne 1 ]]', start)
+    historical = script[start:end]
+    assert '"$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging' in historical
+    assert "read_release_version" in historical
+    assert "Manuelle Prüfung erforderlich" in historical
