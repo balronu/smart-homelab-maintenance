@@ -73,12 +73,41 @@ PREFLIGHT_JSON="$(mktemp /tmp/smh-lxc-helper-preflight.XXXXXX.json)"
 python3 "$ROOT_DIR/scripts/lxc-helper-preflight.py" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" >"$PREFLIGHT_JSON"
 grep -q '"decision":"GO"' "$PREFLIGHT_JSON"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT"
+"$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only
+if "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply; then
+  die "discovery-only apply without confirmation was accepted"
+fi
+# Discovery-only apply must not install or start the helper, and must migrate
+# a detached legacy socket without touching the helper contract.
+install -d -m 0750 -o root -g "$SERVICE_USER" "/run/$AGENT_NAME"
+python3 - <<'PY'
+import os
+import socket
+
+path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stale:
+    stale.bind(path)
+os.chmod(path, 0o660)
+PY
+"$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply --confirm --start-discovery
+systemctl is-active --quiet "${AGENT_NAME}-lxc-discovery.service"
+[[ ! -e "$HELPER_UNIT" ]] || die "discovery-only mode installed helper unit"
+[[ ! -e "$HELPER_PATH" ]] || die "discovery-only mode installed helper file"
+[[ -S "/run/$AGENT_NAME/lxc-discovery.sock" ]] || die "discovery socket missing after discovery-only start"
+systemctl stop "${AGENT_NAME}-lxc-discovery.service"
+
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --apply
 [[ "$(stat -c '%u:%a' "$HELPER_PATH")" == "0:755" ]]
 [[ "$(stat -c '%u:%a' "$HELPER_UNIT")" == "0:644" ]]
 [[ "$(stat -c '%u:%a' "$DISCOVERY_PATH")" == "0:755" ]]
 [[ "$(stat -c '%u:%a' "$ALLOWLIST")" == "0:600" ]]
 systemd-analyze verify "$HELPER_UNIT" "$DISCOVERY_UNIT"
+
+# Repeating discovery-only apply leaves the installed helper contract byte-identical.
+helper_hash_before="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
+"$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply --confirm
+helper_hash_after="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
+[[ "$helper_hash_before" == "$helper_hash_after" ]] || die "discovery-only mode changed helper files"
 
 # RuntimeDirectoryPreserve keeps the directory between service lifecycles.
 # Seed only a kernel-detached, legacy-owned discovery socket to verify that

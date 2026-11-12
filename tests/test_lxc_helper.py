@@ -487,6 +487,18 @@ def test_official_helper_installer_is_preflight_only_by_default_and_never_wildca
     assert "systemctl daemon-reload" in installer
 
 
+def test_discovery_only_installer_is_explicit_and_isolated() -> None:
+    installer = (Path(__file__).parents[1] / "scripts" / "install-lxc-helper.sh").read_text(encoding="utf-8")
+    assert "--discovery-only" in installer
+    assert "--start-discovery" in installer
+    assert "--confirm" in installer
+    assert 'targets=("$DISCOVERY_PATH" "$DISCOVERY_UNIT")' in installer
+    assert 'systemctl start "${AGENT_NAME}-lxc-discovery.service"' in installer
+    assert 'systemctl start "${AGENT_NAME}-lxc-helper.service"' in installer
+    assert "Discovery-only-Apply erfordert --confirm" in installer
+    assert "Discovery-only-Preflight PASS" in installer
+
+
 def test_installer_preserves_existing_allowlist_and_stages_rollback() -> None:
     installer = (Path(__file__).parents[1] / "scripts" / "install-lxc-helper.sh").read_text(encoding="utf-8")
     assert 'install -m 0600 -o root -g root "$HELPER_ETC" "$stage/allowlist"' in installer
