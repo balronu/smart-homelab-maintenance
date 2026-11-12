@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.20 – Stable
+
+### Deutsch / English
+
+- Behebt den systemd-RuntimeDirectory-Lifecycle-Fehler, bei dem ein Neustart
+  des Helper- oder Discovery-Dienstes den Socket-Pfad des jeweils anderen
+  Dienstes entfernte. Beide Units verwenden jetzt
+  `RuntimeDirectoryPreserve=yes`; Discovery entfernt seinen eigenen Socket
+  beim Shutdown explizit. / Fixes the systemd RuntimeDirectory lifecycle bug
+  where restarting either the helper or discovery service removed the other
+  service's socket path. Both units now use `RuntimeDirectoryPreserve=yes`,
+  and discovery explicitly removes its own socket during shutdown.
+- Socket-Pfade, Eigentümer und Berechtigungen bleiben unverändert. Regressionstests
+  decken unabhängige und abwechselnde Neustarts sowie vollständiges Stop/Start
+  ohne verwaiste Socket-Dateien ab. API 1.1 und historische Recovery-Jobs
+  bleiben unverändert. / Socket paths, ownership and permissions remain
+  unchanged. Regression tests cover independent and alternating restarts plus
+  full stop/start without stale socket files. API 1.1 and historical recovery
+  jobs are unchanged.
+
+**Compatibility / Migration:** No productive deployment is performed by this
+release. Existing installations can receive the updated units through the
+official installer/upgrade path; no container or host restart is implied.
+CT107/CT108 historical recovery decisions remain separate and are not changed.
+/ Kein Produktivdeployment durch dieses Release. Bestehende Installationen
+erhalten die geänderten Units über den offiziellen Installer-/Upgradepfad;
+kein Container- oder Host-Neustart ist Bestandteil dieses Releases. Historische
+Recovery-Entscheidungen für CT107/CT108 bleiben getrennt und unverändert.
+
 ## 1.0.19 – Stable
 
 ### Deutsch / English

@@ -1,5 +1,18 @@
 # Smart Homelab Maintenance
 
+## v1.0.20 – Stable
+
+### Deutsch / English
+
+Der systemd-RuntimeDirectory-Lifecycle ist für unabhängige Helper-/Discovery-
+Neustarts korrigiert: Beide Units bewahren das Runtime-Verzeichnis, Discovery
+entfernt seinen eigenen Socket beim Stop. Socket-Pfade, Berechtigungen, API 1.1
+und historische Recovery-Jobs bleiben unverändert. / The systemd
+RuntimeDirectory lifecycle now supports independent helper/discovery restarts:
+both units preserve the runtime directory, while discovery removes its own
+socket on stop. Socket paths, permissions, API 1.1 and historical recovery
+jobs remain unchanged.
+
 ## v1.0.19 – Stable
 
 ### Deutsch / English
