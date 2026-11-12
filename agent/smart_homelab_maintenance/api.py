@@ -13,7 +13,7 @@ from typing import Any, Mapping
 
 from .api_models import ApiError
 from .discovery import DiscoveryService
-from .errors import MaintenanceError, ValidationError
+from .errors import DuplicateJobError, MaintenanceError, ValidationError
 from .jobs import JobRepository
 from .security import redact_secrets
 from .updates import UpdateService
@@ -56,6 +56,8 @@ class ApiApplication:
             return 200, body
         except KeyError:
             return 404, self._error("not_found", "resource not found", request_id)
+        except DuplicateJobError as exc:
+            return 409, self._error(exc.code, str(exc), request_id)
         except MaintenanceError as exc:
             return 400, self._error(exc.code, str(exc), request_id)
         except (TypeError, ValueError) as exc:
@@ -139,9 +141,9 @@ class ApiApplication:
                 request = json.loads(body.decode("utf-8")) if body else {}
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise ValidationError("update body must be valid JSON") from exc
-            if not isinstance(request, dict) or set(request) - {"confirm", "install_confirmed", "plan_digest"}:
-                raise ValidationError("update accepts confirm, install_confirmed and plan_digest")
-            return self.updates.execute_update(parts[3], confirmed=request.get("confirm") is True, install_confirmed=request.get("install_confirmed") is True, plan_digest=request.get("plan_digest"))
+            if not isinstance(request, dict) or set(request) - {"confirm", "install_confirmed", "plan_digest", "attempt_id"}:
+                raise ValidationError("update accepts confirm, install_confirmed, plan_digest and attempt_id")
+            return self.updates.execute_update(parts[3], confirmed=request.get("confirm") is True, install_confirmed=request.get("install_confirmed") is True, plan_digest=request.get("plan_digest"), attempt_id=request.get("attempt_id"))
         if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] == "permissions" and method == "POST":
             if self.updates is None:
                 raise ValidationError("permission management is unavailable")

@@ -9,7 +9,7 @@ from .http_transport import AgentHttpTransport, TransportError
 from .const import ACTIONS
 
 
-async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, install_confirmed: bool = False, plan_digest: str | None = None, simulation_authorized: bool = False, update_authorized: bool = False, mode: str | None = None, generation: int | None = None, preview_token: str | None = None, manual_authorized_ids: list[int] | None = None) -> dict[str, Any]:
+async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, install_confirmed: bool = False, plan_digest: str | None = None, attempt_id: str | None = None, simulation_authorized: bool = False, update_authorized: bool = False, mode: str | None = None, generation: int | None = None, preview_token: str | None = None, manual_authorized_ids: list[int] | None = None) -> dict[str, Any]:
     if action not in ACTIONS:
         raise ValueError("unknown action")
     if action == "check":
@@ -31,7 +31,7 @@ async def async_action(transport: AgentHttpTransport, action: str, *, job_id: st
             raise ValueError("target and explicit confirmation are required")
         if install_confirmed is not True:
             raise ValueError("separate installation confirmation is required")
-        return await transport.execute_update(target, plan_digest=plan_digest, install_confirmed=True)
+        return await transport.execute_update(target, plan_digest=plan_digest, attempt_id=attempt_id, install_confirmed=True)
     if action == "set_permissions":
         if not target or confirm is not True:
             raise ValueError("target and explicit confirmation are required")

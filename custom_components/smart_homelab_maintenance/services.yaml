@@ -92,6 +92,12 @@ execute:
       required: true
       selector:
         text:
+    attempt_id:
+      name: Installation attempt identity
+      description: Stable identity reused for retries of this explicit confirmation.
+      required: false
+      selector:
+        text:
     install_confirmed:
       name: Confirm installation separately
       description: Required second confirmation that packages may actually be installed.

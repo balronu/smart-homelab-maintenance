@@ -12,6 +12,7 @@ from agent.smart_homelab_maintenance.discovery import DiscoveryService, FixtureP
 from agent.smart_homelab_maintenance.errors import ValidationError
 from agent.smart_homelab_maintenance.jobs import JobRepository
 from agent.smart_homelab_maintenance.permissions import PermissionStore
+from agent.smart_homelab_maintenance.types import JobPhase, JobRequest, JobState
 from agent.smart_homelab_maintenance.updates import AptCommandRunner, AptUpdateReader, GuestHelperUnavailableError, ProbeTarget, RootHelperTransport, UpdateService, _parse_apt, _parse_apt_upgradable, make_targets
 
 
@@ -471,6 +472,111 @@ def test_execute_returns_before_slow_update_and_blocks_duplicate_click(tmp_path)
             break
         time.sleep(0.01)
     assert jobs.get(accepted["job_id"])["state"] == "succeeded"
+    jobs.close()
+
+
+def test_reconciled_historical_job_allows_new_confirmed_attempt(tmp_path):
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    historical = jobs.create(JobRequest(
+        target="container:107", operation="update", expected_version=None,
+        idempotency_key=f"container:107:{plan.plan_digest}", confirmation_hash=plan.plan_digest,
+    ))
+    jobs.transition(historical, JobState.PREFLIGHT, phase=JobPhase.PREFLIGHT)
+    jobs.transition(historical, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY)
+    jobs.transition(historical, JobState.RECONCILED_LEGACY_STATE_VERIFIED, phase=JobPhase.RECOVERY)
+    accepted = checked.execute_update(
+        "container:107", confirmed=True, install_confirmed=True,
+        plan_digest=plan.plan_digest, attempt_id="attempt-new-12345678",
+    )
+    assert accepted["success"] is True and accepted["job_id"] != historical
+    for _ in range(50):
+        if jobs.get(accepted["job_id"])["state"] == JobState.SUCCEEDED:
+            break
+        time.sleep(0.01)
+    assert jobs.count() == 2
+    assert jobs.get(historical)["state"] == JobState.RECONCILED_LEGACY_STATE_VERIFIED
+    jobs.close()
+
+
+def test_identical_attempt_retry_replays_same_job_without_second_job(tmp_path):
+    runner = SlowUpdateRunner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    request = dict(confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest, attempt_id="attempt-retry-12345678")
+    first = checked.execute_update("container:107", **request)
+    retry = checked.execute_update("container:107", **request)
+    assert first["success"] is True and retry["replayed"] is True
+    assert retry["job_id"] == first["job_id"]
+    assert jobs.count() == 1
+    for _ in range(50):
+        if jobs.get(first["job_id"])["state"] == JobState.SUCCEEDED:
+            break
+        time.sleep(0.01)
+    assert [call for call in runner.calls if call == ("update", 107)] == [("update", 107)]
+    jobs.close()
+
+
+def test_api_execute_persists_and_replays_attempt_identity(tmp_path):
+    runner = Runner("Inst curl [7.0] (7.1)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), jobs, updates=updates, read_token="token")
+    plan = updates.check("container:107")
+    body = {"confirm": True, "install_confirmed": True, "plan_digest": plan.plan_digest, "attempt_id": "attempt-api-12345678"}
+    headers = {"Authorization": "Bearer token"}
+    import json
+    status, first = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=json.dumps(body).encode())
+    status_retry, retry = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=json.dumps(body).encode())
+    assert status == 200 and status_retry == 200
+    assert first["data"]["job_id"] == retry["data"]["job_id"]
+    assert retry["data"]["replayed"] is True
+    assert jobs.count() == 1
+    for _ in range(50):
+        if jobs.get(first["data"]["job_id"])["state"] in {JobState.SUCCEEDED, JobState.FAILED, JobState.BLOCKED, JobState.MANUAL_RECOVERY}:
+            break
+        time.sleep(0.01)
+    jobs.close()
+
+
+def test_changed_update_plan_requires_new_confirmation_and_creates_no_job(tmp_path):
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = updates.check("container:107")
+    result = updates.execute_update(
+        "container:107", confirmed=True, install_confirmed=True,
+        plan_digest="0" * 64, attempt_id="attempt-stale-12345678",
+    )
+    assert result["success"] is False and "confirmation is stale" in result["error"]
+    assert jobs.count() == 0
+    assert not any(call == ("update", 107) for call in runner.calls)
+    jobs.close()
+
+
+def test_duplicate_without_attempt_identity_is_structured_conflict(tmp_path):
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = updates.check("container:107")
+    jobs.create(JobRequest(
+        target="container:107", operation="update", expected_version=None,
+        idempotency_key=f"container:107:{plan.plan_digest}", confirmation_hash=plan.plan_digest,
+    ))
+    api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), jobs, updates=updates, read_token="token")
+    import json
+    status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers={"Authorization": "Bearer token"}, body=json.dumps({"confirm": True, "install_confirmed": True, "plan_digest": plan.plan_digest}).encode())
+    assert status == 409
+    assert body["error"]["code"] == "duplicate_job"
+    assert jobs.count() == 1
     jobs.close()
 
 
