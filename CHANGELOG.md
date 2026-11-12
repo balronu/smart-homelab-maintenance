@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.23 – Stable
+
+### Deutsch / English
+
+- Ergänzt den expliziten Discovery-only-Installer-Modus. Der Standard ist ein
+  read-only Preflight; Apply erfordert `--discovery-only --apply --confirm`,
+  und ein kontrollierter Start zusätzlich `--start-discovery`. / Adds the
+  explicit Discovery-only installer mode. The default is a read-only
+  preflight; apply requires `--discovery-only --apply --confirm`, and a
+  controlled start additionally requires `--start-discovery`.
+- Der Apply beschränkt sich auf Discovery-Dateien, bewahrt Agent und Helper
+  bytegleich, erstellt ein eigenes Rollback-Staging und stellt bei Fehlern den
+  vorherigen Zustand wieder her. Aktive, mehrdeutige oder unerwartete Zustände
+  bleiben fail-closed. / Apply is limited to Discovery files, preserves agent
+  and helper byte-for-byte, creates dedicated rollback staging, and restores
+  the previous state on errors. Active, ambiguous or unexpected states remain
+  fail closed.
+
+**Kompatibilität/Migration / Compatibility/Migration:** API 1.1,
+Kompatibilitätsversion `1.0.6`, Socket-Pfade und historische CT107/CT108-
+Recovery-Jobs bleiben unverändert. Bestehende Installationen benötigen den
+read-only Preflight und eine separate administrative Freigabe; der Installer
+löscht Sockets nicht pauschal. / API 1.1, compatibility version `1.0.6`,
+socket paths and historical CT107/CT108 recovery jobs remain unchanged.
+Existing installations require the read-only preflight and separate
+administrative approval; the installer does not blindly delete sockets.
+
+**Einschränkungen / Limitations:** Kein automatischer Discovery-Start,
+Agent-Swap, Helper-Neustart, Paketupdate oder produktive CT-Recovery durch
+dieses Release. / No automatic Discovery start, agent swap, helper restart,
+package update or productive CT recovery is performed by this release.
+
 ## 1.0.22 – Stable
 
 ### Deutsch / English
