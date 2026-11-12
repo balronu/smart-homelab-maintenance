@@ -176,16 +176,23 @@ python3 -c 'import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); 
 shift 3
 case "${1:-}" in
   /usr/bin/test)
-    [[ "${2:-}" == -r && "${3:-}" == /etc/os-release ]] || [[ "${2:-}" == -x && "${3:-}" =~ ^/usr/bin/(apt-get|dpkg-query)$ ]]
+    if [[ "${2:-}" == -r && "${3:-}" == /etc/os-release ]] || [[ "${2:-}" == -x && "${3:-}" =~ ^/usr/bin/(apt-get|dpkg-query)$ ]]; then exit 0; fi
+    exit 2
     ;;
   /usr/bin/cat)
-    [[ "${2:-}" == /etc/os-release ]] && printf 'ID=debian\nVERSION_ID="13"\n'
+    [[ "${2:-}" == /etc/os-release ]] || exit 2
+    printf 'ID=debian\nVERSION_ID="13"\n'
+    exit 0
     ;;
   /usr/bin/apt-get)
-    [[ "${2:-}" == --version ]] && printf 'apt 3.0.4 (amd64)\n'
+    [[ "${2:-}" == --version ]] || exit 2
+    printf 'apt 3.0.4 (amd64)\n'
+    exit 0
     ;;
   /usr/bin/dpkg-query)
-    [[ "${2:-}" == --version ]] && printf 'Debian dpkg-query fixture\n'
+    [[ "${2:-}" == --version ]] || exit 2
+    printf 'Debian dpkg-query fixture\n'
+    exit 0
     ;;
   *) exit 2 ;;
 esac
