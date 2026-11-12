@@ -101,6 +101,48 @@ for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-
   }
 done
 
+assert_socket() {
+  local socket_path="$1"
+  [[ -S "$socket_path" ]] || die "socket missing after lifecycle operation: $socket_path"
+  [[ "$(stat -c '%u:%g:%a' "$socket_path")" == "0:$(id -g "$SERVICE_USER"):660" ]] || die "socket ownership/mode drifted: $socket_path"
+}
+
+# The two services share the directory but must preserve it independently.
+# Restart each service while the other remains running and require both paths
+# to remain reachable after every transition.
+assert_socket "/run/$AGENT_NAME/lxc-apt-helper.sock"
+assert_socket "/run/$AGENT_NAME/lxc-discovery.sock"
+systemctl restart "${AGENT_NAME}-lxc-helper.service"
+for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+  assert_socket "$socket_path"
+done
+systemctl restart "${AGENT_NAME}-lxc-discovery.service"
+for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+  assert_socket "$socket_path"
+done
+for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"; do
+  systemctl restart "$unit"
+  for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+    for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+    assert_socket "$socket_path"
+  done
+done
+
+# A complete stop must remove both application-owned sockets even though the
+# shared runtime directory is preserved. A subsequent clean start must recreate
+# both paths without stale-socket failures.
+systemctl stop "${AGENT_NAME}-lxc-discovery.service" "${AGENT_NAME}-lxc-helper.service"
+for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+  [[ ! -e "$socket_path" ]] || die "stale socket survived complete stop: $socket_path"
+done
+systemctl start "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"
+for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+  assert_socket "$socket_path"
+done
+
 # Exercise policy_set through the real helper socket while ProtectSystem=strict
 # is active. The client is the exact unprivileged agent user; no guest command
 # or package operation is involved.

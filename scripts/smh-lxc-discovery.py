@@ -108,8 +108,14 @@ if __name__ == "__main__":
     os.chmod(path.parent, 0o750)
     if path.exists():
         raise SystemExit("discovery socket already exists")
-    with socketserver.ThreadingUnixStreamServer(DISCOVERY_SOCKET, _Handler) as server:
-        server.daemon_threads = False
-        os.chown(DISCOVERY_SOCKET, 0, agent_gid)
-        os.chmod(DISCOVERY_SOCKET, 0o660)
-        server.serve_forever()
+    try:
+        with socketserver.ThreadingUnixStreamServer(DISCOVERY_SOCKET, _Handler) as server:
+            server.daemon_threads = False
+            os.chown(DISCOVERY_SOCKET, 0, agent_gid)
+            os.chmod(DISCOVERY_SOCKET, 0o660)
+            server.serve_forever()
+    finally:
+        try:
+            os.unlink(DISCOVERY_SOCKET)
+        except FileNotFoundError:
+            pass
