@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.0.22 – Stable
+
+### Deutsch / English
+
+- Behebt den Discovery-Startfehler `discovery socket already exists`, wenn ein
+  verwaister Legacy-Socket durch `RuntimeDirectoryPreserve=yes` erhalten blieb.
+  Der Dienst prüft Kernel-Inode-Nutzung, Eigentümer, Dateityp und Modus und
+  bereinigt nur den eindeutig verwaisten eigenen Socket; aktive oder
+  unerwartete Pfade führen fail-closed zum Abbruch. / Fixes the Discovery
+  startup error `discovery socket already exists` when a stale legacy socket
+  survived through `RuntimeDirectoryPreserve=yes`. The service verifies kernel
+  inode usage, ownership, file type and mode, and removes only its own
+  provably stale socket; active or unexpected paths fail closed.
+- Ein exklusiver Discovery-Start-Lock verhindert parallele Starts. Das
+  Shutdown-Cleanup ist an die eigene Socket-Inode gebunden und kann keinen
+  zwischenzeitlich ersetzten Socket entfernen. Der Helper-Socket bleibt
+  unberührt. / An exclusive Discovery start lock prevents parallel starts.
+  Shutdown cleanup is bound to the service's socket inode and cannot remove a
+  socket replaced in the meantime. The helper socket is unaffected.
+- Installer-/systemd-Akzeptanztests decken den Start mit vorhandenem verwaistem
+  Socket sowie unabhängige und wechselnde Neustarts ab. API 1.1,
+  Kompatibilitätsversion `1.0.6` und historische CT107/CT108-Recovery-Jobs
+  bleiben unverändert. / Installer/systemd acceptance tests cover startup with
+  an existing stale socket plus independent and alternating restarts. API 1.1,
+  compatibility version `1.0.6`, and historical CT107/CT108 recovery jobs are
+  unchanged.
+
+**Compatibility / Migration:** No productive deployment is performed by this
+release. Existing installations must use the official installer after a
+read-only preflight and separate administrative approval; no blanket socket
+deletion or agent swap is part of this fix. / Kein Produktivdeployment durch
+dieses Release. Bestehende Installationen müssen nach read-only Preflight und
+separater administrativer Freigabe den offiziellen Installer verwenden; keine
+pauschale Socket-Löschung oder Agent-Swap ist Bestandteil dieses Fixes.
+
+**Limitations:** CT107/CT108 recovery remains separate and unchanged. The
+productive Discovery service is not restarted by this release.
+
 ## 1.0.21 – Stable
 
 ### Deutsch / English

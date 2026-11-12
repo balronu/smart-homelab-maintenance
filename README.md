@@ -1,8 +1,25 @@
 # Smart Homelab Maintenance
 
-## v1.0.21 – Stable
+## v1.0.22 – Stable
 
 ### Deutsch / English
+
+Der Discovery-Dienst behandelt bei bewahrtem Runtime-Verzeichnis einen
+nachweislich verwaisten Legacy-Socket sicher: Aktive oder unerwartete Sockets
+bleiben fail-closed, und der Helper-Socket wird nicht bereinigt. Ein exklusiver
+Start-Lock und inode-geschütztes Shutdown-Cleanup verhindern parallele Starts
+und das Entfernen eines ersetzten Sockets. / With a preserved runtime
+directory, Discovery now safely handles a provably stale legacy socket: active
+or unexpected sockets fail closed, and the helper socket is never cleaned up.
+An exclusive start lock and inode-guarded shutdown cleanup prevent parallel
+starts and removal of a replaced socket.
+
+**Migration:** Bestehende Installationen müssen den offiziellen Installer
+verwenden; der korrigierte Discovery-Code wird erst nach einem read-only
+Preflight und separater administrativer Freigabe produktiv aktiviert. / Existing
+installations must use the official installer; the corrected Discovery code is
+activated in production only after a read-only preflight and separate
+administrative approval.
 
 Der Agent-Updater bindet Rollback-Ziele jetzt an die vollständige Release-
 Identität, den Inhalts-Tree-Hash und den konkret in diesem Upgrade erzeugten
