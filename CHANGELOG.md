@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.0.26 – Stable
+
+### Deutsch
+
+- Macht Installationsversuche über eine explizite `attempt_id` wiederholbar,
+  ohne doppelte Jobs zu erzeugen. Derselbe Versuch liefert den bestehenden
+  Job zurück; ein neuer Versuch darf nach einem terminal reconcilierten
+  historischen Job eine neue Idempotency-Identität verwenden.
+- Gibt echte doppelte Idempotency-Schlüssel als strukturierten HTTP-409-Fehler
+  aus und hält aktive beziehungsweise Recovery-gesperrte Ziele fail-closed.
+- Behebt das HA-Runtime-Test-Fixture für HA-Versionen mit Singleton-Registry
+  und für Versionen mit `device_registry.async_setup`.
+
+### English
+
+- Makes installation attempts retry-safe through an explicit `attempt_id`
+  without creating duplicate jobs. Retrying the same attempt returns the
+  existing job, while a new attempt may use a new idempotency identity after
+  a terminally reconciled historical job.
+- Returns genuine duplicate idempotency keys as structured HTTP 409 errors
+  and keeps active or recovery-blocked targets fail-closed.
+- Fixes the HA runtime test fixture for both singleton-registry HA versions
+  and versions exposing `device_registry.async_setup`.
+
+**Kompatibilität/Migration / Compatibility/Migration:** API 1.1,
+Kompatibilitätsversion `1.0.6`, bestehende Agent-/Helper-Socket-Pfade und
+historische Jobdaten bleiben unverändert. Der produktive Agent `1.0.25` mit
+API 1.1 bleibt kompatibel. / API 1.1, compatibility version `1.0.6`, existing
+agent/helper socket paths and historical job data remain unchanged. The
+productive `1.0.25` agent with API 1.1 remains compatible.
+
+**Nach dem Update / Post-update:** HA-Integration auf `1.0.26` aktualisieren
+und nach gesonderter Freigabe einen read-only Simulations-/Jobannahmetest
+ausführen. / Update the HA integration to `1.0.26` and, after separate
+approval, run a read-only simulation/job-admission test.
+
+**Einschränkungen / Limitations:** Dieses Release führt keinen echten
+Paketupdate, keine Container-/Host-Aktion, keinen HA-Reload/-Neustart und
+keine CT-Recovery aus. / This release performs no real package update,
+container/host action, HA reload/restart, or CT recovery.
+
 ## 1.0.25 – Stable
 
 ### Deutsch / English
