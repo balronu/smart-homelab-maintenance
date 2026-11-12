@@ -396,8 +396,9 @@ def test_discovery_unit_allows_only_pct_required_network_family() -> None:
 
 def test_helper_unit_preserves_shared_runtime_directory_on_restart() -> None:
     unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-helper.service").read_text(encoding="utf-8")
-    assert "RuntimeDirectory=smart-homelab-maintenance" in unit
-    assert "RuntimeDirectoryPreserve=yes" in unit
+    assert "KillSignal=SIGINT" in unit
+    assert "RuntimeDirectory=" not in unit
+    assert "RuntimeDirectoryPreserve=" not in unit
 
 
 def test_discovery_removes_its_socket_on_shutdown() -> None:

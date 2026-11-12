@@ -204,8 +204,8 @@ helper_hash_before="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
 helper_hash_after="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
 [[ "$helper_hash_before" == "$helper_hash_after" ]] || die "discovery-only mode changed helper files"
 
-# The helper unit preserves the shared directory between service lifecycles;
-# Discovery must not re-declare it and re-own the helper socket.
+# The applications preserve the shared parent directory themselves; systemd
+# must not own its lifecycle or re-own either socket.
 # Seed only a kernel-detached, legacy-owned discovery socket to verify that
 # the installer/start path migrates it safely instead of treating it as live.
 systemctl stop "${AGENT_NAME}-lxc-discovery.service"

@@ -12,9 +12,8 @@ ExecStart=/usr/libexec/smart-homelab-maintenance/lxc-apt-helper --serve
 # Let Python unwind through serve()'s finally block so the fixed socket is
 # removed before a controlled restart can bind it again.
 KillSignal=SIGINT
-RuntimeDirectory=smart-homelab-maintenance
-RuntimeDirectoryMode=0750
-RuntimeDirectoryPreserve=yes
+# The application owns its fixed socket and shared parent directory. systemd
+# must not remove or re-own the other service's socket during a restart.
 UMask=0007
 # pct exec needs root namespace setup for unprivileged LXCs; all other
 # filesystem, network and operation allowlists remain enforced below.
