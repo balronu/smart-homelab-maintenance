@@ -88,24 +88,28 @@ for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.serv
     die "$unit did not become active"
   }
 done
-for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
-  ready=0
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    [[ -S "$socket_path" ]] && { ready=1; break; }
-    sleep 0.2
-  done
-  [[ "$ready" -eq 1 ]] || {
-    systemctl status --no-pager "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >&2 || true
-    journalctl --no-pager -u "${AGENT_NAME}-lxc-helper.service" -u "${AGENT_NAME}-lxc-discovery.service" -n 40 >&2 || true
-    die "socket did not become ready: $socket_path"
-  }
-done
-
 assert_socket() {
   local socket_path="$1"
   [[ -S "$socket_path" ]] || die "socket missing after lifecycle operation: $socket_path"
   [[ "$(stat -c '%u:%g:%a' "$socket_path")" == "0:$(id -g "$SERVICE_USER"):660" ]] || die "socket ownership/mode drifted: $socket_path"
 }
+
+wait_for_socket_ready() {
+  local socket_path="$1"
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if [[ -S "$socket_path" ]] && [[ "$(stat -c '%u:%g:%a' "$socket_path")" == "0:$(id -g "$SERVICE_USER"):660" ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+  systemctl status --no-pager "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >&2 || true
+  journalctl --no-pager -u "${AGENT_NAME}-lxc-helper.service" -u "${AGENT_NAME}-lxc-discovery.service" -n 40 >&2 || true
+  die "socket did not reach expected ownership/mode: $socket_path"
+}
+
+for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+  wait_for_socket_ready "$socket_path"
+done
 
 # The two services share the directory but must preserve it independently.
 # Restart each service while the other remains running and require both paths
@@ -114,18 +118,18 @@ assert_socket "/run/$AGENT_NAME/lxc-apt-helper.sock"
 assert_socket "/run/$AGENT_NAME/lxc-discovery.sock"
 systemctl restart "${AGENT_NAME}-lxc-helper.service"
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
-  for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+  wait_for_socket_ready "$socket_path"
   assert_socket "$socket_path"
 done
 systemctl restart "${AGENT_NAME}-lxc-discovery.service"
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
-  for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+  wait_for_socket_ready "$socket_path"
   assert_socket "$socket_path"
 done
 for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"; do
   systemctl restart "$unit"
   for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
-    for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+    wait_for_socket_ready "$socket_path"
     assert_socket "$socket_path"
   done
 done
@@ -139,7 +143,7 @@ for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-
 done
 systemctl start "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
-  for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -S "$socket_path" ]] && break; sleep 0.2; done
+  wait_for_socket_ready "$socket_path"
   assert_socket "$socket_path"
 done
 

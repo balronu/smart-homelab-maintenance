@@ -19,6 +19,8 @@ recover_staging=""
 quarantine_root="$STATE_ROOT/staging-quarantine"
 rollback_dir=""
 previous_agent_version=""
+previous_release_identity=""
+existing_staging_paths=""
 expected_agent_version=""
 update_started=0
 recovery_running=0
@@ -407,6 +409,37 @@ print(version)
 PY
 }
 
+read_release_identity() {
+    local package_root="$1"
+    read_release_version "$package_root" >/dev/null
+    python3 - "$package_root/.release-identity" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(json.dumps({
+    "schema": data["schema"],
+    "release_version": data["release_version"],
+    "source_commit": data["source_commit"],
+    "tree_sha256": data["tree_sha256"],
+}, sort_keys=True, separators=(",", ":")))
+PY
+}
+
+snapshot_staging_paths() {
+    local candidate
+    for candidate in "$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging; do
+        [[ -d "$candidate" && ! -L "$candidate" ]] || continue
+        realpath -e -- "$candidate"
+    done
+}
+
+path_was_present_before_swap() {
+    local candidate="$1"
+    [[ -n "$existing_staging_paths" ]] && grep -F -x -q -- "$candidate" <<<"$existing_staging_paths"
+}
+
 read_source_release_version() {
     local source="$1"
     python3 - "$source/custom_components/smart_homelab_maintenance/manifest.json" <<'PY'
@@ -516,6 +549,9 @@ systemctl is-active --quiet "$SERVICE_NAME" && was_active=1 || true
 [[ "$was_active" -eq 1 ]] || die "Agent-Dienst ist nicht aktiv; kein automatischer Start im Updatepfad."
 previous_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"
 expected_agent_version="$(read_agent_version "$source_dir/agent")"
+previous_release_identity="$(read_release_identity "$AGENT_ROOT/agent")" \
+    || die "Aktive Release-Identität oder Inhaltsintegrität ist nicht verifizierbar; kein Update ausgeführt."
+existing_staging_paths="$(snapshot_staging_paths)"
 restart_count_before="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
 [[ "$restart_count_before" =~ ^[0-9]+$ ]] || die "systemd-Restartzähler ist nicht lesbar; kein Update ausgeführt."
 lifecycle_before="$(read_lifecycle_snapshot)" || die "systemd-Lebenszyklusdaten sind vor dem Update nicht lesbar; kein Update ausgeführt."
@@ -535,14 +571,23 @@ if ! wait_for_port_free; then
 fi
 port_forensics "vor-swap"
 bash "$SCRIPT_DIR/update-agent.sh" --source-dir "$source_dir" --expected-commit "$expected_commit" --apply --keep-rollback
+new_rollback_candidates=0
 for candidate_dir in "$AGENT_ROOT"/agent.previous.*.staging; do
-    [[ -d "$candidate_dir" ]] || continue
-    if [[ "$(read_agent_version "$candidate_dir")" == "$previous_agent_version" ]]; then
-        [[ -z "$rollback_dir" ]] || die "Mehrere Rollback-Stände passen zur vorherigen Agent-Version. Manuelle Prüfung erforderlich."
+    [[ -d "$candidate_dir" && ! -L "$candidate_dir" ]] || continue
+    candidate_path="$(realpath -e -- "$candidate_dir")" \
+        || die "Rollback-Staging-Pfad ist nach dem Swap nicht kanonisch auflösbar. Manuelle Prüfung erforderlich."
+    path_was_present_before_swap "$candidate_path" && continue
+    candidate_identity="$(read_release_identity "$candidate_dir")" \
+        || die "Neu erzeugtes Rollback-Staging ist nicht integer. Manuelle Prüfung erforderlich."
+    if [[ "$candidate_identity" == "$previous_release_identity" ]]; then
+        new_rollback_candidates=$((new_rollback_candidates + 1))
+        [[ "$new_rollback_candidates" -eq 1 ]] \
+            || die "Mehrere neu erzeugte Rollback-Stände passen exakt zur vorherigen Release-Identität. Manuelle Prüfung erforderlich."
         rollback_dir="$candidate_dir"
     fi
 done
-[[ -n "$rollback_dir" ]] || die "Rollback-Staging wurde nicht erzeugt."
+[[ "$new_rollback_candidates" -eq 1 && -n "$rollback_dir" ]] \
+    || die "Kein eindeutig gebundener Rollback-Staging-Pfad zur unmittelbar vorherigen Release-Identität erzeugt."
 if ! wait_for_port_free; then
     die "Portfreigabe vor dem neuen Agent-Start nicht nachweisbar; Rollback wird ausgeführt."
 fi
