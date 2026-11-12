@@ -206,8 +206,23 @@ class AgentHttpTransport:
     async def virtual_machines(self) -> dict[str, Any]:
         return await self.get("/api/v1/virtual-machines?limit=100")
 
-    async def updates(self) -> dict[str, Any]:
-        return await self.get("/api/v1/updates")
+    async def updates(self, *, force: bool = False) -> dict[str, Any]:
+        return await self.get("/api/v1/updates" + ("?force=1" if force else ""))
+
+    async def update_check(self, target: str, *, force: bool = False) -> dict[str, Any]:
+        if not isinstance(target, str) or not re.fullmatch(r"(?:host|container:[1-9][0-9]{0,5})", target):
+            raise TransportError("invalid_target", "update target is not allowed")
+        return await self.get(f"/api/v1/updates/{target}" + ("?force=1" if force else ""))
+
+    async def repair_check(self, job_id: str) -> dict[str, Any]:
+        if not isinstance(job_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{16,64}", job_id):
+            raise TransportError("invalid_job_id", "job ID is invalid")
+        return await self._post_json(f"/api/v1/jobs/{job_id}/repair-check", {})
+
+    async def repair(self, job_id: str) -> dict[str, Any]:
+        if not isinstance(job_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{16,64}", job_id):
+            raise TransportError("invalid_job_id", "job ID is invalid")
+        return await self._post_json(f"/api/v1/jobs/{job_id}/repair", {"confirm": True})
 
     async def dry_run(self, target: str) -> dict[str, Any]:
         if not isinstance(target, str) or not re.fullmatch(r"(?:host|container:[1-9][0-9]{0,5})", target):

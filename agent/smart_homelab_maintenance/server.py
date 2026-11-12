@@ -155,7 +155,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
     recovery_runner = None
     if guest_transport is not None:
         inspector = AgentRecoveryInspector(guest_transport)
-        recovery_runner = lambda: repository.run_recovery(inspector, limit=8)
+        recovery_runner = lambda job_id=None: repository.run_recovery(inspector, limit=8, job_id=job_id)
         # Agent-start trigger is read-only and bounded; failed inspection is
         # persisted as recovery_blocked, never retried as an update.
         recovery_runner()

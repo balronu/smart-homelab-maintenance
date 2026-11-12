@@ -117,13 +117,13 @@ class ApiApplication:
         if path == "/api/v1/updates" and method == "GET":
             if self.updates is None:
                 return {"items": [], "status": "unknown"}
-            items = self.updates.all()
+            items = self.updates.all(force=query.get("force", ["0"])[0] == "1")
             return {"items": items, "checked_at": max((item.get("checked_at") or "" for item in items), default=None)}
         parts = path.strip("/").split("/")
         if len(parts) == 4 and parts[:3] == ["api", "v1", "updates"] and method == "GET":
             if self.updates is None:
                 return {"status": "unknown", "error": "update checks are unavailable"}
-            return self.updates.check(parts[3]).as_dict()
+            return self.updates.check(parts[3], force=query.get("force", ["0"])[0] == "1").as_dict()
         if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] == "dry-run" and method == "POST":
             if self.updates is None:
                 return {"simulation": True, "success": False, "safe": False, "error": "dry run is unavailable"}
@@ -206,6 +206,17 @@ class ApiApplication:
             return self.jobs.reconcile_legacy_state_verified(parts[3], container_id=request["container_id"], evidence=request["evidence"], baseline_packages=request["baseline_packages"])
         if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "events":
             return {"events": self.jobs.events(parts[3], after=self._int(query, "after", 0), limit=self._int(query, "limit", min(50, self.jobs.max_log_entries)))}
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "repair-check" and method == "POST":
+            inspection = self.jobs.repair_inspection(parts[3])
+            if not inspection["repairable"] and callable(self.recovery_runner):
+                recovery_result = self.recovery_runner(parts[3])
+                inspection["recovery_result"] = recovery_result
+            return {"job_id": parts[3], "inspection": inspection, "job": self.jobs.get(parts[3])}
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "repair" and method == "POST":
+            request = self._json_object(body, "repair")
+            if set(request) - {"confirm"} or request.get("confirm") is not True:
+                raise ValidationError("repair requires explicit confirmation")
+            return self.jobs.repair_preflight_block(parts[3])
         raise KeyError(path)
 
     @staticmethod

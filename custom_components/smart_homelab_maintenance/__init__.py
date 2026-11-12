@@ -66,7 +66,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     if vol is not None:
         async def handle_action(call):
             entry_id = call.data.get("entry_id")
-            if call.service in {"set_permissions", "policy_prepare", "policy_apply", "orchestration_preview", "orchestration_apply"}:
+            if call.service in {"set_permissions", "repair", "policy_prepare", "policy_apply", "orchestration_preview", "orchestration_apply"}:
                 user_id = getattr(call.context, "user_id", None)
                 if not user_id or not hasattr(hass, "auth"):
                     return {"error": "administrator_required"}
@@ -94,7 +94,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 preview_token=call.data.get("preview_token"),
                 manual_authorized_ids=list(call.data.get("manual_authorized_ids", [])),
             )
-            if call.service in ("check", "dry_run", "set_permissions", "policy_apply", "orchestration_preview", "orchestration_apply"):
+            if call.service in ("check", "refresh", "refresh_target", "dry_run", "repair_check", "repair", "set_permissions", "policy_apply", "orchestration_preview", "orchestration_apply"):
                 if call.service == "dry_run":
                     coordinator.record_dry_run(str(call.data.get("target")), result.get("data", result))
                 await coordinator.async_request_refresh()
@@ -117,7 +117,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             vol.Optional("preview_token"): str,
             vol.Optional("manual_authorized_ids", default=[]): [vol.All(vol.Coerce(int), vol.Range(min=1, max=999999))],
         })
-        for action in ("check", "get_job", "get_job_events", "dry_run", "execute", "set_permissions", "policy_prepare", "policy_apply", "orchestration_preview", "orchestration_apply"):
+        for action in ("check", "refresh", "refresh_target", "get_job", "get_job_events", "dry_run", "execute", "repair_check", "repair", "set_permissions", "policy_prepare", "policy_apply", "orchestration_preview", "orchestration_apply"):
             kwargs = {"schema": schema}
             if SupportsResponse is not None:
                 kwargs["supports_response"] = SupportsResponse.ONLY

@@ -532,8 +532,8 @@ class UpdateService:
         self._cache[target_id] = (result, self._clock())
         return result
 
-    def all(self) -> list[dict[str, Any]]:
-        return [self.check(target.target).as_dict() for target in self._targets()]
+    def all(self, *, force: bool = False) -> list[dict[str, Any]]:
+        return [self.check(target.target, force=force).as_dict() for target in self._targets()]
 
     def dry_run(self, target_id: str, *, confirmed: bool) -> dict[str, Any]:
         if confirmed is not True:
@@ -700,6 +700,7 @@ class UpdateService:
     def _run_update_job(self, job_id: str, target: ProbeTarget, plan_digest: str | None) -> None:
         """Run the mutating helper outside the HTTP request lifetime."""
         target_id = target.target
+        preflight_complete = False
         try:
             assert self._jobs is not None
             # All guest inspection and final simulation remain fail-closed, but
@@ -728,6 +729,7 @@ class UpdateService:
             if held or conflicts or removals:
                 self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="simulation contains unsafe changes", error_code="unsafe_plan")
                 return
+            preflight_complete = True
             self._jobs.transition(job_id, JobState.RUNNING, phase=JobPhase.EXECUTION, progress=30, message="fixed APT update started")
             self._jobs.append_log(job_id, "apt update and no-remove upgrade started")
             update_result = self._runner.update(target.vmid)
@@ -752,8 +754,17 @@ class UpdateService:
                 self._jobs.transition(job_id, JobState.MANUAL_RECOVERY if code == 0 else JobState.FAILED, phase=JobPhase.RECOVERY, progress=100, message="postcheck failed" if code == 0 else "APT update failed", error_code="postcheck_failed" if code == 0 else "apt_failed")
                 self._jobs.append_log(job_id, "postcheck failed" if code == 0 else "APT update failed", level="error")
         except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
-            self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="execution status is uncertain; manual recovery required", error_code="execution_status_unknown")
-            self._jobs.append_log(job_id, "transport or timeout failure; no automatic retry was attempted", level="warning")
+            if not preflight_complete:
+                # No mutating helper call has been dispatched until this point.
+                # A slow/failing read-only inspection must not poison the job
+                # with an execution-uncertain recovery lock.
+                timeout = isinstance(exc, (TimeoutError, asyncio.TimeoutError))
+                error_code = "preflight_helper_timeout" if timeout else "preflight_helper_unavailable"
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="read-only preflight failed; no package update was started", error_code=error_code, error_message=type(exc).__name__)
+                self._jobs.append_log(job_id, "read-only preflight failed before mutation; no package update was started", level="warning")
+            else:
+                self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="execution status is uncertain; manual recovery required", error_code="execution_status_unknown")
+                self._jobs.append_log(job_id, "transport or timeout failure after mutation dispatch; no automatic retry was attempted", level="warning")
         except Exception as exc:  # pragma: no cover - defensive worker boundary
             self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="worker failed; manual recovery required", error_code="worker_failed", error_message=type(exc).__name__)
             self._jobs.append_log(job_id, "unexpected worker failure; no automatic retry was attempted", level="error")
