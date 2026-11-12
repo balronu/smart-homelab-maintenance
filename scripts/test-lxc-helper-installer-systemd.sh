@@ -15,6 +15,9 @@ DISCOVERY_UNIT="/etc/systemd/system/${AGENT_NAME}-lxc-discovery.service"
 ALLOWLIST="$ETC_ROOT/lxc-apt-allowlist.toml"
 HELPER_PATH="$HELPER_ROOT/lxc-apt-helper"
 DISCOVERY_PATH="$HELPER_ROOT/lxc-discovery.py"
+PCT_FIXTURE_PATH="/usr/sbin/pct"
+DISCOVERY_DROPIN_DIR="/etc/systemd/system/${AGENT_NAME}-lxc-discovery.service.d"
+PCT_FIXTURE_CREATED=0
 CREATED_GROUP=0
 CREATED_USER=0
 
@@ -26,6 +29,8 @@ cleanup() {
   systemctl disable "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >/dev/null 2>&1 || true
   systemctl disable "${AGENT_NAME}-agent.service" >/dev/null 2>&1 || true
   rm -f "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST"
+  if [[ "$PCT_FIXTURE_CREATED" -eq 1 ]]; then rm -f "$PCT_FIXTURE_PATH"; fi
+  rmdir "$DISCOVERY_DROPIN_DIR" 2>/dev/null || true
   rmdir "$HELPER_ROOT" "$ETC_ROOT" "$STATE_ROOT" 2>/dev/null || true
   systemctl daemon-reload >/dev/null 2>&1 || true
   if [[ "$CREATED_USER" -eq 1 ]]; then userdel "$SERVICE_USER" >/dev/null 2>&1 || true; fi
@@ -103,6 +108,36 @@ systemctl stop "${AGENT_NAME}-lxc-discovery.service"
 [[ "$(stat -c '%u:%a' "$ALLOWLIST")" == "0:600" ]]
 systemd-analyze verify "$HELPER_UNIT" "$DISCOVERY_UNIT"
 
+# The real discovery subprocess is exercised under systemd below.  The
+# disposable pct adapter opens AF_INET before returning fixed Debian fixture
+# output; it is not a production command or a guest and is removed by cleanup.
+[[ ! -e "$PCT_FIXTURE_PATH" ]] || die "refusing to replace pre-existing pct: $PCT_FIXTURE_PATH"
+cat > "$PCT_FIXTURE_PATH" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+[[ "${1:-}" == exec && "${2:-}" =~ ^[0-9]+$ && "${3:-}" == -- ]] || exit 2
+python3 -c 'import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(("127.0.0.1", 0)); s.close()'
+shift 3
+case "${1:-}" in
+  /usr/bin/test)
+    [[ "${2:-}" == -r && "${3:-}" == /etc/os-release ]] || [[ "${2:-}" == -x && "${3:-}" =~ ^/usr/bin/(apt-get|dpkg-query)$ ]]
+    ;;
+  /usr/bin/cat)
+    [[ "${2:-}" == /etc/os-release ]] && printf 'ID=debian\nVERSION_ID="13"\n'
+    ;;
+  /usr/bin/apt-get)
+    [[ "${2:-}" == --version ]] && printf 'apt 3.0.4 (amd64)\n'
+    ;;
+  /usr/bin/dpkg-query)
+    [[ "${2:-}" == --version ]] && printf 'Debian dpkg-query fixture\n'
+    ;;
+  *) exit 2 ;;
+esac
+EOF
+chmod 0755 "$PCT_FIXTURE_PATH"
+PCT_FIXTURE_CREATED=1
+trap cleanup EXIT
+
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
 helper_hash_before="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply --confirm
@@ -153,6 +188,49 @@ wait_for_socket_ready() {
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
   wait_for_socket_ready "$socket_path"
 done
+
+probe_discovery() {
+  runuser -u "$SERVICE_USER" -- python3 - "$@" <<'PY'
+import json
+import socket
+import sys
+
+path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+    channel.settimeout(5)
+    channel.connect(path)
+    channel.sendall(b'{"container_id":321,"operation":"probe"}\n')
+    response = json.loads(channel.makefile().readline())
+print(json.dumps(response, sort_keys=True))
+if len(sys.argv) > 1 and sys.argv[1] == "expect-failure":
+    raise SystemExit(0 if response.get("ok") is False else 1)
+raise SystemExit(0 if response.get("ok") is True else 1)
+PY
+}
+
+# This is the regression proof: the actual service process invokes the actual
+# fixed /usr/sbin/pct path inside its systemd sandbox, where the fixture must
+# create an AF_INET socket.
+probe_discovery
+
+# Negative control: with the old AF_UNIX-only restriction, the same real
+# probe must fail closed. Restore the corrected unit before continuing.
+systemctl stop "${AGENT_NAME}-lxc-discovery.service"
+install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
+cat > "$DISCOVERY_DROPIN_DIR/10-negative-af-unix-only.conf" <<'EOF'
+[Service]
+RestrictAddressFamilies=AF_UNIX
+EOF
+systemctl daemon-reload
+systemctl start "${AGENT_NAME}-lxc-discovery.service"
+wait_for_socket_ready "/run/$AGENT_NAME/lxc-discovery.sock"
+probe_discovery expect-failure
+rm -f "$DISCOVERY_DROPIN_DIR/10-negative-af-unix-only.conf"
+rmdir "$DISCOVERY_DROPIN_DIR"
+systemctl daemon-reload
+systemctl restart "${AGENT_NAME}-lxc-discovery.service"
+wait_for_socket_ready "/run/$AGENT_NAME/lxc-discovery.sock"
+probe_discovery
 
 # The two services share the directory but must preserve it independently.
 # Restart each service while the other remains running and require both paths

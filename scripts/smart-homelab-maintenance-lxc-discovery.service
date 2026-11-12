@@ -23,7 +23,9 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictRealtime=true
 LockPersonality=true
-RestrictAddressFamilies=AF_UNIX
+# pct exec needs AF_INET for Proxmox cluster transport; keep all other
+# address-family restrictions in place.
+RestrictAddressFamilies=AF_UNIX AF_INET
 ReadOnlyPaths=/usr/libexec/smart-homelab-maintenance/lxc-discovery.py
 Restart=on-failure
 RestartSec=5

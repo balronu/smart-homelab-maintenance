@@ -386,6 +386,14 @@ def test_discovery_unit_shares_helper_runtime_group() -> None:
     assert "RuntimeDirectoryPreserve=yes" in unit
 
 
+def test_discovery_unit_allows_only_pct_required_network_family() -> None:
+    unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-discovery.service").read_text(encoding="utf-8")
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET" in unit
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET6" not in unit
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_NETLINK" not in unit
+    assert "RestrictAddressFamilies=" in unit
+
+
 def test_helper_unit_preserves_shared_runtime_directory_on_restart() -> None:
     unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-helper.service").read_text(encoding="utf-8")
     assert "RuntimeDirectory=smart-homelab-maintenance" in unit
