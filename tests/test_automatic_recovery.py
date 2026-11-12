@@ -8,7 +8,7 @@ from agent.smart_homelab_maintenance.jobs import JobRepository
 from agent.smart_homelab_maintenance.recovery import RecoveryEvidence, classify_recovery
 from agent.smart_homelab_maintenance.agent_recovery import AgentRecoveryInspector
 from agent.smart_homelab_maintenance.types import JobRequest, JobState
-from agent.smart_homelab_maintenance.errors import ValidationError
+from agent.smart_homelab_maintenance.errors import InvalidTransitionError, ValidationError
 
 
 def evidence(**changes):
@@ -24,6 +24,54 @@ def evidence(**changes):
 
 
 class AutomaticRecoveryTests(unittest.TestCase):
+    def test_preflight_repair_closes_only_proven_non_mutating_block(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "preflight-repair-101"))
+            repo.transition(job, JobState.PREFLIGHT, phase="preflight")
+            repo.transition(job, JobState.BLOCKED, phase="preflight", error_code="preflight_helper_timeout", message="read-only preflight failed")
+            result = repo.repair_preflight_block(job)
+            self.assertTrue(result["accepted"])
+            self.assertEqual(repo.get(job)["state"], JobState.RECONCILED_NOT_EXECUTED)
+            self.assertIn("package state was not touched", repo.get(job)["message"])
+            repo.close()
+
+    def test_preflight_repair_rejects_unknown_manual_recovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "manual-repair-101"))
+            repo.transition(job, JobState.PREFLIGHT, phase="preflight")
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery", error_code="execution_status_unknown")
+            with self.assertRaises(InvalidTransitionError):
+                repo.repair_preflight_block(job)
+            self.assertEqual(repo.get(job)["state"], JobState.MANUAL_RECOVERY)
+            repo.close()
+
+    def test_repair_inspection_is_read_only_and_marks_only_safe_preflight_blocks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "inspect-repair-101"))
+            repo.transition(job, JobState.PREFLIGHT, phase="preflight")
+            repo.transition(job, JobState.BLOCKED, phase="preflight", error_code="preflight_helper_timeout")
+            before = len(repo.audit_events(job))
+            result = repo.repair_inspection(job)
+            self.assertTrue(result["repairable"])
+            self.assertFalse(result["package_state_touched"])
+            self.assertEqual(repo.get(job)["state"], JobState.BLOCKED)
+            self.assertEqual(len(repo.audit_events(job)), before)
+            repo.close()
+
+    def test_repair_inspection_refuses_unknown_execution_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "inspect-unknown-101"))
+            repo.transition(job, JobState.PREFLIGHT, phase="preflight")
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery", error_code="execution_status_unknown")
+            result = repo.repair_inspection(job)
+            self.assertFalse(result["repairable"])
+            self.assertIsNone(result["package_state_touched"])
+            repo.close()
+
     def test_legacy_recovery_requires_complete_current_evidence_and_persists_baseline(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = JobRepository(str(Path(directory) / "jobs.sqlite"))

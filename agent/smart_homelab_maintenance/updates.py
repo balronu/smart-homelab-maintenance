@@ -532,8 +532,8 @@ class UpdateService:
         self._cache[target_id] = (result, self._clock())
         return result
 
-    def all(self) -> list[dict[str, Any]]:
-        return [self.check(target.target).as_dict() for target in self._targets()]
+    def all(self, *, force: bool = False) -> list[dict[str, Any]]:
+        return [self.check(target.target, force=force).as_dict() for target in self._targets()]
 
     def dry_run(self, target_id: str, *, confirmed: bool) -> dict[str, Any]:
         if confirmed is not True:

@@ -23,6 +23,7 @@ _TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     JobState.WAITING_CONFIRMATION: frozenset({JobState.RUNNING, JobState.CANCELLED, JobState.BLOCKED}),
     JobState.RUNNING: frozenset({JobState.POSTCHECK, JobState.VERIFYING, JobState.FAILED, JobState.TIMEOUT, JobState.MANUAL_RECOVERY, JobState.INTERRUPTED}),
     JobState.POSTCHECK: frozenset({JobState.SUCCEEDED, JobState.COMPLETED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.TIMEOUT, JobState.VERIFYING}),
+    JobState.BLOCKED: frozenset({JobState.RECONCILED_NOT_EXECUTED}),
     JobState.VERIFYING: frozenset({JobState.SUCCEEDED, JobState.COMPLETED, JobState.FAILED, JobState.MANUAL_RECOVERY, JobState.RECONCILED_COMPLETED, JobState.RECOVERY_BLOCKED}),
     JobState.MANUAL_RECOVERY: frozenset({JobState.RECONCILED_NOT_EXECUTED, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED, JobState.RECONCILED_COMPLETED, JobState.RECONCILED_LEGACY_STATE_VERIFIED}),
     JobState.RECOVERY_PENDING: frozenset({JobState.RUNNING, JobState.RECONCILED_NOT_EXECUTED, JobState.RECONCILED_COMPLETED, JobState.RECOVERY_BLOCKED}),
@@ -399,15 +400,21 @@ class JobRepository:
             if updated != 1:
                 raise ValidationError("unknown job_id")
 
-    def pending_recovery(self, *, limit: int = 8) -> list[dict[str, Any]]:
+    def pending_recovery(self, *, limit: int = 8, job_id: str | None = None) -> list[dict[str, Any]]:
         """Return bounded recovery work without changing any job state."""
         if limit < 1 or limit > 32:
             raise ValidationError("invalid recovery limit")
         with self._lock:
-            rows = self._connection.execute(
-                "SELECT * FROM jobs WHERE state IN (?, ?, ?) AND COALESCE(recovery_attempts, 0) < 3 ORDER BY created_at LIMIT ?",
-                (JobState.MANUAL_RECOVERY, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED, limit),
-            ).fetchall()
+            if job_id is None:
+                rows = self._connection.execute(
+                    "SELECT * FROM jobs WHERE state IN (?, ?, ?) AND COALESCE(recovery_attempts, 0) < 3 ORDER BY created_at LIMIT ?",
+                    (JobState.MANUAL_RECOVERY, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED, limit),
+                ).fetchall()
+            else:
+                rows = self._connection.execute(
+                    "SELECT * FROM jobs WHERE job_id=? AND state IN (?, ?, ?) AND COALESCE(recovery_attempts, 0) < 3",
+                    (job_id, JobState.MANUAL_RECOVERY, JobState.RECOVERY_PENDING, JobState.RECOVERY_BLOCKED),
+                ).fetchall()
         now = datetime.now(timezone.utc)
         result = []
         for row in rows:
@@ -421,13 +428,13 @@ class JobRepository:
             result.append(dict(row))
         return result
 
-    def run_recovery(self, inspector, *, limit: int = 8, actor: str = "automatic-recovery") -> list[dict[str, Any]]:
+    def run_recovery(self, inspector, *, limit: int = 8, actor: str = "automatic-recovery", job_id: str | None = None) -> list[dict[str, Any]]:
         """Inspect a bounded batch; an inspector must never perform package writes."""
         if not self._recovery_lock.acquire(blocking=False):
             return []
         results = []
         try:
-            for job in self.pending_recovery(limit=limit):
+            for job in self.pending_recovery(limit=limit, job_id=job_id):
                 with self._lock, self._connection:
                     self._connection.execute("UPDATE jobs SET recovery_attempts=COALESCE(recovery_attempts,0)+1,last_recovery_at=? WHERE job_id=?", (utc_now(), job["job_id"]))
                 try:
@@ -450,6 +457,50 @@ class JobRepository:
         finally:
             self._recovery_lock.release()
         return results
+
+    def repair_preflight_block(self, job_id: str) -> dict[str, Any]:
+        """Close a proven pre-mutation block without touching package state."""
+        safe_codes = {
+            "preflight_helper_timeout", "preflight_helper_unavailable",
+            "fresh_plan_unavailable", "stale_plan", "simulation_failed", "unsafe_plan",
+        }
+        with self._lock:
+            row = self._connection.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+        if row is None:
+            raise ValidationError("unknown job_id")
+        if JobState(row["state"]) is not JobState.BLOCKED or row["error_code"] not in safe_codes:
+            raise InvalidTransitionError("only a proven preflight block can be repaired")
+        self.transition(job_id, JobState.RECONCILED_NOT_EXECUTED, phase=JobPhase.RECOVERY, progress=100,
+                        message="preflight block repaired; package state was not touched",
+                        error_code="preflight_repaired", error_message="the job failed before the mutation phase")
+        self.append_log(job_id, "preflight block repaired after explicit confirmation; package state was not touched")
+        return {"accepted": True, "job_id": job_id, "state": JobState.RECONCILED_NOT_EXECUTED.value, "outcome": "preflight_repaired"}
+
+    def repair_inspection(self, job_id: str) -> dict[str, Any]:
+        """Return a read-only repair decision for a single job."""
+        safe_codes = {
+            "preflight_helper_timeout", "preflight_helper_unavailable",
+            "fresh_plan_unavailable", "stale_plan", "simulation_failed", "unsafe_plan",
+        }
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT job_id,state,phase,error_code,error_message,target FROM jobs WHERE job_id=?",
+                (job_id,),
+            ).fetchone()
+        if row is None:
+            raise ValidationError("unknown job_id")
+        repairable = JobState(row["state"]) is JobState.BLOCKED and row["error_code"] in safe_codes
+        return {
+            "job_id": row["job_id"],
+            "target": row["target"],
+            "state": row["state"],
+            "phase": row["phase"],
+            "error_code": row["error_code"],
+            "error_message": row["error_message"],
+            "repairable": repairable,
+            "package_state_touched": False if repairable else None,
+            "reason": "proven preflight failure; no package mutation started" if repairable else "execution state is not proven safe for automatic repair",
+        }
 
     def cancel_requested(self, job_id: str) -> bool:
         with self._lock:
