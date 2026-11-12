@@ -1,5 +1,34 @@
 # Smart Homelab Maintenance
 
+## v1.0.21 – Stable
+
+### Deutsch / English
+
+Der Agent-Updater bindet Rollback-Ziele jetzt an die vollständige Release-
+Identität, den Inhalts-Tree-Hash und den konkret in diesem Upgrade erzeugten
+Staging-Pfad. Mehrdeutige Kandidaten werden vor einer unsicheren Auswahl
+fail-closed abgebrochen. / The agent updater now binds rollback targets to the
+complete release identity, content tree digest, and the concrete staging path
+created by the current upgrade. Ambiguous candidates fail closed before an
+unsafe selection.
+
+Der systemd-RuntimeDirectory-Lifecycle unterstützt weiterhin unabhängige
+Helper-/Discovery-Neustarts; beide Units bewahren das Runtime-Verzeichnis und
+Discovery entfernt seinen eigenen Socket beim Stop. Socket-Pfade,
+Berechtigungen, API 1.1 und historische Recovery-Jobs bleiben unverändert. /
+The systemd RuntimeDirectory lifecycle continues to support independent
+helper/discovery restarts; both units preserve the runtime directory and
+discovery removes its own socket on stop. Socket paths, permissions, API 1.1
+and historical recovery jobs remain unchanged.
+
+**Migration:** Bestehende Installationen müssen den offiziellen Installer bzw.
+Upgradepfad verwenden. Historische Staging-Verzeichnisse werden nicht
+automatisch verschoben, gelöscht oder überschrieben. Vor einem produktiven
+Upgrade ist ein separater Read-only-Preflight erforderlich. / Existing
+installations must use the official installer or upgrade path. Historical
+staging directories are not moved, deleted, or overwritten automatically. A
+separate read-only preflight is required before a productive upgrade.
+
 ## v1.0.20 – Stable
 
 ### Deutsch / English
