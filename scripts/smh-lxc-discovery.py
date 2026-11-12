@@ -155,8 +155,11 @@ class _Handler(socketserver.StreamRequestHandler):
                 raise ValueError("operation or container id not allowed")
             with PROBE_LOCK:
                 result = {"ok": True, "container_id": container_id, "operation": "probe", "result": fixed_probe(container_id)}
-        except (OSError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError, RuntimeError, subprocess.TimeoutExpired):
-            result = {"ok": False, "error": {"code": "probe_failed"}}
+        except (OSError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            error: dict[str, str] = {"code": "probe_failed"}
+            if os.environ.get("SMH_DISCOVERY_TEST_DIAGNOSTICS") == "1":
+                error["detail"] = f"{type(exc).__name__}: {exc}"
+            result = {"ok": False, "error": error}
         self.wfile.write((json.dumps(result, separators=(",", ":")) + "\n").encode("utf-8"))
 
 

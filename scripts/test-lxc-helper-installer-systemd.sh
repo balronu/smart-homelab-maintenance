@@ -190,6 +190,13 @@ chmod 0755 "$PCT_FIXTURE_PATH"
 PCT_FIXTURE_CREATED=1
 trap cleanup EXIT
 
+install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
+cat > "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf" <<'EOF'
+[Service]
+Environment=SMH_DISCOVERY_TEST_DIAGNOSTICS=1
+EOF
+systemctl daemon-reload
+
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
 helper_hash_before="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply --confirm
