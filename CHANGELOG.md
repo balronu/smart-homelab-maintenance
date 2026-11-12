@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.19 – Stable
+
+### Deutsch / English
+
+- Behebt den Upgrade-Fehler, bei dem ein Legacy-Agentbaum ohne
+  `.release-identity` als neues Rollback-Staging erzeugt wurde und dadurch den
+  nächsten Upgrade-Preflight blockierte. Der Updater sichert vor dem Swap einen
+  separaten, inhaltsgebundenen Legacy-Rollback-Nachweis mit Manifest-SHA-256;
+  eine Release-Version oder ein Commit werden nicht erfunden. / Fixes the
+  upgrade defect where a legacy agent tree without `.release-identity` became
+  new rollback staging and blocked the next upgrade preflight. Before the
+  swap, the updater records a separate content-bound legacy rollback proof
+  with a manifest SHA-256; no release version or commit is invented.
+
+**Compatibility / Migration:** Existing legacy staging is not rewritten or
+quarantined automatically and remains a separate administrative decision. The
+new proof applies to future upgrades from a pre-identity active tree; regular
+release identities remain mandatory for identified Stable trees. / Vorhandenes
+Legacy-Staging wird weder automatisch umgeschrieben noch quarantänisiert und
+bleibt eine separate administrative Entscheidung. Der neue Nachweis gilt für
+zukünftige Upgrades aus einem alten aktiven Baum; reguläre Release-Identitäten
+bleiben für identifizierte Stable-Bäume verpflichtend.
+
 ## 1.0.18 – Stable
 
 ### Deutsch / English

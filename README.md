@@ -1,6 +1,6 @@
 # Smart Homelab Maintenance
 
-## v1.0.18 – Stable
+## v1.0.19 – Stable
 
 ### Deutsch / English
 
@@ -27,6 +27,12 @@ Kandidatenplan, prüft Manifeste unmittelbar vor der Quarantäne und unterstütz
 eine sichere Wiederaufnahme nach Teilfortschritt. / The one-time legacy
 migration path creates an exact candidate plan, rechecks manifests immediately
 before quarantine, and supports safe resume after partial progress.
+
+Der Updater erstellt für einen alten Agentbaum ohne Release-Identität vor dem
+Swap einen separaten, inhaltsgebundenen Legacy-Rollback-Nachweis ohne erfundene
+Release-Zuordnung. / Before the swap, the updater creates a separate
+content-bound legacy rollback proof for an old agent tree without release
+identity, without inventing a release assignment.
 
 ## v1.0.11 – Stable
 
