@@ -279,6 +279,7 @@ systemctl stop "${AGENT_NAME}-lxc-discovery.service"
 install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
 cat > "$DISCOVERY_DROPIN_DIR/10-negative-af-unix-only.conf" <<'EOF'
 [Service]
+RestrictAddressFamilies=
 RestrictAddressFamilies=AF_UNIX
 EOF
 systemctl daemon-reload
