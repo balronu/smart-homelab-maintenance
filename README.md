@@ -1,6 +1,6 @@
 # Smart Homelab Maintenance
 
-## v1.0.16 – Stable
+## v1.0.17 – Stable
 
 ### Deutsch / English
 
@@ -15,6 +15,12 @@ tampered identity remains fail-closed.
 **Migration:** Vorhandenes Legacy-Staging ohne Identität benötigt weiterhin
 den administrativ bestätigten Quarantänepfad. / Existing legacy staging
 without identity still requires the administrator-confirmed quarantine path.
+
+Der neue einmalige Legacy-Migrationspfad erstellt vorab einen unveränderlichen
+Kandidatenplan, prüft Manifeste unmittelbar vor der Quarantäne und unterstützt
+eine sichere Wiederaufnahme nach Teilfortschritt. / The one-time legacy
+migration path creates an exact candidate plan, rechecks manifests immediately
+before quarantine, and supports safe resume after partial progress.
 
 ## v1.0.11 – Stable
 

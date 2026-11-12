@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.17 – Stable
+
+### Deutsch / English
+
+- Ergänzt einen ausdrücklich administrativen, einmaligen Migrationspfad für
+  historische Rollback-Stagings ohne `.release-identity`. Der Pfad arbeitet
+  ausschließlich mit einer exakten Kandidatenliste, Manifest-Locking,
+  Quarantäne statt Löschung, Append-only-Audit und sicherer Wiederaufnahme.
+  Die reguläre Release-Identitätsprüfung bleibt unverändert fail-closed. /
+  Adds an explicitly administrative one-time migration path for historical
+  rollback staging without `.release-identity`. It uses only an exact
+  candidate list, manifest locking, quarantine instead of deletion, append-only
+  audit, and safe resume. Normal release-identity verification remains
+  fail-closed.
+
+**Compatibility / Migration:** No package or container changes are performed.
+The migration requires a separately confirmed administrative action and aborts
+on any manifest, process, systemd, symlink, or rollback-path deviation. /
+Keine Paket- oder Containeränderungen; die Migration benötigt eine separate
+administrative Bestätigung und bricht bei jeder Abweichung ab.
+
 ## 1.0.16 – Stable
 
 ### Deutsch / English
