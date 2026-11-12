@@ -32,7 +32,7 @@ def test_update_transaction_has_interrupted_swap_recovery():
     assert 'source_commit' in script
     assert "legacy_rollback_evidence.py" in script
     assert "--create" in script
-    assert "--legacy-rollback-evidence.json" in script
+    assert ".legacy-rollback-evidence.json" in script
 
 
 def test_current_stable_update_does_not_create_legacy_evidence():
