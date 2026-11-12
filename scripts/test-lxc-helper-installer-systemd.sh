@@ -195,7 +195,6 @@ install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
 cat > "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf" <<'EOF'
 [Service]
 EOF
-printf 'Environment=SMH_DISCOVERY_TEST_DIAGNOSTICS=1\nEnvironment=SMH_DISCOVERY_TEST_ALLOW_PEER_UID_MISMATCH=1\n' >> "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf"
 systemctl daemon-reload
 
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
@@ -270,6 +269,8 @@ import sys
 import time
 
 path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+mode = sys.argv[1] if len(sys.argv) > 1 else "success"
+container_id = int(sys.argv[2]) if len(sys.argv) > 2 else 321
 response = None
 last_error = None
 for _ in range(50):
@@ -277,7 +278,7 @@ for _ in range(50):
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
             channel.settimeout(1)
             channel.connect(path)
-            channel.sendall(b'{"container_id":321,"operation":"probe"}\n')
+            channel.sendall((json.dumps({"container_id": container_id, "operation": "probe"}, separators=(",", ":")) + "\n").encode())
             response = json.loads(channel.makefile().readline())
         break
     except OSError as exc:
@@ -286,7 +287,7 @@ for _ in range(50):
 if response is None:
     raise SystemExit(f"discovery socket never became reachable: {last_error}")
 print(json.dumps(response, sort_keys=True))
-if len(sys.argv) > 1 and sys.argv[1] == "expect-failure":
+if mode == "expect-failure":
     raise SystemExit(0 if response.get("ok") is False else 1)
 raise SystemExit(0 if response.get("ok") is True else 1)
 PY
@@ -303,7 +304,24 @@ PY
 # This is the regression proof: the actual service process invokes the actual
 # fixed /usr/sbin/pct path inside its systemd sandbox, where the fixture must
 # create an AF_INET socket.
-probe_discovery
+probe_discovery success 107
+probe_discovery success 108
+
+# The real socket path must also reject a root client: root can open the 0660
+# socket, but only the configured agent UID may pass SO_PEERCRED validation.
+python3 - <<'PY'
+import json
+import socket
+
+path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+    channel.settimeout(5)
+    channel.connect(path)
+    channel.sendall(b'{"container_id":321,"operation":"probe"}\n')
+    response = json.loads(channel.makefile().readline())
+if response != {"ok": False, "error": {"code": "probe_failed"}}:
+    raise SystemExit(f"unauthorized root client was not rejected generically: {response}")
+PY
 
 # Negative control: with the old AF_UNIX-only restriction, the same real
 # probe must fail closed. Restore the corrected unit before continuing.
@@ -317,12 +335,13 @@ EOF
 systemctl daemon-reload
 systemctl start "${AGENT_NAME}-lxc-discovery.service"
 wait_for_socket_ready "/run/$AGENT_NAME/lxc-discovery.sock"
-probe_discovery expect-failure
+probe_discovery expect-failure 321
 rm -f "$DISCOVERY_DROPIN_DIR/10-negative-af-unix-only.conf"
 systemctl daemon-reload
 systemctl restart "${AGENT_NAME}-lxc-discovery.service"
 wait_for_socket_ready "/run/$AGENT_NAME/lxc-discovery.sock"
-probe_discovery
+probe_discovery success 107
+probe_discovery success 108
 
 # The two services share the directory but must preserve it independently.
 # Restart each service while the other remains running and require both paths
