@@ -41,6 +41,22 @@ Der Kandidat trennt die Privilegiengrenze vom Agenten:
 Die Simulation bleibt eine ausdrücklich angeforderte Simulation. Der Helper
 enthält keinen Installations-, Entfernungs-, `apt update`- oder Neustartpfad.
 
+## Lock-Prüfung ohne `fuser`
+
+Die vier APT-/dpkg-Lockprüfungen verwenden keinen optionalen Gast-Helfer wie
+`fuser`. Für jede kanonische Lockdatei werden die kanonische Gerätekennung
+(`stat %D`) und der Inode mit `stat` gelesen und gegen die kernelverwaltete
+Tabelle `/proc/locks` geprüft. Die Schreibweise `major:minor` aus
+`/proc/locks` wird dabei normalisiert, weil LXC bei regulären Dateien für
+`%t:%T` nicht die verwertbare Lock-Gerätekennung liefern kann.
+Eine fehlende Lockdatei oder ein nicht zugeordnetes Lock liefert den
+normalen Status „nicht gehalten“ (Rückgabecode 1). Ein gehaltener Eintrag
+liefert 0. Ein fehlendes `/proc/locks`, fehlerhaftes `stat` oder ein
+Parsingfehler liefert einen anderen Rückgabecode und bleibt im Agenten
+fail-closed. Die Prüfung läuft innerhalb der bestehenden Helper-Serialisierung;
+ein einzelner Gast-Snapshot wird nicht als dauerhafte Garantie gegen externe
+Prozessstarts missverstanden.
+
 ## Allowlist-Format (nur Vorschlag, nicht aktiv)
 
 Eine nicht autorisierende Vorlage liegt unter

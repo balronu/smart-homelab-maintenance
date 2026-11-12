@@ -48,6 +48,29 @@ def test_helper_inspection_is_fixed_read_only_and_bounded() -> None:
     assert all("apt-get" not in call and "install" not in call for call in calls[1:])
 
 
+@pytest.mark.parametrize("name", ["apt_lock", "apt_archives_lock", "dpkg_lock", "dpkg_frontend_lock"])
+def test_helper_lock_inspection_uses_kernel_lock_table_without_fuser(name: str) -> None:
+    command = helper.build_inspect_argv(101, name)
+    assert command[:4] == ["/usr/sbin/pct", "exec", "101", "--"]
+    assert command[4:7] == ["/bin/sh", "-c", command[6]]
+    script = command[6]
+    assert "/proc/locks" in script
+    assert "/usr/bin/fuser" not in script
+    assert "/usr/bin/stat -c '%D %i'" in script
+    assert "exit 2" in script
+
+
+def test_helper_inspection_preserves_unknown_kernel_lock_result() -> None:
+    def run(argv, **_kwargs):
+        if argv[1] == "status":
+            return 0, "status: running\n", ""
+        return (2 if "/var/lib/apt/lists/lock" in argv else 1), "", ""
+
+    response = helper.handle({"container_id": 101, "operation": "inspect"}, allowed_ids={101}, run=run)
+    assert response["ok"] is True
+    assert response["observations"]["apt_lock"]["returncode"] == 2
+
+
 def test_helper_update_is_two_fixed_phases_and_requires_separate_permission() -> None:
     update = helper.build_argv(101, "update")
     assert update == ["/usr/sbin/pct", "exec", "101", "--", "/usr/bin/apt-get", "update"]
