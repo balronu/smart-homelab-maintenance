@@ -143,7 +143,15 @@ class _Handler(socketserver.StreamRequestHandler):
         result: dict[str, Any]
         try:
             if not _peer_allowed(self.request):
-                raise ValueError("unauthorized client")
+                detail = "unauthorized client"
+                if os.environ.get("SMH_DISCOVERY_TEST_DIAGNOSTICS") == "1":
+                    try:
+                        peer_uid = struct.unpack("3i", self.request.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[0]
+                        expected_uid = pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
+                        detail = f"unauthorized client uid={peer_uid} expected={expected_uid}"
+                    except (OSError, KeyError, struct.error):
+                        pass
+                raise ValueError(detail)
             line = self.rfile.readline(MAX_REQUEST_BYTES + 1)
             if len(line) > MAX_REQUEST_BYTES or not line.endswith(b"\n"):
                 raise ValueError("request limit")
