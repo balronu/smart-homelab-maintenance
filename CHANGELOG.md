@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.15 – Stable
+
+### Deutsch / English
+
+- Ersetzt die nicht portable `fuser`-Abhängigkeit der LXC-APT-Lockprüfung
+  durch eine fail-closed Prüfung der kanonischen Geräte-/Inode-Zuordnung gegen
+  `/proc/locks`; fehlende oder nicht auswertbare Kernel-Evidenz bleibt
+  blockierend. / Replaces the non-portable `fuser` dependency in LXC APT lock
+  inspection with a fail-closed canonical device/inode check against
+  `/proc/locks`; missing or unparseable kernel evidence remains blocked.
+
+**Compatibility / Migration:** API contract 1.1 remains unchanged. No package
+installation is required in target containers. / API-Vertrag 1.1 bleibt
+unverändert; in Zielcontainern ist keine Paketinstallation erforderlich.
+
+**Known limitation / Einschränkung:** Historical CT107/CT108 jobs still require
+their separate administrative recovery decision and are not automatically
+unlocked by this release.
+
 ## 1.0.14 – Stable
 
 ### Deutsch / English
