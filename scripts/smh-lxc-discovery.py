@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import os
 import json
+import fcntl
 import pwd
 import grp
 import socket
 import socketserver
+import stat
 import struct
 import subprocess
 import threading
@@ -21,12 +23,72 @@ from pathlib import Path
 from typing import Any
 
 DISCOVERY_SOCKET = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+DISCOVERY_START_LOCK = "/run/smart-homelab-maintenance/lxc-discovery.sock.lock"
 EXPECTED_CLIENT_USER = "smart-homelab-maintenance"
 MAX_REQUEST_BYTES = 16 * 1024
 
 TIMEOUT = 10
 MAX_OUTPUT = 64 * 1024
 PROBE_LOCK = threading.Lock()
+
+
+def _live_unix_socket_inodes(proc_net_unix: Path = Path("/proc/net/unix")) -> set[int]:
+    """Return socket inodes still owned by the kernel."""
+
+    inodes: set[int] = set()
+    try:
+        lines = proc_net_unix.read_text(encoding="ascii").splitlines()[1:]
+    except (FileNotFoundError, PermissionError, OSError, UnicodeDecodeError) as exc:
+        raise RuntimeError("cannot inspect kernel Unix socket table") from exc
+    for line in lines:
+        fields = line.split()
+        if len(fields) >= 7 and fields[6].isdigit():
+            inodes.add(int(fields[6]))
+    return inodes
+
+
+def _remove_stale_socket(path: Path, agent_gid: int) -> None:
+    """Remove only a provably stale socket owned by this service."""
+
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return
+    live_inodes = _live_unix_socket_inodes()
+    _validate_stale_socket_metadata(metadata, agent_gid, live_inodes)
+    path.unlink()
+
+
+def _validate_stale_socket_metadata(metadata: os.stat_result, agent_gid: int, live_inodes: set[int]) -> None:
+    """Fail closed unless metadata identifies an eligible detached socket."""
+
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISSOCK(metadata.st_mode):
+        raise RuntimeError("discovery socket path is not an owned Unix socket")
+    # root:root is accepted only for the one-way migration from the old
+    # RuntimeDirectoryPreserve=no layout. New sockets are always changed to
+    # the agent group below before serving requests.
+    if metadata.st_uid != 0 or metadata.st_gid not in {0, agent_gid} or stat.S_IMODE(metadata.st_mode) != 0o660:
+        raise RuntimeError("discovery socket ownership or mode is unsafe")
+    if metadata.st_ino in live_inodes:
+        raise RuntimeError("discovery socket is active")
+
+
+class _DiscoveryStartLock:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.fd: int | None = None
+
+    def __enter__(self) -> "_DiscoveryStartLock":
+        self.fd = os.open(self.path, os.O_CREAT | os.O_RDWR, 0o600)
+        os.chmod(self.path, 0o600)
+        fcntl.flock(self.fd, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, _type: object, _value: object, _traceback: object) -> None:
+        assert self.fd is not None
+        fcntl.flock(self.fd, fcntl.LOCK_UN)
+        os.close(self.fd)
+        self.fd = None
 
 
 def _run(container_id: int, command: tuple[str, ...]) -> tuple[int, str]:
@@ -106,16 +168,23 @@ if __name__ == "__main__":
     agent_gid = grp.getgrnam(EXPECTED_CLIENT_USER).gr_gid
     os.chown(path.parent, 0, agent_gid)
     os.chmod(path.parent, 0o750)
-    if path.exists():
-        raise SystemExit("discovery socket already exists")
+    with _DiscoveryStartLock(Path(DISCOVERY_START_LOCK)):
+        try:
+            _remove_stale_socket(path, agent_gid)
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
+        server = socketserver.ThreadingUnixStreamServer(DISCOVERY_SOCKET, _Handler)
+        socket_inode = os.fstat(server.fileno()).st_ino
     try:
-        with socketserver.ThreadingUnixStreamServer(DISCOVERY_SOCKET, _Handler) as server:
+        with server:
             server.daemon_threads = False
             os.chown(DISCOVERY_SOCKET, 0, agent_gid)
             os.chmod(DISCOVERY_SOCKET, 0o660)
             server.serve_forever()
     finally:
         try:
-            os.unlink(DISCOVERY_SOCKET)
+            current = path.lstat()
+            if current.st_ino == socket_inode and stat.S_ISSOCK(current.st_mode):
+                path.unlink()
         except FileNotFoundError:
             pass

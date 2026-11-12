@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import socket
+import stat
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -15,6 +18,12 @@ SPEC = importlib.util.spec_from_file_location("smh_lxc_apt_helper", HELPER_PATH)
 assert SPEC and SPEC.loader
 helper = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(helper)
+
+DISCOVERY_PATH = Path(__file__).parents[1] / "scripts" / "smh-lxc-discovery.py"
+DISCOVERY_SPEC = importlib.util.spec_from_file_location("smh_lxc_discovery", DISCOVERY_PATH)
+assert DISCOVERY_SPEC and DISCOVERY_SPEC.loader
+discovery = importlib.util.module_from_spec(DISCOVERY_SPEC)
+DISCOVERY_SPEC.loader.exec_module(discovery)
 
 
 def test_helper_builds_only_fixed_read_and_simulation_commands() -> None:
@@ -386,7 +395,86 @@ def test_helper_unit_preserves_shared_runtime_directory_on_restart() -> None:
 def test_discovery_removes_its_socket_on_shutdown() -> None:
     source = (Path(__file__).parents[1] / "scripts" / "smh-lxc-discovery.py").read_text(encoding="utf-8")
     assert "finally:" in source
-    assert "os.unlink(DISCOVERY_SOCKET)" in source
+    assert "current.st_ino == socket_inode" in source
+    assert "path.unlink()" in source
+
+
+def test_discovery_removes_only_a_verified_stale_socket(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    socket_path = tmp_path / "discovery.sock"
+    owner = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    owner.bind(str(socket_path))
+    owner.close()
+    monkeypatch.setattr(discovery, "_live_unix_socket_inodes", lambda: set())
+    monkeypatch.setattr(discovery.Path, "lstat", lambda _path: SimpleNamespace(
+        st_mode=stat.S_IFSOCK | 0o660, st_uid=0, st_gid=1234, st_ino=101
+    ))
+
+    discovery._remove_stale_socket(socket_path, 1234)
+
+    assert not socket_path.exists()
+
+
+def test_discovery_refuses_active_socket_and_preserves_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    socket_path = tmp_path / "discovery.sock"
+    owner = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    owner.bind(str(socket_path))
+    owner.listen(1)
+    monkeypatch.setattr(discovery.Path, "lstat", lambda _path: SimpleNamespace(
+        st_mode=stat.S_IFSOCK | 0o660, st_uid=0, st_gid=1234, st_ino=owner.fileno()
+    ))
+    monkeypatch.setattr(discovery, "_live_unix_socket_inodes", lambda: {owner.fileno()})
+    try:
+        with pytest.raises(RuntimeError, match="active"):
+            discovery._remove_stale_socket(socket_path, 1234)
+        assert socket_path.exists()
+    finally:
+        owner.close()
+
+
+def test_discovery_refuses_symlink_and_unexpected_type(tmp_path: Path) -> None:
+    target = tmp_path / "target"
+    target.write_text("protected", encoding="utf-8")
+    link = tmp_path / "discovery.sock"
+    link.symlink_to(target)
+    with pytest.raises(RuntimeError, match="not an owned Unix socket"):
+        discovery._remove_stale_socket(link, os.getgid())
+    assert target.read_text(encoding="utf-8") == "protected"
+
+    regular = tmp_path / "regular.sock"
+    regular.write_text("protected", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="not an owned Unix socket"):
+        discovery._remove_stale_socket(regular, os.getgid())
+
+
+def test_discovery_start_uses_lock_and_inode_guard() -> None:
+    source = DISCOVERY_PATH.read_text(encoding="utf-8")
+    assert "_DiscoveryStartLock" in source
+    assert "_live_unix_socket_inodes" in source
+    assert "socket_inode = os.fstat(server.fileno()).st_ino" in source
+
+
+def test_discovery_accepts_only_the_legacy_root_group_for_migration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    socket_path = tmp_path / "discovery.sock"
+    owner = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    owner.bind(str(socket_path))
+    owner.close()
+    monkeypatch.setattr(discovery.Path, "lstat", lambda _path: SimpleNamespace(
+        st_mode=stat.S_IFSOCK | 0o660, st_uid=0, st_gid=0, st_ino=102
+    ))
+    monkeypatch.setattr(discovery, "_live_unix_socket_inodes", lambda: set())
+    discovery._remove_stale_socket(socket_path, 4321)
+    assert not socket_path.exists()
+
+
+def test_discovery_refuses_unexpected_socket_group(tmp_path: Path) -> None:
+    socket_path = tmp_path / "discovery.sock"
+    owner = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    owner.bind(str(socket_path))
+    owner.close()
+    metadata = SimpleNamespace(st_mode=stat.S_IFSOCK | 0o660, st_uid=0, st_gid=4321, st_ino=103)
+    with pytest.raises(RuntimeError, match="ownership or mode"):
+        discovery._validate_stale_socket_metadata(metadata, 9876, set())
+    assert socket_path.exists()
 
 
 def test_official_helper_installer_is_preflight_only_by_default_and_never_wildcards() -> None:
