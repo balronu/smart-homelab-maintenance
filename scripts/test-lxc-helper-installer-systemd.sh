@@ -259,6 +259,8 @@ PY
   fi
   systemctl show "${AGENT_NAME}-lxc-discovery.service" -p ActiveState -p SubState -p MainPID -p RestrictAddressFamilies >&2 || true
   journalctl --no-pager -u "${AGENT_NAME}-lxc-discovery.service" -n 30 >&2 || true
+  ls -l "$PCT_FIXTURE_PATH" "$PCT_FIXTURE_LOG" "/run/$AGENT_NAME/lxc-discovery.sock" >&2 || true
+  runuser -u "$SERVICE_USER" -- "$PCT_FIXTURE_PATH" exec 321 -- /usr/bin/test -r /etc/os-release >&2 || true
   cat "$PCT_FIXTURE_LOG" >&2 || true
   return 1
 }
