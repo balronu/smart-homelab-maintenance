@@ -207,6 +207,7 @@ helper_hash_after="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
 # RuntimeDirectoryPreserve keeps the directory between service lifecycles.
 # Seed only a kernel-detached, legacy-owned discovery socket to verify that
 # the installer/start path migrates it safely instead of treating it as live.
+systemctl stop "${AGENT_NAME}-lxc-discovery.service"
 install -d -m 0750 -o root -g "$SERVICE_USER" "/run/$AGENT_NAME"
 seed_detached_discovery_socket
 
