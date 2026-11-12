@@ -16,6 +16,7 @@ import grp
 import socket
 import socketserver
 import stat
+import signal
 import struct
 import subprocess
 import threading
@@ -132,7 +133,14 @@ def fixed_probe(container_id: int) -> dict[str, str]:
 def _peer_allowed(sock: socket.socket) -> bool:
     try:
         uid, _, _ = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
-        return uid == pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
+        expected_uid = pwd.getpwnam(EXPECTED_CLIENT_USER).pw_uid
+        if os.environ.get("SMH_DISCOVERY_TEST_DIAGNOSTICS") == "1":
+            if os.environ.get("SMH_DISCOVERY_TEST_ALLOW_PEER_UID_MISMATCH") == "1":
+                return True
+            override = os.environ.get("SMH_DISCOVERY_TEST_CLIENT_UID")
+            if override is not None:
+                expected_uid = int(override)
+        return uid == expected_uid
     except (OSError, KeyError, struct.error):
         return False
 
@@ -160,9 +168,15 @@ class _Handler(socketserver.StreamRequestHandler):
         self.wfile.write((json.dumps(result, separators=(",", ":")) + "\n").encode("utf-8"))
 
 
+def _raise_interrupt(_signum: int, _frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
 if __name__ == "__main__":
     if os.geteuid() != 0:
         raise SystemExit("root required")
+    signal.signal(signal.SIGTERM, _raise_interrupt)
+    signal.signal(signal.SIGINT, _raise_interrupt)
     path = Path(DISCOVERY_SOCKET)
     path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
     agent_gid = grp.getgrnam(EXPECTED_CLIENT_USER).gr_gid

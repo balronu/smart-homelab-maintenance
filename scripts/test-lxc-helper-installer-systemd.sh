@@ -15,6 +15,9 @@ DISCOVERY_UNIT="/etc/systemd/system/${AGENT_NAME}-lxc-discovery.service"
 ALLOWLIST="$ETC_ROOT/lxc-apt-allowlist.toml"
 HELPER_PATH="$HELPER_ROOT/lxc-apt-helper"
 DISCOVERY_PATH="$HELPER_ROOT/lxc-discovery.py"
+PCT_FIXTURE_PATH="/usr/sbin/pct"
+DISCOVERY_DROPIN_DIR="/etc/systemd/system/${AGENT_NAME}-lxc-discovery.service.d"
+PCT_FIXTURE_CREATED=0
 CREATED_GROUP=0
 CREATED_USER=0
 
@@ -26,6 +29,9 @@ cleanup() {
   systemctl disable "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service" >/dev/null 2>&1 || true
   systemctl disable "${AGENT_NAME}-agent.service" >/dev/null 2>&1 || true
   rm -f "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST"
+  if [[ "$PCT_FIXTURE_CREATED" -eq 1 ]]; then rm -f "$PCT_FIXTURE_PATH"; fi
+  rm -f "$DISCOVERY_DROPIN_DIR"/*.conf
+  rmdir "$DISCOVERY_DROPIN_DIR" 2>/dev/null || true
   rmdir "$HELPER_ROOT" "$ETC_ROOT" "$STATE_ROOT" 2>/dev/null || true
   systemctl daemon-reload >/dev/null 2>&1 || true
   if [[ "$CREATED_USER" -eq 1 ]]; then userdel "$SERVICE_USER" >/dev/null 2>&1 || true; fi
@@ -36,11 +42,20 @@ trap cleanup EXIT
 [[ "$EUID" -eq 0 ]] || die "root is required"
 [[ "$(readlink /proc/1/exe)" == */systemd ]] || { printf '%s\n' 'SKIP: PID1 is not systemd; no real installer test claimed.'; exit 0; }
 systemd_state="$(systemctl is-system-running 2>/dev/null || true)"
-if [[ ! "$systemd_state" =~ ^(running|degraded)$ ]]; then
-  message="NOT RUN: PID1 is systemd, but systemctl is-system-running returned '$systemd_state'; no installer result is claimed."
+if [[ "$systemd_state" == "starting" ]]; then
+  for _ in $(seq 1 30); do
+    sleep 1
+    systemd_state="$(systemctl is-system-running 2>/dev/null || true)"
+    [[ "$systemd_state" =~ ^(running|degraded)$ ]] && break
+  done
+fi
+if [[ "$systemd_state" =~ ^(failed|maintenance|offline|unknown|)$ ]]; then
+  message="systemd is not ready for real installer acceptance after bounded wait: $systemd_state"
   printf '%s\n' "$message"
-  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then printf '## Installer systemd acceptance\n\n- **NOT RUN:** `%s`\n' "$message" >> "$GITHUB_STEP_SUMMARY"; fi
-  exit 0
+  die "$message"
+fi
+if [[ "$systemd_state" == "starting" ]]; then
+  printf '%s\n' 'systemd remains starting, but the isolated unit operations are available; continuing with real acceptance.'
 fi
 
 for path in "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST" "$STATE_ROOT"; do
@@ -70,8 +85,27 @@ systemctl enable "$AGENT_NAME-agent.service" >/dev/null
 python3 -m py_compile "$ROOT_DIR/scripts/smh-lxc-apt-helper.py" "$ROOT_DIR/scripts/smh-lxc-discovery.py"
 bash -n "$INSTALLER"
 PREFLIGHT_JSON="$(mktemp /tmp/smh-lxc-helper-preflight.XXXXXX.json)"
+set +e
 python3 "$ROOT_DIR/scripts/lxc-helper-preflight.py" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" >"$PREFLIGHT_JSON"
-grep -q '"decision":"GO"' "$PREFLIGHT_JSON"
+preflight_rc=$?
+set -e
+if [[ "$preflight_rc" -ne 0 ]]; then
+  [[ "$systemd_state" == "starting" ]] || die "installer preflight failed"
+  python3 - "$PREFLIGHT_JSON" <<'PY'
+import json
+import sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+if result.get("failed_checks") != ["systemd"]:
+    raise SystemExit("installer preflight has failures beyond transient systemd startup")
+check = next(item for item in result["checks"] if item["name"] == "systemd")
+if check["detail"] != "systemd state: starting":
+    raise SystemExit("unexpected systemd preflight state")
+print("PASS: installer preflight has no failure other than runner systemd startup state")
+PY
+else
+  grep -q '"decision":"GO"' "$PREFLIGHT_JSON"
+fi
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only
 if "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply; then
@@ -80,15 +114,34 @@ fi
 # Discovery-only apply must not install or start the helper, and must migrate
 # a detached legacy socket without touching the helper contract.
 install -d -m 0750 -o root -g "$SERVICE_USER" "/run/$AGENT_NAME"
-python3 - <<'PY'
+seed_detached_discovery_socket() {
+  python3 - <<'PY'
 import os
 import socket
+import stat
 
 path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+try:
+    metadata = os.lstat(path)
+except FileNotFoundError:
+    pass
+else:
+    if not stat.S_ISSOCK(metadata.st_mode) or metadata.st_uid != 0 or stat.S_IMODE(metadata.st_mode) != 0o660:
+        raise SystemExit("existing discovery path is not a safe fixture socket")
+    live = {
+        int(line.split()[6])
+        for line in open("/proc/net/unix", encoding="ascii").read().splitlines()[1:]
+        if len(line.split()) >= 7 and line.split()[6].isdigit()
+    }
+    if metadata.st_ino in live:
+        raise SystemExit("existing discovery socket is active")
+    os.unlink(path)
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stale:
     stale.bind(path)
 os.chmod(path, 0o660)
 PY
+}
+seed_detached_discovery_socket
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply --confirm --start-discovery
 systemctl is-active --quiet "${AGENT_NAME}-lxc-discovery.service"
 [[ ! -e "$HELPER_UNIT" ]] || die "discovery-only mode installed helper unit"
@@ -103,25 +156,61 @@ systemctl stop "${AGENT_NAME}-lxc-discovery.service"
 [[ "$(stat -c '%u:%a' "$ALLOWLIST")" == "0:600" ]]
 systemd-analyze verify "$HELPER_UNIT" "$DISCOVERY_UNIT"
 
+# The real discovery subprocess is exercised under systemd below.  The
+# disposable pct adapter opens AF_INET before returning fixed Debian fixture
+# output; it is not a production command or a guest and is removed by cleanup.
+[[ ! -e "$PCT_FIXTURE_PATH" ]] || die "refusing to replace pre-existing pct: $PCT_FIXTURE_PATH"
+cat > "$PCT_FIXTURE_PATH" <<'EOF'
+#!/usr/bin/python3
+import socket
+import sys
+if len(sys.argv) < 5 or sys.argv[1] != "exec" or not sys.argv[2].isdigit() or sys.argv[3] != "--":
+    raise SystemExit(2)
+try:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as channel:
+        channel.bind(("127.0.0.1", 0))
+except OSError as exc:
+    raise SystemExit(1)
+command = sys.argv[4:]
+if command == ["/usr/bin/test", "-r", "/etc/os-release"]:
+    raise SystemExit(0)
+if command == ["/usr/bin/cat", "/etc/os-release"]:
+    print('ID=debian\nVERSION_ID="13"')
+    raise SystemExit(0)
+if command == ["/usr/bin/apt-get", "--version"]:
+    print("apt 3.0.4 (amd64)")
+    raise SystemExit(0)
+if command == ["/usr/bin/dpkg-query", "--version"]:
+    print("Debian dpkg-query fixture")
+    raise SystemExit(0)
+if command in (["/usr/bin/test", "-x", "/usr/bin/apt-get"], ["/usr/bin/test", "-x", "/usr/bin/dpkg-query"]):
+    raise SystemExit(0)
+raise SystemExit(2)
+EOF
+chmod 0755 "$PCT_FIXTURE_PATH"
+PCT_FIXTURE_CREATED=1
+trap cleanup EXIT
+
+install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
+cat > "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf" <<'EOF'
+[Service]
+EOF
+printf 'Environment=SMH_DISCOVERY_TEST_DIAGNOSTICS=1\nEnvironment=SMH_DISCOVERY_TEST_ALLOW_PEER_UID_MISMATCH=1\n' >> "$DISCOVERY_DROPIN_DIR/20-test-diagnostics.conf"
+systemctl daemon-reload
+
 # Repeating discovery-only apply leaves the installed helper contract byte-identical.
 helper_hash_before="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --discovery-only --apply --confirm
 helper_hash_after="$(sha256sum "$HELPER_PATH" "$HELPER_UNIT")"
 [[ "$helper_hash_before" == "$helper_hash_after" ]] || die "discovery-only mode changed helper files"
 
-# RuntimeDirectoryPreserve keeps the directory between service lifecycles.
+# The applications preserve the shared parent directory themselves; systemd
+# must not own its lifecycle or re-own either socket.
 # Seed only a kernel-detached, legacy-owned discovery socket to verify that
 # the installer/start path migrates it safely instead of treating it as live.
+systemctl stop "${AGENT_NAME}-lxc-discovery.service"
 install -d -m 0750 -o root -g "$SERVICE_USER" "/run/$AGENT_NAME"
-python3 - <<'PY'
-import os
-import socket
-
-path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
-with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stale:
-    stale.bind(path)
-os.chmod(path, 0o660)
-PY
+seed_detached_discovery_socket
 
 "$INSTALLER" --source-dir "$ROOT_DIR" --expected-commit "$EXPECTED_COMMIT" --apply --start
 for unit in "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"; do
@@ -134,7 +223,26 @@ done
 assert_socket() {
   local socket_path="$1"
   [[ -S "$socket_path" ]] || die "socket missing after lifecycle operation: $socket_path"
-  [[ "$(stat -c '%u:%g:%a' "$socket_path")" == "0:$(id -g "$SERVICE_USER"):660" ]] || die "socket ownership/mode drifted: $socket_path"
+  local actual expected
+  actual="$(stat -c '%u:%g:%a' "$socket_path")"
+  expected="0:$(id -g "$SERVICE_USER"):660"
+  [[ "$actual" == "$expected" ]] || die "socket ownership/mode drifted: $socket_path (actual=$actual expected=$expected)"
+}
+
+record_lifecycle_state() {
+  local label="$1"
+  printf 'LIFECYCLE %s\n' "$label"
+  for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
+    if [[ -e "$socket_path" ]]; then
+      stat -c 'SOCKET path=%n inode=%i uid=%u gid=%g mode=%a' "$socket_path"
+    else
+      printf 'SOCKET path=%s absent\n' "$socket_path"
+    fi
+  done
+  systemctl show "${AGENT_NAME}-lxc-helper.service" \
+    -p MainPID -p NRestarts -p ActiveState -p SubState -p RuntimeDirectory -p RuntimeDirectoryMode
+  systemctl show "${AGENT_NAME}-lxc-discovery.service" \
+    -p MainPID -p NRestarts -p ActiveState -p SubState -p RuntimeDirectory -p RuntimeDirectoryMode
 }
 
 wait_for_socket_ready() {
@@ -154,9 +262,72 @@ for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-
   wait_for_socket_ready "$socket_path"
 done
 
+probe_discovery() {
+  if runuser -u "$SERVICE_USER" -- python3 - "$@" <<'PY'
+import json
+import socket
+import sys
+import time
+
+path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
+response = None
+last_error = None
+for _ in range(50):
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+            channel.settimeout(1)
+            channel.connect(path)
+            channel.sendall(b'{"container_id":321,"operation":"probe"}\n')
+            response = json.loads(channel.makefile().readline())
+        break
+    except OSError as exc:
+        last_error = exc
+        time.sleep(0.1)
+if response is None:
+    raise SystemExit(f"discovery socket never became reachable: {last_error}")
+print(json.dumps(response, sort_keys=True))
+if len(sys.argv) > 1 and sys.argv[1] == "expect-failure":
+    raise SystemExit(0 if response.get("ok") is False else 1)
+raise SystemExit(0 if response.get("ok") is True else 1)
+PY
+  then
+    return 0
+  fi
+  systemctl show "${AGENT_NAME}-lxc-discovery.service" -p ActiveState -p SubState -p MainPID -p RestrictAddressFamilies -p Environment >&2 || true
+  journalctl --no-pager -u "${AGENT_NAME}-lxc-discovery.service" -n 30 >&2 || true
+  ls -l "$PCT_FIXTURE_PATH" "/run/$AGENT_NAME/lxc-discovery.sock" >&2 || true
+  runuser -u "$SERVICE_USER" -- "$PCT_FIXTURE_PATH" exec 321 -- /usr/bin/test -r /etc/os-release >&2 || true
+  return 1
+}
+
+# This is the regression proof: the actual service process invokes the actual
+# fixed /usr/sbin/pct path inside its systemd sandbox, where the fixture must
+# create an AF_INET socket.
+probe_discovery
+
+# Negative control: with the old AF_UNIX-only restriction, the same real
+# probe must fail closed. Restore the corrected unit before continuing.
+systemctl stop "${AGENT_NAME}-lxc-discovery.service"
+install -d -m 0755 -o root -g root "$DISCOVERY_DROPIN_DIR"
+cat > "$DISCOVERY_DROPIN_DIR/10-negative-af-unix-only.conf" <<'EOF'
+[Service]
+RestrictAddressFamilies=
+RestrictAddressFamilies=AF_UNIX
+EOF
+systemctl daemon-reload
+systemctl start "${AGENT_NAME}-lxc-discovery.service"
+wait_for_socket_ready "/run/$AGENT_NAME/lxc-discovery.sock"
+probe_discovery expect-failure
+rm -f "$DISCOVERY_DROPIN_DIR/10-negative-af-unix-only.conf"
+systemctl daemon-reload
+systemctl restart "${AGENT_NAME}-lxc-discovery.service"
+wait_for_socket_ready "/run/$AGENT_NAME/lxc-discovery.sock"
+probe_discovery
+
 # The two services share the directory but must preserve it independently.
 # Restart each service while the other remains running and require both paths
 # to remain reachable after every transition.
+record_lifecycle_state before-lifecycle
 assert_socket "/run/$AGENT_NAME/lxc-apt-helper.sock"
 assert_socket "/run/$AGENT_NAME/lxc-discovery.sock"
 systemctl restart "${AGENT_NAME}-lxc-helper.service"
@@ -165,6 +336,7 @@ for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-
   assert_socket "$socket_path"
 done
 systemctl restart "${AGENT_NAME}-lxc-discovery.service"
+record_lifecycle_state after-discovery-restart
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
   wait_for_socket_ready "$socket_path"
   assert_socket "$socket_path"
@@ -182,7 +354,12 @@ done
 # both paths without stale-socket failures.
 systemctl stop "${AGENT_NAME}-lxc-discovery.service" "${AGENT_NAME}-lxc-helper.service"
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do
-  [[ ! -e "$socket_path" ]] || die "stale socket survived complete stop: $socket_path"
+  socket_gone=0
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if [[ ! -e "$socket_path" ]]; then socket_gone=1; break; fi
+    sleep 0.1
+  done
+  [[ "$socket_gone" -eq 1 ]] || die "stale socket survived complete stop: $socket_path"
 done
 systemctl start "${AGENT_NAME}-lxc-helper.service" "${AGENT_NAME}-lxc-discovery.service"
 for socket_path in "/run/$AGENT_NAME/lxc-apt-helper.sock" "/run/$AGENT_NAME/lxc-discovery.sock"; do

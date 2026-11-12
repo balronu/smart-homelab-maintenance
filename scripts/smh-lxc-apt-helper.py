@@ -15,6 +15,7 @@ import re
 import socket
 import socketserver
 import selectors
+import signal
 import subprocess
 import sys
 import time
@@ -496,6 +497,10 @@ class _UnixHelperServer(socketserver.ThreadingUnixStreamServer):
         super().__init__(socket_path, _SocketHandler)
 
 
+def _raise_interrupt(_signum: int, _frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
 def serve(socket_path: str, *, allowlist: Path = DEFAULT_ALLOWLIST) -> None:
     """Serve the fixed protocol from a root-owned systemd service."""
     if socket_path != "/run/smart-homelab-maintenance/lxc-apt-helper.sock":
@@ -519,4 +524,6 @@ def serve(socket_path: str, *, allowlist: Path = DEFAULT_ALLOWLIST) -> None:
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _raise_interrupt)
+    signal.signal(signal.SIGINT, _raise_interrupt)
     raise SystemExit(main())

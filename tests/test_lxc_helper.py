@@ -375,21 +375,30 @@ def test_policy_write_rejects_insecure_or_symlinked_directory(tmp_path: Path) ->
         helper._write_policy_entries(link / "allowlist.toml", {})
 
 
-def test_discovery_unit_shares_helper_runtime_group() -> None:
+def test_discovery_unit_does_not_reown_helper_runtime_directory() -> None:
     helper_source = (Path(__file__).parents[1] / "scripts" / "smh-lxc-apt-helper.py").read_text(encoding="utf-8")
     unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-discovery.service").read_text(encoding="utf-8")
     assert "User=root" in unit
     assert "Group=root" in unit
     assert "os.chown(socket_path, 0, agent_gid)" in helper_source
-    assert "RuntimeDirectory=smart-homelab-maintenance" in unit
-    assert "RuntimeDirectoryMode=0750" in unit
-    assert "RuntimeDirectoryPreserve=yes" in unit
+    assert "RuntimeDirectory=" not in unit
+    assert "RuntimeDirectoryMode=" not in unit
+    assert "RuntimeDirectoryPreserve=" not in unit
+
+
+def test_discovery_unit_allows_only_pct_required_network_family() -> None:
+    unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-discovery.service").read_text(encoding="utf-8")
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET" in unit
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET6" not in unit
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_NETLINK" not in unit
+    assert "RestrictAddressFamilies=" in unit
 
 
 def test_helper_unit_preserves_shared_runtime_directory_on_restart() -> None:
     unit = (Path(__file__).parents[1] / "scripts" / "smart-homelab-maintenance-lxc-helper.service").read_text(encoding="utf-8")
-    assert "RuntimeDirectory=smart-homelab-maintenance" in unit
-    assert "RuntimeDirectoryPreserve=yes" in unit
+    assert "KillSignal=SIGINT" in unit
+    assert "RuntimeDirectory=" not in unit
+    assert "RuntimeDirectoryPreserve=" not in unit
 
 
 def test_discovery_removes_its_socket_on_shutdown() -> None:
