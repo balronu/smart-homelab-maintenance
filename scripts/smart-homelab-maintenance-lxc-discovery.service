@@ -8,6 +8,7 @@ Type=simple
 User=root
 Group=root
 ExecStart=/usr/bin/python3 /usr/libexec/smart-homelab-maintenance/lxc-discovery.py
+ExecStopPost=/usr/bin/rm -f /run/smart-homelab-maintenance/lxc-discovery.sock
 # Let Python unwind through serve()'s finally block so the fixed socket is
 # removed before a controlled restart can bind it again.
 KillSignal=SIGINT
