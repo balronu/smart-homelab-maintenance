@@ -267,13 +267,24 @@ probe_discovery() {
 import json
 import socket
 import sys
+import time
 
 path = "/run/smart-homelab-maintenance/lxc-discovery.sock"
-with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
-    channel.settimeout(5)
-    channel.connect(path)
-    channel.sendall(b'{"container_id":321,"operation":"probe"}\n')
-    response = json.loads(channel.makefile().readline())
+response = None
+last_error = None
+for _ in range(50):
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+            channel.settimeout(1)
+            channel.connect(path)
+            channel.sendall(b'{"container_id":321,"operation":"probe"}\n')
+            response = json.loads(channel.makefile().readline())
+        break
+    except OSError as exc:
+        last_error = exc
+        time.sleep(0.1)
+if response is None:
+    raise SystemExit(f"discovery socket never became reachable: {last_error}")
 print(json.dumps(response, sort_keys=True))
 if len(sys.argv) > 1 and sys.argv[1] == "expect-failure":
     raise SystemExit(0 if response.get("ok") is False else 1)
