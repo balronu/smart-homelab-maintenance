@@ -141,6 +141,10 @@ SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labe
     const localSimulation = this._updateSnapshots.get(target);
     const simulationVerified = Boolean(localSimulation?.dry_run?.success === true && localSimulation?.dry_run?.safe === true && localSimulation?.plan_digest === update.plan_digest);
     if (refs.install) {
+      if (refs.install._attemptPlanDigest && refs.install._attemptPlanDigest !== update.plan_digest) {
+        refs.install._attemptId = null;
+        refs.install._attemptPlanDigest = null;
+      }
       const safeToInstall = kind === "container" && update.update_supported === true && update.execution_enabled === true && update.backend_connected === true && update.status === "updates_available" && update.fresh === true && update.simulation_authorized === true && update.update_authorized === true && simulationVerified && update.job_conflict !== true && !(update.held_packages || []).length && !(update.conflicts || []).length && !(update.removals || []).length && Boolean(update.plan_digest);
       refs.install.disabled = !safeToInstall;
       refs.install.setAttribute("aria-disabled", String(!safeToInstall));
@@ -394,6 +398,11 @@ SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
       ? `Ziel: ${target}\nPakete (${packages.length}): ${packageSummary}\nRisiken: ${risks}\nNeustartbedarf: möglicherweise.\n\nDieses konkrete Update jetzt installieren?`
       : `Target: ${target}\nPackages (${packages.length}): ${packageSummary}\nRisks: ${risks}\nRestart need: possible.\n\nInstall this exact update now?`;
     if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(confirmation)) return;
+    if (button._attemptPlanDigest !== update.plan_digest || !button._attemptId) {
+      button._attemptPlanDigest = update.plan_digest;
+      button._attemptId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+    const attemptId = button._attemptId;
     const result = button._updateResult || document.createElement("div");
     result.className = "muted simulation-result";
     result.setAttribute("role", "status");
@@ -403,7 +412,7 @@ SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
     button.setAttribute("aria-busy", "true");
     let timer;
     try {
-      const call = this._hass?.callService?.("smart_homelab_maintenance", "execute", { target, confirm: true, install_confirmed: true, plan_digest: update.plan_digest }, undefined, true, true);
+      const call = this._hass?.callService?.("smart_homelab_maintenance", "execute", { target, confirm: true, install_confirmed: true, plan_digest: update.plan_digest, attempt_id: attemptId }, undefined, true, true);
       if (!call || typeof call.then !== "function") throw new Error(german ? "Home Assistant hat keine Serviceantwort geliefert." : "Home Assistant returned no service response.");
       const response = await Promise.race([
         call,
@@ -413,6 +422,7 @@ SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
       if (!data || data.success !== true) throw new Error(data?.error || (german ? "Update fehlgeschlagen." : "Update failed."));
       result.textContent = data.job_id ? `${german ? "Update erfolgreich abgeschlossen." : "Update completed successfully."} (${data.job_id})` : (german ? "Update erfolgreich abgeschlossen." : "Update completed successfully.");
       result.classList.remove("warning");
+      button._attemptId = null;
     } catch (error) {
       result.textContent = `${german ? "Update fehlgeschlagen" : "Update failed"}: ${error?.message || (german ? "unbekannter Fehler" : "unknown error")}`;
       result.classList.add("warning");

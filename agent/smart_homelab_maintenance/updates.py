@@ -20,13 +20,14 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Sequence
 
-from .errors import ValidationError
+from .errors import DuplicateJobError, ValidationError
 from .jobs import JobRepository
 from .permissions import PermissionStore
 from .types import JobPhase, JobRequest, JobState, Verification, utc_now
 
 _VMID = re.compile(r"^[1-9][0-9]{0,5}$")
 _TARGET = re.compile(r"^(host|container:[1-9][0-9]{0,5}|vm:[1-9][0-9]{0,5})$")
+_ATTEMPT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$")
 _INST = re.compile(r"^Inst\s+(\S+)(?:\s+\[([^]]*)\])?\s+\(([^ )]+)")
 _REMV = re.compile(r"^Remv\s+(\S+)")
 LXC_HELPER_SOCKET = "/run/smart-homelab-maintenance/lxc-apt-helper.sock"
@@ -568,9 +569,11 @@ class UpdateService:
         finally:
             self._active_simulations.discard(target_id)
 
-    def execute_update(self, target_id: str, *, confirmed: bool, install_confirmed: bool = False, plan_digest: str | None) -> dict[str, Any]:
+    def execute_update(self, target_id: str, *, confirmed: bool, install_confirmed: bool = False, plan_digest: str | None, attempt_id: str | None = None) -> dict[str, Any]:
         if confirmed is not True or install_confirmed is not True:
             raise ValidationError("explicit simulation and installation confirmations are both required")
+        if attempt_id is not None and (not isinstance(attempt_id, str) or not _ATTEMPT_ID.fullmatch(attempt_id)):
+            raise ValidationError("attempt_id is invalid")
         if not self.execution_enabled:
             return {"target": target_id, "success": False, "safe": False, "error": "update execution is disabled"}
         target = self.target_map().get(target_id)
@@ -578,10 +581,10 @@ class UpdateService:
             return {"target": target_id, "success": False, "safe": False, "error": "only authorized LXC targets may be updated"}
         if not target.update_authorized:
             return {"target": target_id, "success": False, "safe": False, "error": "target is not authorized for real updates"}
-        if self._jobs is not None and self._jobs.has_unresolved_target(target_id):
+        if self._jobs is not None and attempt_id is None and self._jobs.has_unresolved_target(target_id):
             return {"target": target_id, "success": False, "safe": False,
                     "error": "another update is active or requires manual recovery",
-                    "status": "manual_recovery_required"}
+                    "error_code": "target_busy", "status": "manual_recovery_required"}
         # Use the already-fetched, user-confirmed plan for the HTTP admission
         # decision. A fresh helper check here would defeat async acceptance;
         # the worker repeats it before any mutating operation.
@@ -592,22 +595,65 @@ class UpdateService:
             return {"target": target_id, "success": False, "safe": False, "error": "update plan changed; confirmation is stale", "plan_digest": current.plan_digest}
         if current.held_packages or current.conflicts or current.removals:
             return {"target": target_id, "success": False, "safe": False, "error": "update plan contains held, conflicting, or removing packages"}
-        if target_id in self._active_simulations:
-            return {"target": target_id, "success": False, "safe": False, "error": "another update is already running for target"}
         job_id: str | None = None
         if self._jobs is not None:
+            idempotency_key = f"{target_id}:{current.plan_digest}"
+            if attempt_id:
+                idempotency_key += f":{attempt_id}"
+            existing = self._jobs.get_by_idempotency_key(idempotency_key)
+            if existing is not None and attempt_id is not None:
+                if existing.get("target") != target_id or existing.get("confirmation_hash") != current.plan_digest:
+                    raise DuplicateJobError("installation attempt identity conflicts with the confirmed update plan")
+                return {
+                    "target": target_id,
+                    "operation": "update",
+                    "success": True,
+                    "accepted": True,
+                    "replayed": True,
+                    "safe": True,
+                    "job_id": existing["job_id"],
+                    "status": existing["state"],
+                    "plan_digest": current.plan_digest,
+                    "message": "existing installation attempt returned; no second job was created",
+                }
+            if self._jobs.has_unresolved_target(target_id):
+                return {"target": target_id, "success": False, "safe": False,
+                        "error": "another update is active or requires manual recovery",
+                        "error_code": "target_busy", "status": "manual_recovery_required"}
+            if existing is not None:
+                raise DuplicateJobError("installation attempt identity already exists; a new attempt identity is required")
+            if target_id in self._active_simulations:
+                return {"target": target_id, "success": False, "safe": False, "error": "another update is already running for target", "error_code": "target_busy"}
             try:
                 job_id = self._jobs.create(JobRequest(
                     target=target_id,
                     operation="update",
                     expected_version=None,
-                    idempotency_key=f"{target_id}:{current.plan_digest}",
+                    idempotency_key=idempotency_key,
                     confirmation_hash=current.plan_digest,
                 ))
                 self._jobs.transition(job_id, JobState.PREFLIGHT, phase=JobPhase.PREFLIGHT, progress=10, message="fresh update plan validated")
                 self._jobs.append_log(job_id, "fresh plan and target authorization validated")
+            except DuplicateJobError:
+                existing = self._jobs.get_by_idempotency_key(idempotency_key)
+                if attempt_id is not None and existing is not None and existing.get("target") == target_id and existing.get("confirmation_hash") == current.plan_digest:
+                    return {
+                        "target": target_id,
+                        "operation": "update",
+                        "success": True,
+                        "accepted": True,
+                        "replayed": True,
+                        "safe": True,
+                        "job_id": existing["job_id"],
+                        "status": existing["state"],
+                        "plan_digest": current.plan_digest,
+                        "message": "existing installation attempt returned; no second job was created",
+                    }
+                raise DuplicateJobError("installation attempt identity already exists")
             except Exception as exc:
                 return {"target": target_id, "success": False, "safe": False, "error": "update job could not be created", "job_error": type(exc).__name__}
+        elif target_id in self._active_simulations:
+            return {"target": target_id, "success": False, "safe": False, "error": "another update is already running for target", "error_code": "target_busy"}
         self._active_simulations.add(target_id)
         try:
             if job_id and self._jobs:

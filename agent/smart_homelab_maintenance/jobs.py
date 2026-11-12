@@ -144,6 +144,14 @@ class JobRepository:
                 raise
         return job_id
 
+    def get_by_idempotency_key(self, idempotency_key: str) -> dict[str, Any] | None:
+        """Return the existing job for a retry-safe request identity."""
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM jobs WHERE idempotency_key = ?", (idempotency_key,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
     def get(self, job_id: str) -> dict[str, Any]:
         with self._lock:
             row = self._connection.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
