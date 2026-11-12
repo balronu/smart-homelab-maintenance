@@ -30,6 +30,7 @@ cleanup() {
   systemctl disable "${AGENT_NAME}-agent.service" >/dev/null 2>&1 || true
   rm -f "$HELPER_UNIT" "$DISCOVERY_UNIT" "$AGENT_UNIT" "$HELPER_PATH" "$DISCOVERY_PATH" "$ALLOWLIST"
   if [[ "$PCT_FIXTURE_CREATED" -eq 1 ]]; then rm -f "$PCT_FIXTURE_PATH"; fi
+  rm -f "$DISCOVERY_DROPIN_DIR"/*.conf
   rmdir "$DISCOVERY_DROPIN_DIR" 2>/dev/null || true
   rmdir "$HELPER_ROOT" "$ETC_ROOT" "$STATE_ROOT" 2>/dev/null || true
   systemctl daemon-reload >/dev/null 2>&1 || true
