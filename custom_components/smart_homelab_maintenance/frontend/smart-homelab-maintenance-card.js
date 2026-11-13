@@ -1,5 +1,5 @@
 import { isActiveJob, isTerminalJob, jobActivityAt, jobResult, rememberedJobKey, unwrapJobResponse } from "./job-status.js";
-const DEFAULTS = { title: "Smart Homelab Maintenance", compact: false, show_maintenance: true, show_vms: true, show_containers: true };
+const DEFAULTS = { title: "Smart Homelab Maintenance", compact: false, show_maintenance: true, show_vms: true, show_containers: true, scroll_diagnostics: false };
 export function resolveLanguage(hass) {
   const localeObjectLanguage = hass?.locale && typeof hass.locale === "object" && typeof hass.locale.language === "string"
     ? hass.locale.language
@@ -9,7 +9,7 @@ export function resolveLanguage(hass) {
   return raw.toLowerCase().startsWith("de") ? "de" : "en";
 }
 const textFor = (language) => language === "de" ? { connected: "Verbunden", offline: "Agent nicht erreichbar", hostOffline: "Host offline", overview: "Übersicht", host: "Proxmox-Host", lastUpdated: "Letzte Aktualisierung", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung", running: "laufend", stopped: "gestoppt", unknown: "unbekannt", cpu: "CPU", memory: "RAM", storage: "Speicher", availableMemory: "Freier RAM", freeStorage: "Freier Speicher", version: "Version", kernel: "Kernel", uptime: "Laufzeit", jobs: "Laufende Jobs", noData: "Keine Daten verfügbar", noVms: "Keine VMs erkannt", noContainers: "Keine Container erkannt", error: "Fehler", readOnly: "Nur-Lese-Modus", updates: "Updates", simulate: "Update simulieren", install: "Updates installieren", installConfirm: "Die Simulation ist bestanden. Soll dieses konkrete Paket-Update jetzt wirklich installiert werden?", installDisabled: "Updatefunktion noch nicht freigegeben", simulateDisabled: "Simulation nicht verfügbar", unauthorizedReason: "Simulation nicht verfügbar: Ziel nicht autorisiert", helperUnavailableReason: "Simulation nicht verfügbar: Helper nicht eingerichtet", stoppedReason: "Simulation nicht verfügbar: Container ist gestoppt", unsupportedReason: "Simulation nicht verfügbar: Ziel nicht unterstützt", staleReason: "Simulation nicht verfügbar: Prüfdaten veraltet", notCheckedReason: "Simulation nicht verfügbar: Ziel noch nicht geprüft", vmExclusion: "Updates dieser virtuellen Maschine werden nicht über Smart Homelab Maintenance durchgeführt. Bitte die Updatefunktion des jeweiligen Gastbetriebssystems verwenden.", noUpdatesReason: "Keine verfügbaren Updates für die Simulation", current: "Aktuell", updatesAvailable: "verfügbar", notChecked: "Noch nicht geprüft", unsupported: "Nicht unterstützt", unauthorized: "Nicht autorisiert", failed: "Prüfung fehlgeschlagen", stale: "Daten veraltet", unknownUpdate: "Unbekannt", security: "Sicherheitsupdates", checked: "Letzte Prüfung", simulation: "Simulation", compatibility: "Agent-Kompatibilität", compatibilityCurrent: "Aktuell", compatibilityOutdated: "Veraltet", compatibilityIncompatible: "Inkompatibel", compatibilityUnknown: "Unbekannt" } : { connected: "Connected", offline: "Agent unreachable", hostOffline: "Host offline", overview: "Overview", host: "Proxmox host", lastUpdated: "Last updated", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance", running: "running", stopped: "stopped", unknown: "unknown", cpu: "CPU", memory: "RAM", storage: "Storage", availableMemory: "Free RAM", freeStorage: "Free storage", version: "Version", kernel: "Kernel", uptime: "Uptime", jobs: "Running jobs", noData: "No data available", noVms: "No virtual machines detected", noContainers: "No containers detected", error: "Error", readOnly: "Read-only mode", updates: "Updates", simulate: "Simulate update", install: "Install updates", installConfirm: "The simulation passed. Do you really want to install this specific package update now?", installDisabled: "Update function not released", simulateDisabled: "Simulation unavailable", unauthorizedReason: "Simulation unavailable: target is not authorized", helperUnavailableReason: "Simulation unavailable: helper is not configured", stoppedReason: "Simulation unavailable: container is stopped", unsupportedReason: "Simulation unavailable: target is not supported", staleReason: "Simulation unavailable: check data is stale", notCheckedReason: "Simulation unavailable: target has not been checked", vmExclusion: "Updates for this virtual machine are not performed through Smart Homelab Maintenance. Please use the update function of the respective guest operating system.", noUpdatesReason: "No updates are available for simulation", current: "Up to date", updatesAvailable: "available", notChecked: "Not checked", unsupported: "Not supported", unauthorized: "Not authorized", failed: "Check failed", stale: "Data is stale", unknownUpdate: "Unknown", security: "security updates", checked: "Last checked", simulation: "Simulation", compatibility: "Agent compatibility", compatibilityCurrent: "Current", compatibilityOutdated: "Outdated", compatibilityIncompatible: "Incompatible", compatibilityUnknown: "Unknown" };
-const editorText = (language) => language === "de" ? { title: "Titel", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung" } : { title: "Title", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance" };
+const editorText = (language) => language === "de" ? { title: "Titel", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung", scroll_diagnostics: "iOS-Scroll-Diagnose" } : { title: "Title", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance", scroll_diagnostics: "iOS scroll diagnosis" };
 const labelsFor = (language) => ({ ...textFor(language), refresh: language === "de" ? "Jetzt auf Updates prüfen" : "Check for updates now", repairCheck: language === "de" ? "Reparatur prüfen" : "Check repair need", repair: language === "de" ? "Reparatur durchführen" : "Perform repair", repairDetails: language === "de" ? "Details anzeigen" : "Show details", closeDetails: language === "de" ? "Details schließen" : "Hide details", runningJob: language === "de" ? "Fortschritt anzeigen" : "Show progress" });
 const permissionText = (language) => language === "de" ? { allowSimulation: "Simulation freigeben", revokeSimulation: "Simulation widerrufen", allowUpdates: "Updates freigeben", revokeUpdates: "Updates widerrufen", permissionConfirm: "Berechtigung wirklich ändern?", permissionRunning: "Berechtigung wird geändert …", permissionPending: "Berechtigung geändert; HA-Rückread wird bestätigt …", permissionSuccess: "Berechtigung erfolgreich geändert.", permissionFailed: "Berechtigungsänderung fehlgeschlagen", permissionReadbackFailed: "Berechtigung geändert, aber der bestätigte Rückread fehlt." } : { allowSimulation: "Allow simulation", revokeSimulation: "Revoke simulation", allowUpdates: "Allow updates", revokeUpdates: "Revoke updates", permissionConfirm: "Really change this permission?", permissionRunning: "Changing permission …", permissionPending: "Permission changed; confirming HA readback …", permissionSuccess: "Permission changed successfully.", permissionFailed: "Permission change failed", permissionReadbackFailed: "Permission changed, but the confirmed readback is missing." };
 const esc = (value) => String(value ?? "").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
@@ -45,11 +45,11 @@ function resourceLines(item, labels) { return [bar(labels.memory, item.memory_us
 const css = `:host{display:block;color:var(--primary-text-color);box-sizing:border-box;container-type:inline-size}.card{background:var(--ha-card-background,var(--card-background-color));border-radius:var(--ha-card-border-radius,12px);padding:16px;box-shadow:var(--ha-card-box-shadow);overflow:visible;box-sizing:border-box}.header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}.header h2{margin:0;font-size:1.25rem;min-width:0;overflow-wrap:anywhere}.status{display:inline-flex;align-items:center;gap:6px;font-size:.9em;flex:none}.dot{width:9px;height:9px;border-radius:50%;background:var(--success-color,#43a047)}.offline .dot{background:var(--error-color,#db4437)}.summary,.grid{display:grid;grid-template-columns:1fr;gap:8px}.metric,.item{border:1px solid var(--divider-color,#ddd);border-radius:8px;padding:10px;min-width:0}.metric strong{display:block;font-size:1.2em;overflow-wrap:anywhere}.muted{color:var(--secondary-text-color);font-size:.86em;overflow-wrap:anywhere}.section{margin-top:14px}.section h3{margin:0 0 8px;font-size:1rem}.item-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.item-head strong{min-width:0;overflow-wrap:anywhere}.bar-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:8px}.bar-row progress{width:100%;min-width:0}.pill{border-radius:12px;padding:2px 7px;font-size:.78em;background:var(--secondary-background-color);white-space:nowrap;flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis}.warning{color:var(--error-color,#db4437);overflow-wrap:anywhere}.readonly{color:var(--secondary-text-color);font-size:.82em;margin-top:10px}.action-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.action-row button{flex:1 1 12rem;min-width:0}button.simulate,button.install,button.permission{padding:7px 10px;border:1px solid var(--primary-color,#03a9f4);border-radius:7px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;cursor:pointer}button.simulate:disabled,button.install:disabled,button.permission:disabled{opacity:.55;cursor:not-allowed;border-color:var(--divider-color,#777)}details{margin-top:8px}summary{cursor:pointer;list-style-position:inside;overflow-wrap:anywhere}@container (min-width:600px){.summary,.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@container (min-width:1000px){.summary,.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:420px){.card{padding:12px}.header{align-items:flex-start;flex-direction:column}.action-row{flex-direction:column}.action-row button{flex-basis:auto;width:100%}}`;
 const editorCss = `:host{display:block;box-sizing:border-box;color:var(--primary-text-color)}.editor{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:4px 0;box-sizing:border-box;max-width:100%}.field{display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr);align-items:center;gap:12px;min-width:0;line-height:1.35}.field.checkbox{grid-template-columns:auto minmax(0,1fr);justify-content:start;gap:10px;cursor:pointer}.field span{overflow-wrap:anywhere}.field input[type=text]{box-sizing:border-box;min-width:0;width:100%;max-width:100%;padding:8px 10px;border:1px solid var(--divider-color,#777);border-radius:6px;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);font:inherit}.field input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:var(--primary-color,#03a9f4)}@media(max-width:600px){.editor{gap:10px}.field,.field.checkbox{grid-template-columns:minmax(0,1fr);gap:6px}.field.checkbox{grid-template-columns:auto minmax(0,1fr);align-items:start}.field input[type=text]{font-size:16px;min-height:40px}}`;
 const premiumCss = `.card{background:linear-gradient(145deg,var(--ha-card-background,var(--card-background-color)),color-mix(in srgb,var(--ha-card-background,var(--card-background-color)) 86%,var(--primary-color,#03a9f4)));border:1px solid color-mix(in srgb,var(--divider-color,#ddd) 70%,transparent);}.header{padding-bottom:4px}.status{padding:5px 9px;border-radius:999px;background:var(--secondary-background-color);}.status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--success-color,#43a047) 18%,transparent)}.offline .status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--error-color,#db4437) 18%,transparent)}.section{border-top:1px solid color-mix(in srgb,var(--divider-color,#ddd) 55%,transparent);padding-top:14px}.item{background:color-mix(in srgb,var(--card-background-color,#fff) 76%,transparent);transition:border-color .18s ease,background .18s ease}.item[open]{border-color:color-mix(in srgb,var(--primary-color,#03a9f4) 55%,var(--divider-color,#ddd));background:color-mix(in srgb,var(--primary-color,#03a9f4) 5%,var(--card-background-color,#fff))}.item>summary{list-style:none}.item>summary::-webkit-details-marker{display:none}.item-head{cursor:pointer;padding:0}.item-head::after{content:"+";color:var(--secondary-text-color);font-weight:700}.item[open]>.item-head::after{content:"−"}.item-body{padding-top:10px}.metric strong{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){.item{transition:none}}`;
-const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch;margin-top:10px}.action-row button{width:100%;min-width:0;height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.vm-exclusion{margin:10px 0 0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--secondary-background-color);overflow-wrap:anywhere}.simulation-result,.permission-result{margin-top:8px;min-width:0;overflow-wrap:anywhere}.simulation-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.simulation-summary strong{font-size:1.05em}.package-list{margin-top:8px}.package-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:5px 0;border-top:1px solid var(--divider-color,#ddd);min-width:0}.package-name,.package-version{min-width:0;overflow-wrap:anywhere;word-break:break-word}.job-detail-content{display:grid;gap:6px;margin-top:8px}.job-detail-row{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:8px;min-width:0}.job-detail-row strong{overflow-wrap:anywhere;word-break:break-word}@media(max-width:600px){.simulation-summary{grid-template-columns:1fr}.package-row{grid-template-columns:1fr}.action-row button{font-size:.92em}.job-detail-row{grid-template-columns:1fr;gap:2px}}`;
+const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch;margin-top:10px}.action-row button{width:100%;min-width:0;height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.vm-exclusion{margin:10px 0 0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--secondary-background-color);overflow-wrap:anywhere}.simulation-result,.permission-result{margin-top:8px;min-width:0;overflow-wrap:anywhere}.simulation-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.simulation-summary strong{font-size:1.05em}.package-list{margin-top:8px}.package-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:5px 0;border-top:1px solid var(--divider-color,#ddd);min-width:0}.package-name,.package-version{min-width:0;overflow-wrap:anywhere;word-break:break-word}.job-detail-content{display:grid;gap:6px;margin-top:8px}.job-detail-row{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:8px;min-width:0}.job-detail-row strong{overflow-wrap:anywhere;word-break:break-word}.scroll-diagnostics{margin-top:14px;border-top:1px solid var(--divider-color,#ddd);padding-top:12px}.scroll-diagnostics summary{font-weight:600}.scroll-diagnostic-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}.scroll-diagnostic-actions button{min-height:40px;white-space:normal;overflow-wrap:anywhere}.scroll-diagnostic-json{max-height:22rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--secondary-background-color);padding:8px;border-radius:6px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;user-select:text}@media(max-width:600px){.simulation-summary{grid-template-columns:1fr}.package-row{grid-template-columns:1fr}.action-row button{font-size:.92em}.job-detail-row{grid-template-columns:1fr;gap:2px}.scroll-diagnostic-actions{grid-template-columns:1fr}.scroll-diagnostic-json{max-height:18rem}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
-  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._permissionStates = new Map(); this._lastConfirmedPermissions = new Map(); this._updateSnapshots = new Map(); this._trackedJobs = new Map(); this._jobTimers = new Map(); this._lastSize = null; this._resizeObserver = null; this._resizeFrame = null; }
-  connectedCallback() { this._ensureShell(); this._ensureRefreshButton(); this._restoreRememberedJobs(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
-  disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; if (this._resizeFrame !== null) cancelAnimationFrame(this._resizeFrame); this._resizeFrame = null; for (const timer of this._jobTimers.values()) clearTimeout(timer); this._jobTimers.clear(); }
+  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._permissionStates = new Map(); this._lastConfirmedPermissions = new Map(); this._updateSnapshots = new Map(); this._trackedJobs = new Map(); this._jobTimers = new Map(); this._scrollDiagnosticCleanup = null; this._scrollDiagnosticState = null; this._lastSize = null; this._resizeObserver = null; this._resizeFrame = null; }
+  connectedCallback() { this._ensureShell(); this._ensureRefreshButton(); this._ensureScrollDiagnostics(); this._restoreRememberedJobs(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
+  disconnectedCallback() { this._stopScrollDiagnostics(); this._resizeObserver?.disconnect(); this._resizeObserver = null; if (this._resizeFrame !== null) cancelAnimationFrame(this._resizeFrame); this._resizeFrame = null; for (const timer of this._jobTimers.values()) clearTimeout(timer); this._jobTimers.clear(); }
   setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
   set hass(value) { this._hass = value; this.render(); }
   get hass() { return this._hass; }
@@ -76,6 +76,74 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
     this._resizeObserver.observe(this);
     this._resizeObserver.observe(this._shell.card);
   }
+  _ensureScrollDiagnostics() {
+    if (this._scrollDiagnostics || !this._shell) return;
+    const panel = this.shadowRoot.querySelector(".scroll-diagnostics");
+    if (!panel) return;
+    this._scrollDiagnostics = {
+      panel, summary: panel.querySelector("summary strong"), status: panel.querySelector(".scroll-diagnostic-status"),
+      start: panel.querySelector(".scroll-diagnostic-start"), stop: panel.querySelector(".scroll-diagnostic-stop"),
+      copy: panel.querySelector(".scroll-diagnostic-copy"), json: panel.querySelector(".scroll-diagnostic-json"),
+    };
+    this._scrollDiagnostics.start.addEventListener("click", () => this._startScrollDiagnostics());
+    this._scrollDiagnostics.stop.addEventListener("click", () => this._stopScrollDiagnostics());
+    this._scrollDiagnostics.copy.addEventListener("click", () => this._copyScrollDiagnostics());
+  }
+  _renderScrollDiagnostics() {
+    const refs = this._scrollDiagnostics;
+    if (!refs) return;
+    const language = resolveLanguage(this._hass);
+    const labels = diagnosticText(language);
+    refs.panel.hidden = this.config.scroll_diagnostics !== true;
+    refs.summary.textContent = labels.title;
+    refs.start.textContent = labels.start;
+    refs.stop.textContent = labels.stop;
+    refs.copy.textContent = labels.copy;
+    refs.start.hidden = Boolean(this._scrollDiagnosticCleanup);
+    refs.stop.hidden = !this._scrollDiagnosticCleanup;
+    refs.status.textContent = this._scrollDiagnosticCleanup ? labels.running : labels.idle;
+    if (this._scrollDiagnosticState) refs.json.textContent = JSON.stringify(scrollDiagnosticForCard(this, this._scrollDiagnosticState), null, 2);
+    else refs.json.textContent = "";
+  }
+  _startScrollDiagnostics() {
+    this._stopScrollDiagnostics();
+    const state = { touchstart: 0, touchmove: 0, touchend: 0, scrollDeltaDuringTouch: 0, touchArrived: false, touchMovedWithoutScroll: false };
+    this._scrollDiagnosticState = state;
+    const update = () => {
+      const snapshot = scrollDiagnosticForCard(this, state);
+      if (this._scrollDiagnostics) this._scrollDiagnostics.json.textContent = JSON.stringify(snapshot, null, 2);
+    };
+    const documentWindow = this.ownerDocument?.defaultView || globalThis;
+    const readScroll = () => {
+      const scrollable = scrollDiagnosticForCard(this, state).identifiedScrollContainer;
+      return Number(scrollable?.scrollTop || 0);
+    };
+    let beforeMove = null;
+    const onTouchStart = () => { state.touchstart += 1; state.touchArrived = true; beforeMove = readScroll(); update(); };
+    const onTouchMove = () => { state.touchmove += 1; state.touchArrived = true; const current = readScroll(); if (beforeMove !== null) state.scrollDeltaDuringTouch = current - beforeMove; if (state.touchmove > 0 && state.scrollDeltaDuringTouch === 0) state.touchMovedWithoutScroll = true; update(); };
+    const onTouchEnd = () => { state.touchend += 1; update(); };
+    documentWindow.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
+    documentWindow.addEventListener("touchmove", onTouchMove, { capture: true, passive: true });
+    documentWindow.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
+    this._scrollDiagnosticCleanup = () => {
+      documentWindow.removeEventListener("touchstart", onTouchStart, true);
+      documentWindow.removeEventListener("touchmove", onTouchMove, true);
+      documentWindow.removeEventListener("touchend", onTouchEnd, true);
+      this._scrollDiagnosticCleanup = null;
+      this._renderScrollDiagnostics();
+    };
+    this._renderScrollDiagnostics();
+  }
+  _stopScrollDiagnostics() { if (this._scrollDiagnosticCleanup) this._scrollDiagnosticCleanup(); }
+  async _copyScrollDiagnostics() {
+    const refs = this._scrollDiagnostics;
+    if (!refs) return;
+    const language = resolveLanguage(this._hass);
+    const labels = diagnosticText(language);
+    const payload = refs.json.textContent || JSON.stringify(scrollDiagnosticForCard(this, this._scrollDiagnosticState), null, 2);
+    try { await navigator.clipboard.writeText(payload); refs.status.textContent = labels.copied; }
+    catch (_) { refs.status.textContent = labels.copyFailed; }
+  }
   _metric() { const node = document.createElement("div"); node.className = "metric"; node.innerHTML = '<span class="muted"></span><strong></strong><span class="muted"></span>'; return { node, label: node.children[0], value: node.children[1], sub: node.children[2] }; }
   _restoreRememberedJobs() { try { for (const key of Object.keys(localStorage)) { if (!key.startsWith("smart-homelab-maintenance:job:container:")) continue; const value = JSON.parse(localStorage.getItem(key)); if (value?.target && value?.job_id) this._trackedJobs.set(value.target, value); } } catch (_) {} }
   _rememberJob(target, job) { if (!target || !job?.job_id) return; const value = { ...job, target, job_id: String(job.job_id) }; this._trackedJobs.set(target, value); try { localStorage.setItem(rememberedJobKey(target), JSON.stringify(value)); } catch (_) {} }
@@ -86,7 +154,7 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   _section(titleKey, className = "section") { const section = document.createElement("div"); section.className = className; const heading = document.createElement("h3"); section.append(heading); const grid = document.createElement("div"); grid.className = "grid"; section.append(grid); return { section, heading, grid, titleKey }; }
   _ensureShell() {
     if (this._shell) return;
-    this.shadowRoot.innerHTML = `<style>${css}${premiumCss}</style><section class="card"><div class="header"><h2></h2><span class="status" role="status"><i class="dot"></i><span></span></span></div><p class="warning" hidden></p><p class="compatibility muted" role="status"></p><div class="section overview"><h3></h3><div class="summary"></div></div><details class="section host-details" data-section="host"><summary><strong></strong></summary><div class="host-actions action-row"></div><div class="grid host-grid"></div></details><div class="section vm-section"><h3></h3><div class="grid vm-grid"></div><p class="muted empty-vms" hidden></p></div><div class="section container-section"><h3></h3><div class="grid container-grid"></div><p class="muted empty-containers" hidden></p></div><div class="section maintenance-section"><h3></h3><div class="summary maintenance-summary"></div><div class="readonly"></div></div></section>`;
+    this.shadowRoot.innerHTML = `<style>${css}${premiumCss}</style><section class="card"><div class="header"><h2></h2><span class="status" role="status"><i class="dot"></i><span></span></span></div><p class="warning" hidden></p><p class="compatibility muted" role="status"></p><div class="section overview"><h3></h3><div class="summary"></div></div><details class="section host-details" data-section="host"><summary><strong></strong></summary><div class="host-actions action-row"></div><div class="grid host-grid"></div></details><div class="section vm-section"><h3></h3><div class="grid vm-grid"></div><p class="muted empty-vms" hidden></p></div><div class="section container-section"><h3></h3><div class="grid container-grid"></div><p class="muted empty-containers" hidden></p></div><div class="section maintenance-section"><h3></h3><div class="summary maintenance-summary"></div><div class="readonly"></div></div><details class="scroll-diagnostics" hidden><summary><strong></strong></summary><p class="muted scroll-diagnostic-status"></p><div class="scroll-diagnostic-actions"><button type="button" class="scroll-diagnostic-start"></button><button type="button" class="scroll-diagnostic-stop" hidden></button><button type="button" class="scroll-diagnostic-copy"></button></div><pre class="scroll-diagnostic-json" aria-label="scroll diagnostic JSON"></pre></details></section>`;
     const root = this.shadowRoot; this._shell = { card: root.querySelector(".card"), title: root.querySelector(".header h2"), status: root.querySelector(".status"), statusText: root.querySelector(".status span"), warning: root.querySelector(".warning"), compatibility: root.querySelector(".compatibility"), overview: root.querySelector(".overview"), overviewTitle: root.querySelector(".overview h3"), overviewGrid: root.querySelector(".overview .summary"), host: root.querySelector(".host-details"), hostTitle: root.querySelector(".host-details summary strong"), hostActions: root.querySelector(".host-actions"), hostGrid: root.querySelector(".host-grid"), vm: this._sectionRefs("vm"), container: this._sectionRefs("container"), maintenance: this._sectionRefs("maintenance") };
     this._shell.hostButton = this._dryRunButton("host"); this._shell.hostActions.append(this._shell.hostButton); this._shell.hostUpdate = document.createElement("div"); this._shell.hostUpdate.className = "muted update-status"; this._shell.hostUpdate.hidden = true; this._shell.hostGrid.append(this._shell.hostUpdate);
     this._shell.overviewMetrics = ["host", "lastUpdated", "cpu", "memory", "storage"].map(() => this._metric()); this._shell.overviewMetrics.forEach((m) => this._shell.overviewGrid.append(m.node));
@@ -105,7 +173,7 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
     this._setMetric(s.overviewMetrics[0], labels.host, host?.name || labels.noData, host?.online === false ? labels.hostOffline : host?.online === true ? labels.connected : labels.unknown); this._setMetric(s.overviewMetrics[1], labels.lastUpdated, data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : labels.noData); this._setMetric(s.overviewMetrics[2], labels.cpu, host?.cpu_percent != null ? `${Number(host.cpu_percent).toFixed(1)}%` : labels.noData, host?.cpu_cores ? `${host.cpu_cores} cores` : ""); this._setMetric(s.overviewMetrics[3], labels.memory, host?.memory_used_bytes != null ? bytes(host.memory_used_bytes) : labels.noData, host?.memory_total_bytes ? `of ${bytes(host.memory_total_bytes)}` : ""); this._setMetric(s.overviewMetrics[4], labels.storage, host?.storage_used_bytes != null ? bytes(host.storage_used_bytes) : labels.noData, host?.storage_total_bytes ? `of ${bytes(host.storage_total_bytes)}` : "");
     s.host.hidden = !host; s.hostTitle.textContent = host ? `${labels.host} · ${host.name}` : ""; const hostUpdate = host?.update || {}; const hostEnabled = simulationEnabled(hostUpdate); s.hostButton.textContent = labels.simulate; s.hostButton.hidden = false; s.hostButton.disabled = !hostEnabled; s.hostButton.setAttribute("aria-disabled", String(!hostEnabled)); s.hostButton.title = hostEnabled ? "" : simulationReason(hostUpdate, labels); s.hostUpdate.textContent = updateText(hostUpdate, labels); s.hostUpdate.hidden = !s.hostUpdate.textContent; this._setMetric(s.hostMetrics[0], labels.version, displayValue(host?.release)); this._setMetric(s.hostMetrics[1], labels.kernel, displayValue(host?.kernel)); this._setMetric(s.hostMetrics[2], labels.uptime, uptime(host?.uptime_seconds)); this._setBar(s.hostBars[0], labels.cpu, host?.cpu_percent, 100); this._setBar(s.hostBars[1], labels.memory, host?.memory_used_bytes, host?.memory_total_bytes, host?.memory_available_bytes, labels.availableMemory); this._setBar(s.hostBars[2], labels.storage, host?.storage_used_bytes, host?.storage_total_bytes, host?.storage_available_bytes, labels.freeStorage);
     s.vm.section.hidden = !this.config.show_vms; s.vm.heading.textContent = `${labels.vms} (${data.vms.length})`; this._updateItems("vm", data.vms, labels, "VM"); s.vm.empty.textContent = labels.noVms; s.vm.empty.hidden = data.vms.length !== 0; s.container.section.hidden = !this.config.show_containers; s.container.heading.textContent = `${labels.containers} (${data.containers.length})`; this._updateItems("container", data.containers, labels, "CT"); s.container.empty.textContent = labels.noContainers; s.container.empty.hidden = data.containers.length !== 0;
-    s.maintenance.section.hidden = !this.config.show_maintenance; s.maintenance.heading.textContent = labels.maintenance; this._setMetric(s.jobs, labels.jobs, data.jobs === null ? null : data.jobs); const recoveryStatus = recoveryText(data.jobSummary, resolveLanguage(this._hass) === "de"); const readonly = s.maintenance.section.querySelector(".readonly"); readonly.textContent = recoveryStatus || labels.readOnly; readonly.title = data.jobSummary?.last_recovery_at ? `${labels.checked}: ${new Date(data.jobSummary.last_recovery_at).toLocaleString()}` : ""; this._ensureInstallButtons(labels);
+    s.maintenance.section.hidden = !this.config.show_maintenance; s.maintenance.heading.textContent = labels.maintenance; this._setMetric(s.jobs, labels.jobs, data.jobs === null ? null : data.jobs); const recoveryStatus = recoveryText(data.jobSummary, resolveLanguage(this._hass) === "de"); const readonly = s.maintenance.section.querySelector(".readonly"); readonly.textContent = recoveryStatus || labels.readOnly; readonly.title = data.jobSummary?.last_recovery_at ? `${labels.checked}: ${new Date(data.jobSummary.last_recovery_at).toLocaleString()}` : ""; this._ensureInstallButtons(labels); if (this.config.scroll_diagnostics !== true) this._stopScrollDiagnostics(); this._renderScrollDiagnostics();
   }
   _ensureInstallButtons(labels) {
     const add = (button) => {
@@ -120,44 +188,88 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   static getStubConfig() { return { title: "Smart Homelab Maintenance", show_vms: true, show_containers: true }; }
 }
 
-function scrollDiagnosticForCard(card) {
-  const style = (node) => {
-    if (!node || node.nodeType !== Node.ELEMENT_NODE) return null;
-    const computed = getComputedStyle(node);
-    const rect = node.getBoundingClientRect();
-    return {
-      tag: node.tagName.toLowerCase(), id: node.id || null, className: typeof node.className === "string" ? node.className : null,
-      rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
-      clientHeight: node.clientHeight, scrollHeight: node.scrollHeight, scrollTop: node.scrollTop,
-      overflowY: computed.overflowY, overflow: computed.overflow, height: computed.height,
-      maxHeight: computed.maxHeight, position: computed.position, touchAction: computed.touchAction,
-    };
+function diagnosticStyle(node, label = null) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return null;
+  const computed = getComputedStyle(node);
+  const rect = node.getBoundingClientRect();
+  return {
+    label, tag: node.tagName.toLowerCase(), id: node.id || null,
+    className: typeof node.className === "string" ? node.className : null,
+    rect: { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height },
+    clientWidth: node.clientWidth, clientHeight: node.clientHeight, scrollWidth: node.scrollWidth,
+    scrollHeight: node.scrollHeight, scrollLeft: node.scrollLeft, scrollTop: node.scrollTop,
+    overflow: computed.overflow, overflowX: computed.overflowX, overflowY: computed.overflowY,
+    height: computed.height, minHeight: computed.minHeight, maxHeight: computed.maxHeight,
+    position: computed.position, display: computed.display, touchAction: computed.touchAction,
+    overscrollBehaviorY: computed.overscrollBehaviorY,
   };
+}
+
+function diagnosticAncestors(card) {
   const ancestors = [];
   let node = card;
-  while (node && node.nodeType === Node.ELEMENT_NODE && ancestors.length < 12) {
-    ancestors.push(style(node));
-    node = node.parentElement;
+  while (node && node.nodeType === Node.ELEMENT_NODE && ancestors.length < 32) {
+    ancestors.push(diagnosticStyle(node));
+    if (node.parentElement) node = node.parentElement;
+    else {
+      const root = node.getRootNode?.();
+      node = root?.host || null;
+    }
   }
+  return ancestors;
+}
+
+function diagnosticScrollCandidates(card, internalNodes) {
+  const nodes = [card, ...internalNodes, ...diagnosticAncestors(card).map((_, index) => {
+    let node = card;
+    for (let i = 0; i < index && node; i += 1) node = node.parentElement || node.getRootNode?.().host || null;
+    return node;
+  }), card.ownerDocument?.scrollingElement].filter(Boolean);
+  const unique = [...new Set(nodes)];
+  return unique.map((node) => {
+    const entry = diagnosticStyle(node);
+    const scrollableSize = Number(node.scrollHeight) > Number(node.clientHeight) + 1;
+    const scrollStyle = ["auto", "scroll", "overlay"].includes(getComputedStyle(node).overflowY);
+    return { ...entry, scrollableSize, scrollStyle, likelyScrollContainer: scrollableSize || scrollStyle };
+  });
+}
+
+function scrollDiagnosticForCard(card, touch = null) {
   const root = card.shadowRoot;
+  const internalNodes = root ? [root.querySelector(".card"), root.querySelector(".container-grid")] : [];
   const items = root ? [...root.querySelectorAll(".container-grid .item")] : [];
-  const last = items.at(-1);
+  const ct112 = root?.querySelector('.container-grid .item[data-item-id="112"]') || null;
+  const candidates = diagnosticScrollCandidates(card, internalNodes);
+  const selected = candidates.find((entry) => entry.likelyScrollContainer) || candidates.find((entry) => entry.tag === "html") || null;
   let squareGridParent = card.parentElement;
   while (squareGridParent && squareGridParent !== document.body && squareGridParent.localName !== "hui-grid-card") squareGridParent = squareGridParent.parentElement;
   return {
-    generatedAt: new Date().toISOString(),
-    element: style(card),
-    shadowRoot: root ? {
-      host: style(card),
-      card: style(root.querySelector(".card")),
-      containerGrid: style(root.querySelector(".container-grid")),
-      itemCount: items.length,
-      lastItem: style(last),
+    schema: "smart-homelab-maintenance.scroll-diagnostics.v1", capturedAt: new Date().toISOString(),
+    note: "Technical layout metrics only; no HA state, credentials, tokens, or scroll behavior changes.",
+    runtime: {
+      userAgent: typeof navigator === "undefined" ? null : navigator.userAgent,
+      platform: typeof navigator === "undefined" ? null : navigator.platform,
+      maxTouchPoints: typeof navigator === "undefined" ? null : navigator.maxTouchPoints,
+      standalone: typeof navigator === "undefined" ? null : navigator.standalone === true,
+      displayModeStandalone: typeof matchMedia === "undefined" ? null : matchMedia("(display-mode: standalone)").matches,
+      viewport: typeof visualViewport === "undefined" ? null : { width: visualViewport.width, height: visualViewport.height, offsetTop: visualViewport.offsetTop, pageTop: visualViewport.pageTop, scale: visualViewport.scale },
+    },
+    card: diagnosticStyle(card), ancestors: diagnosticAncestors(card),
+    shadowDom: root ? {
+      host: diagnosticStyle(card), card: diagnosticStyle(root.querySelector(".card")),
+      containerGrid: diagnosticStyle(root.querySelector(".container-grid")), itemCount: items.length,
+      ct112: diagnosticStyle(ct112, "CT112"),
     } : null,
-    squareGridParent: squareGridParent ? { tag: squareGridParent.localName, square: squareGridParent.hasAttribute("square"), naturalHeightApplied: squareGridParent === card._naturalGridParent } : null,
-    ancestors,
+    scrollContainers: candidates, identifiedScrollContainer: selected,
+    squareGridParent: squareGridParent ? { tag: squareGridParent.localName, square: squareGridParent.hasAttribute("square") } : null,
+    ct112Position: ct112 ? { rect: diagnosticStyle(ct112, "CT112")?.rect, offsetTop: ct112.offsetTop, offsetParent: ct112.offsetParent?.tagName?.toLowerCase() || null } : null,
+    touch: touch ? { ...touch } : { touchstart: 0, touchmove: 0, touchend: 0, scrollDeltaDuringTouch: 0, touchArrived: false, touchMovedWithoutScroll: false },
   };
 }
+
+const diagnosticText = (language) => language === "de"
+  ? { title: "iOS-Scroll-Diagnose", start: "Diagnose starten", stop: "Diagnose beenden", copy: "JSON kopieren", idle: "Standardmäßig deaktiviert. Die Diagnose verändert das Scrollverhalten nicht.", running: "Diagnose aktiv; auf dieser Karte wischen und danach JSON kopieren.", copied: "Diagnose-JSON kopiert.", copyFailed: "Kopieren nicht möglich; JSON markieren und manuell kopieren." }
+  : { title: "iOS scroll diagnosis", start: "Start diagnosis", stop: "Stop diagnosis", copy: "Copy JSON", idle: "Disabled by default. Diagnosis does not change scrolling behavior.", running: "Diagnosis active; swipe this card, then copy the JSON.", copied: "Diagnostic JSON copied.", copyFailed: "Copy unavailable; select and copy the JSON manually." };
 
 // Read-only console probe for authenticated mobile/WebView diagnosis. It is
 // intentionally opt-in and does not change layout, focus, or scroll position.
@@ -321,10 +433,10 @@ export class SmartHomelabMaintenanceCardEditor extends HTMLElement {
   setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
   render() {
     if (!this._rendered) {
-      this.innerHTML = `<style>${editorCss}</style><div class="editor"><label class="field"><span data-label="title"></span><input data-field="title" type="text"></label><label class="field checkbox"><input data-field="show_vms" type="checkbox"><span data-label="vms"></span></label><label class="field checkbox"><input data-field="show_containers" type="checkbox"><span data-label="containers"></span></label><label class="field checkbox"><input data-field="show_maintenance" type="checkbox"><span data-label="maintenance"></span></label></div>`;
+      this.innerHTML = `<style>${editorCss}</style><div class="editor"><label class="field"><span data-label="title"></span><input data-field="title" type="text"></label><label class="field checkbox"><input data-field="show_vms" type="checkbox"><span data-label="vms"></span></label><label class="field checkbox"><input data-field="show_containers" type="checkbox"><span data-label="containers"></span></label><label class="field checkbox"><input data-field="show_maintenance" type="checkbox"><span data-label="maintenance"></span></label><label class="field checkbox"><input data-field="scroll_diagnostics" type="checkbox"><span data-label="scroll_diagnostics"></span></label></div>`;
       this.addEventListener("change", (event) => {
         if (!(event.target instanceof HTMLInputElement)) return;
-        const next = { ...this.config, title: this.querySelector('[data-field="title"]').value, show_vms: this.querySelector('[data-field="show_vms"]').checked, show_containers: this.querySelector('[data-field="show_containers"]').checked, show_maintenance: this.querySelector('[data-field="show_maintenance"]').checked };
+        const next = { ...this.config, title: this.querySelector('[data-field="title"]').value, show_vms: this.querySelector('[data-field="show_vms"]').checked, show_containers: this.querySelector('[data-field="show_containers"]').checked, show_maintenance: this.querySelector('[data-field="show_maintenance"]').checked, scroll_diagnostics: this.querySelector('[data-field="scroll_diagnostics"]').checked };
         this.config = next;
         this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: next }, bubbles: true, composed: true }));
       });
@@ -334,7 +446,8 @@ export class SmartHomelabMaintenanceCardEditor extends HTMLElement {
     for (const field of ["title", "vms", "containers", "maintenance"]) this.querySelector(`[data-label="${field}"]`).textContent = labels[field];
     const title = this.querySelector('[data-field="title"]');
     if (title && !title.matches(":focus")) title.value = this.config.title;
-    for (const field of ["show_vms", "show_containers", "show_maintenance"]) {
+    this.querySelector('[data-label="scroll_diagnostics"]').textContent = labels.scroll_diagnostics;
+    for (const field of ["show_vms", "show_containers", "show_maintenance", "scroll_diagnostics"]) {
       const input = this.querySelector(`[data-field="${field}"]`);
       if (input && !input.matches(":focus")) input.checked = Boolean(this.config[field]);
     }

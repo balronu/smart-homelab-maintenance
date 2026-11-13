@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>scroll diagnostics harness</title></head>
+<body><smart-homelab-maintenance-card id="card"></smart-homelab-maintenance-card><pre id="result"></pre>
+<script type="module" src="./smart-homelab-maintenance-card.js"></script>
+<script type="module">
+const card = document.querySelector("#card");
+const defaultCard = document.createElement("smart-homelab-maintenance-card");
+document.body.append(defaultCard);
+defaultCard.setConfig({ show_vms: false, show_containers: true, show_maintenance: false });
+card.setConfig({ show_vms: false, show_containers: true, show_maintenance: false, scroll_diagnostics: true });
+card.hass = { language: "en", states: {
+  "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
+  "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
+  "sensor.smart_homelab_maintenance_container_112": { state: "running", attributes: { container_id: 112, name: "ct112", running: true, os_name: "Debian", os_version: "13", package_manager: "apt", update: { status: "current", dry_run_supported: false } } },
+  "sensor.smart_homelab_maintenance_running_jobs": { state: "0", attributes: {} },
+} };
+await new Promise((resolve) => setTimeout(resolve, 0));
+const panel = card.shadowRoot.querySelector(".scroll-diagnostics");
+const start = panel.querySelector(".scroll-diagnostic-start");
+let scrollIntoViewCalls = 0;
+card.scrollIntoView = () => { scrollIntoViewCalls += 1; };
+start.click();
+window.dispatchEvent(new Event("touchstart", { bubbles: true, composed: true }));
+window.dispatchEvent(new Event("touchmove", { bubbles: true, composed: true }));
+window.dispatchEvent(new Event("touchend", { bubbles: true, composed: true }));
+const payload = JSON.parse(panel.querySelector(".scroll-diagnostic-json").textContent);
+let copied = "";
+try { Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text) => { copied = text; } } }); } catch (_) {}
+panel.querySelector(".scroll-diagnostic-copy").click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+window.__SCROLL_DIAGNOSTICS__ = {
+  visible: panel.hidden === false,
+  defaultDisabled: defaultCard.shadowRoot.querySelector(".scroll-diagnostics").hidden === true,
+  schema: payload.schema,
+  hasAncestors: Array.isArray(payload.ancestors) && payload.ancestors.length > 0,
+  hasShadowMetrics: Boolean(payload.shadowDom?.containerGrid),
+  ct112: payload.shadowDom?.ct112?.label === "CT112" && payload.ct112Position?.rect?.height >= 0,
+  hasScrollContainer: Array.isArray(payload.scrollContainers) && payload.scrollContainers.length > 0,
+  touchObserved: payload.touch.touchstart === 1 && payload.touch.touchmove === 1 && payload.touch.touchend === 1,
+  noSensitiveState: !panel.querySelector(".scroll-diagnostic-json").textContent.includes("connected"),
+  copyWorks: copied.includes("smart-homelab-maintenance.scroll-diagnostics.v1"),
+  scrollBehaviorUntouched: scrollIntoViewCalls === 0,
+};
+document.querySelector("#result").textContent = JSON.stringify(window.__SCROLL_DIAGNOSTICS__);
+</script></body></html>

@@ -66,6 +66,10 @@ try {
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("acceptedIsNotSuccess"), null, { timeout: 10000 });
     const jobResult = JSON.parse(await page.locator("#result").textContent());
     if (!jobResult.acceptedIsNotSuccess || !jobResult.doubleClickBlocked || !jobResult.detailVisible || !jobResult.successAfterTerminal || !jobResult.historicalLabel || !jobResult.historicalDetail || !jobResult.blockedDetail || !jobResult.unknownVisible) throw new Error(`${name} job status harness failed: ${JSON.stringify(jobResult)}`);
+    await page.goto(`http://127.0.0.1:${port}/frontend/scroll-diagnostics-harness.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
+    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("hasAncestors"), null, { timeout: 10000 });
+    const diagnosticResult = JSON.parse(await page.locator("#result").textContent());
+    if (!diagnosticResult.visible || !diagnosticResult.defaultDisabled || diagnosticResult.schema !== "smart-homelab-maintenance.scroll-diagnostics.v1" || !diagnosticResult.hasAncestors || !diagnosticResult.hasShadowMetrics || !diagnosticResult.ct112 || !diagnosticResult.hasScrollContainer || !diagnosticResult.touchObserved || !diagnosticResult.noSensitiveState || !diagnosticResult.copyWorks || !diagnosticResult.scrollBehaviorUntouched) throw new Error(`${name} scroll diagnostics harness failed: ${JSON.stringify(diagnosticResult)}`);
     await page.goto(`http://127.0.0.1:${port}/frontend/browser-harness.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
     await page.screenshot({ path: `/tmp/card-${name}.png`, fullPage: true, timeout: ACTION_TIMEOUT });
