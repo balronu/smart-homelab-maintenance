@@ -119,8 +119,14 @@ try {
     await page.goto(`http://127.0.0.1:${port}/frontend/sections-scroll-regression.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("legacyReproducesClip"), null, { timeout: 10000 });
     const sectionsRegression = JSON.parse(await page.locator("#result").textContent());
-    if (!sectionsRegression.legacyReproducesClip || !sectionsRegression.fixedReachable || sectionsRegression.cardCount !== 2 || !sectionsRegression.lastText.includes("112")) {
+    if (!sectionsRegression.legacyReproducesClip || !sectionsRegression.fixedReachable || sectionsRegression.cardCount !== 2 || !sectionsRegression.lastText.includes("112") || !sectionsRegression.crossesShadowBoundary || !sectionsRegression.legacyAncestors.some((ancestor) => ancestor.id === "legacy-slot" && ancestor.clipping)) {
       throw new Error(`${name} Sections stale-height regression failed: ${JSON.stringify(sectionsRegression)}`);
+    }
+    await page.goto(`http://127.0.0.1:${port}/frontend/sections-layout-matrix.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
+    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("directFull"), null, { timeout: 10000 });
+    const layoutMatrix = JSON.parse(await page.locator("#result").textContent());
+    if (!layoutMatrix.directFull || !layoutMatrix.dynamicTextVisible || !layoutMatrix.grewOrStable) {
+      throw new Error(`${name} direct/nested Sections layout matrix failed: ${JSON.stringify(layoutMatrix)}`);
     }
     await page.close();
     await context.close();

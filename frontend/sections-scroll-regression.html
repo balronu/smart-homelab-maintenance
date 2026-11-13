@@ -21,6 +21,7 @@
   <pre id="result"></pre>
 <script type="module">
 import "./smart-homelab-maintenance-card.js";
+import { inspectScrollAncestors, relevantScrollAncestors } from "./scroll-diagnostics.js";
 const states = {
   "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
   "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
@@ -47,5 +48,8 @@ window.scrollTo(0, document.documentElement.scrollHeight);
 await new Promise(resolve => requestAnimationFrame(resolve));
 const measure = (slot, card) => { const slotBox = slot.getBoundingClientRect(); const lastBox = last(card).getBoundingClientRect(); const relativeLastBottom = lastBox.bottom - slotBox.top; return { slotHeight: slot.getBoundingClientRect().height, cardHeight: card.getBoundingClientRect().height, lastBottom: lastBox.bottom, slotBottom: slotBox.bottom, relativeLastBottom, clipped: relativeLastBottom > slotBox.height + 2 }; };
 const result = { legacy: measure(legacySlot, legacyCard), fixed: measure(fixedSlot, fixedCard), legacyReproducesClip: measure(legacySlot, legacyCard).clipped, fixedReachable: !measure(fixedSlot, fixedCard).clipped, cardCount: cards.length, lastText: last(fixedCard).textContent };
+result.legacyAncestors = relevantScrollAncestors(last(legacyCard));
+result.fixedAncestors = relevantScrollAncestors(last(fixedCard));
+result.crossesShadowBoundary = inspectScrollAncestors(last(fixedCard)).some((ancestor) => ancestor.tag === "smart-homelab-maintenance-card");
 document.querySelector("#result").textContent = JSON.stringify(result);
 </script></body></html>
