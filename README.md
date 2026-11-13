@@ -1,33 +1,33 @@
 # Smart Homelab Maintenance
 
-## v1.0.27 – Stable
+## v1.0.28 – Stable
 
 ### Deutsch / English
 
-Diese Stable-Version behebt die Preflight-Timeout-Sperre vor Paketmutationen,
-führt eine sichere zweistufige Job-Reparatur ein und zeigt laufende Jobs direkt
-auf den Containerkarten. Die Updateprüfung kann global oder pro Container
-erneut gestartet werden. / This stable release fixes preflight timeout blocks
-before package mutation, adds a safe two-step job repair flow, and shows live
-jobs directly on container cards. Update checks can be refreshed globally or
-per container.
+Diese Stable-Version behebt die dynamische Kartenhöhe in Home-Assistant-
+Sections: Geöffnete Details und dynamische Statusänderungen bleiben auch auf
+schmalen Layouts vollständig erreichbar. / This stable release fixes dynamic
+card height handling in Home Assistant Sections so opened details and dynamic
+status changes remain reachable on narrow layouts.
 
 **Kompatibilität / Compatibility:** Integration, Frontend und Agent verwenden
-gemeinsam Version `1.0.27`; API 1.1, Config Entries, Berechtigungen,
+gemeinsam Version `1.0.28`; API 1.1, Config Entries, Berechtigungen,
 Allowlisten und Jobdaten bleiben kompatibel. / Integration, frontend and agent
-share version `1.0.27`; API 1.1, Config Entries, permissions, allowlists and
+share version `1.0.28`; API 1.1, Config Entries, permissions, allowlists and
 job data remain compatible.
 
 **Nach dem Update / Post-update:** Die HA-Integration über HACS/Marketplace
 aktualisieren und den Agenten über den offiziellen Upgrade-Mechanismus auf
-`1.0.27` aktualisieren. CT101 bleibt von diesem Release unberührt. / Update
-the HA integration through HACS/Marketplace and upgrade the agent to `1.0.27`
+`1.0.28` aktualisieren. CT101 bleibt von diesem Release unberührt. / Update
+the HA integration through HACS/Marketplace and upgrade the agent to `1.0.28`
 through the official upgrade mechanism. CT101 is not changed by this release.
 
 **Einschränkungen / Limitations:** Eine authentifizierte HA-iOS-WebView konnte
 nicht bereitgestellt werden; iPhone-/iPad-Tests basieren auf der automatisierten
 Browser-Matrix. / An authenticated HA iOS WebView was unavailable; iPhone/iPad
 coverage is based on the automated browser matrix.
+
+## v1.0.27 – Stable
 
 ### Deutsch / English
 
