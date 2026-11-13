@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.0.28 – Stable
+
+### Deutsch
+
+- Behebt die dynamische Kartenhöhe in Home-Assistant-Sections: Die gerenderte
+  Kartenhöhe wird für Masonry/Sections neu gemeldet, auch nach geöffneten
+  Details und dynamischen Statusänderungen.
+- Ergänzt Regressionstests für direkte Sections-Karten, verschachtelte Grid-
+  Karten, Shadow-DOM-/Slot-Grenzen, Square-Grid-Clipping und mobile Chromium-
+  Viewports.
+- Beide ausgelieferten Frontend-Kopien bleiben byte-identisch; bestehende
+  Config Entries, Services und Agent-/Helper-Pfade bleiben unverändert.
+
+### English
+
+- Fixes dynamic card height handling in Home Assistant Sections: the rendered
+  card height is reported again for Masonry/Sections after opened details and
+  dynamic status changes.
+- Adds regressions for direct Sections cards, nested grid cards,
+  Shadow-DOM/slot boundaries, square-grid clipping, and mobile Chromium
+  viewports.
+- Keeps both shipped frontend copies byte-identical; existing Config Entries,
+  services, and agent/helper paths remain unchanged.
+
+**Kompatibilität/Migration / Compatibility/Migration:** API 1.1, existing
+Config Entries, permissions, job data, and agent/helper paths remain
+compatible. / API 1.1, bestehende Config Entries, Berechtigungen, Jobdaten
+und Agent-/Helper-Pfade bleiben kompatibel.
+
+**Nach dem Update / Post-update:** HA-Integration über HACS/Marketplace auf
+`1.0.28` aktualisieren und den offiziellen Agent-Upgrade-Mechanismus auf
+`1.0.28` anwenden. Keine produktiven HA-/Proxmox-/Agent-Änderungen werden
+durch die Veröffentlichung selbst ausgeführt. / Update the HA integration to
+`1.0.28` through HACS/Marketplace and use the official agent upgrade
+mechanism for `1.0.28`. The publication itself performs no productive
+HA/Proxmox/agent changes.
+
+**Einschränkung / Limitation:** Der echte iPhone-/HA-iOS-WebKit-Test ist offen;
+die automatisierte Chromium-Matrix ist kein Nachweis für reales iOS-Touch-
+Verhalten. / Real iPhone/HA-iOS WebKit validation remains open; the automated
+Chromium matrix is not proof of real iOS touch behavior.
+
 ## 1.0.27 – Stable
 
 ### Deutsch
