@@ -43,7 +43,7 @@ def _orchestration_attributes(value: Mapping[str, Any] | None) -> dict[str, Any]
 
 
 def _job_summaries(jobs: Any) -> list[dict[str, Any]]:
-    fields = ("job_id", "target", "state", "phase", "progress", "message", "error_code", "error_message", "created_at", "started_at", "finished_at")
+    fields = ("job_id", "target", "state", "phase", "progress", "message", "error_code", "error_message", "created_at", "started_at", "finished_at", "last_activity_at")
     return [{key: job.get(key) for key in fields if key in job} for job in jobs if isinstance(job, Mapping)]
 
 
