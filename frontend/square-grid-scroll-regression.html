@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Square grid scroll regression</title>
+<style>
+  body { margin: 0; font: 16px sans-serif; }
+  hui-grid-card { display: block; width: 320px; margin: 16px; }
+  hui-grid-card[square] { height: 320px; overflow: hidden; }
+  hui-grid-card:not([square]) { height: auto; }
+  #after { height: 120px; padding: 16px; background: #eee; }
+</style></head>
+<body>
+  <hui-grid-card square><smart-homelab-maintenance-card></smart-homelab-maintenance-card></hui-grid-card>
+  <div id="after">Dashboard content after the card</div>
+  <pre id="result"></pre>
+<script type="module">
+import "./smart-homelab-maintenance-card.js";
+const states = {
+  "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
+  "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
+  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { online: true, memory_used_bytes: 100, memory_total_bytes: 200, storage_used_bytes: 300, storage_total_bytes: 600 } },
+  ...Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`sensor.smart_homelab_maintenance_container_${101 + i}`, { state: "running", attributes: { container_id: 101 + i, name: `container-${101 + i}`, os_name: "Debian", os_version: "13", memory_used_bytes: 20, memory_total_bytes: 50, disk_used_bytes: 30, disk_total_bytes: 100 } }]))
+};
+const parent = document.querySelector("hui-grid-card");
+const card = parent.querySelector("smart-homelab-maintenance-card");
+card.setConfig({ show_vms: false, show_containers: true });
+card.hass = { language: "en", states };
+await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+const items = [...card.shadowRoot.querySelectorAll(".container-grid .item")];
+const last = items.at(-1);
+const parentBox = parent.getBoundingClientRect();
+const lastBox = last.getBoundingClientRect();
+const result = {
+  squareAttributeRemoved: !parent.hasAttribute("square"),
+  itemCount: items.length,
+  lastReachable: lastBox.bottom <= parentBox.bottom + 2,
+  naturalHeight: parentBox.height > 320,
+  lastText: last?.textContent || ""
+};
+window.__SQUARE_GRID_SCROLL_REGRESSION__ = result;
+document.querySelector("#result").textContent = JSON.stringify(result);
+</script></body></html>
