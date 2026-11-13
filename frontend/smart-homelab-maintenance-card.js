@@ -46,25 +46,34 @@ const editorCss = `:host{display:block;box-sizing:border-box;color:var(--primary
 const premiumCss = `.card{background:linear-gradient(145deg,var(--ha-card-background,var(--card-background-color)),color-mix(in srgb,var(--ha-card-background,var(--card-background-color)) 86%,var(--primary-color,#03a9f4)));border:1px solid color-mix(in srgb,var(--divider-color,#ddd) 70%,transparent);}.header{padding-bottom:4px}.status{padding:5px 9px;border-radius:999px;background:var(--secondary-background-color);}.status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--success-color,#43a047) 18%,transparent)}.offline .status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--error-color,#db4437) 18%,transparent)}.section{border-top:1px solid color-mix(in srgb,var(--divider-color,#ddd) 55%,transparent);padding-top:14px}.item{background:color-mix(in srgb,var(--card-background-color,#fff) 76%,transparent);transition:border-color .18s ease,background .18s ease}.item[open]{border-color:color-mix(in srgb,var(--primary-color,#03a9f4) 55%,var(--divider-color,#ddd));background:color-mix(in srgb,var(--primary-color,#03a9f4) 5%,var(--card-background-color,#fff))}.item>summary{list-style:none}.item>summary::-webkit-details-marker{display:none}.item-head{cursor:pointer;padding:0}.item-head::after{content:"+";color:var(--secondary-text-color);font-weight:700}.item[open]>.item-head::after{content:"−"}.item-body{padding-top:10px}.metric strong{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){.item{transition:none}}`;
 const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch;margin-top:10px}.action-row button{width:100%;min-width:0;height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.vm-exclusion{margin:10px 0 0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--secondary-background-color);overflow-wrap:anywhere}.simulation-result,.permission-result{margin-top:8px;min-width:0;overflow-wrap:anywhere}.simulation-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.simulation-summary strong{font-size:1.05em}.package-list{margin-top:8px}.package-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:5px 0;border-top:1px solid var(--divider-color,#ddd);min-width:0}.package-name,.package-version{min-width:0;overflow-wrap:anywhere;word-break:break-word}@media(max-width:600px){.simulation-summary{grid-template-columns:1fr}.package-row{grid-template-columns:1fr}.action-row button{font-size:.92em}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
-  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._permissionStates = new Map(); this._lastConfirmedPermissions = new Map(); this._updateSnapshots = new Map(); this._lastSize = null; this._resizeObserver = null; }
+  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._permissionStates = new Map(); this._lastConfirmedPermissions = new Map(); this._updateSnapshots = new Map(); this._lastSize = null; this._resizeObserver = null; this._resizeFrame = null; }
   connectedCallback() { this._ensureShell(); this._ensureRefreshButton(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
-  disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; }
+  disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; if (this._resizeFrame !== null) cancelAnimationFrame(this._resizeFrame); this._resizeFrame = null; }
   setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
   set hass(value) { this._hass = value; this.render(); }
   get hass() { return this._hass; }
-  getCardSize() { return 8; }
+  getCardSize() {
+    const measuredHeight = this._shell?.card?.getBoundingClientRect().height || this.getBoundingClientRect().height;
+    return Math.max(1, Math.ceil((measuredHeight || 50) / 50));
+  }
   getGridOptions() { return { columns: "full", rows: "auto" }; }
   _observeSize() {
     if (this._resizeObserver || typeof ResizeObserver === "undefined") return;
-    this._resizeObserver = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      const size = `${Math.round(width)}x${Math.round(height)}`;
+    this._resizeObserver = new ResizeObserver((entries) => {
+      if (!entries.length) return;
+      const measure = (target, name) => { const rect = target.getBoundingClientRect(); return `${name}:${Math.round(rect.width)}x${Math.round(rect.height)}`; };
+      const size = `${measure(this, "host")}|${measure(this._shell.card, "card")}`;
       if (this._lastSize === null) { this._lastSize = size; return; }
       if (this._lastSize === size) return;
       this._lastSize = size;
-      this.dispatchEvent(new CustomEvent("card-updated", { bubbles: true, composed: true }));
+      if (this._resizeFrame !== null) return;
+      this._resizeFrame = requestAnimationFrame(() => {
+        this._resizeFrame = null;
+        this.dispatchEvent(new CustomEvent("card-updated", { bubbles: true, composed: true }));
+      });
     });
     this._resizeObserver.observe(this);
+    this._resizeObserver.observe(this._shell.card);
   }
   _metric() { const node = document.createElement("div"); node.className = "metric"; node.innerHTML = '<span class="muted"></span><strong></strong><span class="muted"></span>'; return { node, label: node.children[0], value: node.children[1], sub: node.children[2] }; }
   _bar() { const node = document.createElement("div"); node.className = "bar-row"; node.innerHTML = '<span></span><progress max="100"></progress><span class="muted"></span>'; return { node, label: node.children[0], progress: node.children[1], value: node.children[2] }; }

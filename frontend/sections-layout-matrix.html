@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sections direct and nested layout matrix</title>
+<style>
+  html,body{margin:0;min-height:100%;font-family:system-ui;background:#eee}
+  .section{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px;align-items:start;padding:8px}
+  .section>smart-homelab-maintenance-card,.nested-grid{grid-column:1/-1;min-width:0}
+  .nested-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px}
+  .nested-grid>smart-homelab-maintenance-card{grid-column:1/-1}
+  #after{height:180px;padding:12px;background:#ddd}
+</style>
+<main>
+  <section class="section" id="section">
+    <smart-homelab-maintenance-card id="direct"></smart-homelab-maintenance-card>
+    <div class="nested-grid"><smart-homelab-maintenance-card id="nested"></smart-homelab-maintenance-card></div>
+  </section>
+  <div id="after">AFTER_SECTIONS_CARDS</div>
+</main>
+<pre id="result"></pre>
+<script type="module">
+import "./smart-homelab-maintenance-card.js";
+const states = {
+  "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
+  "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
+  "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { online: true } },
+  "sensor.smart_homelab_maintenance_running_jobs": { state: "0", attributes: {} },
+  ...Object.fromEntries(Array.from({ length: 12 }, (_, index) => {
+    const id = 101 + index;
+    return [`sensor.smart_homelab_maintenance_container_${id}`, { state: "running", attributes: {
+      container_id: id, name: `Container ${id} with a long status message that must wrap on a phone`, running: true,
+      os_name: "Debian", os_version: "12", update: { status: "updates_available", available_count: index + 1 },
+    } }];
+  })),
+};
+const cards = [document.querySelector("#direct"), document.querySelector("#nested")];
+for (const card of cards) { card.setConfig({ show_vms: false, show_containers: true }); card.hass = { language: "en", states }; }
+await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+for (const card of cards) [...card.shadowRoot.querySelectorAll(".container-grid .item")].at(-1).open = true;
+await new Promise((resolve) => setTimeout(resolve, 120));
+const measure = (card) => {
+  const last = [...card.shadowRoot.querySelectorAll(".container-grid .item")].at(-1);
+  const host = card.getBoundingClientRect(); const lastBox = last.getBoundingClientRect();
+  return { count: card.shadowRoot.querySelectorAll(".container-grid .item").length, hostHeight: host.height, cardHeight: card.shadowRoot.querySelector(".card").getBoundingClientRect().height, lastBottom: lastBox.bottom, hostBottom: host.bottom, open: last.open, lastText: last.textContent };
+};
+const before = cards.map(measure);
+  states["sensor.smart_homelab_maintenance_container_112"].attributes.update = { status: "error", error: "A very long dynamic update status that must remain visible" };
+for (const card of cards) card.hass = { language: "en", states };
+await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+const after = cards.map(measure);
+const result = { direct: after[0], nested: after[1], directFull: after.every((entry) => entry.count === 12 && entry.lastBottom <= entry.hostBottom + 2 && entry.open), dynamicTextVisible: after.every((entry) => entry.lastText.includes("long dynamic")), grewOrStable: after.every((entry, index) => entry.hostHeight >= before[index].hostHeight), sentinelTop: document.querySelector("#after").getBoundingClientRect().top };
+document.querySelector("#result").textContent = JSON.stringify(result);
+</script></html>
