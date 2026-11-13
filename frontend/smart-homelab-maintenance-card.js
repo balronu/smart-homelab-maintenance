@@ -127,6 +127,8 @@ function scrollDiagnosticForCard(card) {
   const root = card.shadowRoot;
   const items = root ? [...root.querySelectorAll(".container-grid .item")] : [];
   const last = items.at(-1);
+  let squareGridParent = card.parentElement;
+  while (squareGridParent && squareGridParent !== document.body && squareGridParent.localName !== "hui-grid-card") squareGridParent = squareGridParent.parentElement;
   return {
     generatedAt: new Date().toISOString(),
     element: style(card),
@@ -137,6 +139,7 @@ function scrollDiagnosticForCard(card) {
       itemCount: items.length,
       lastItem: style(last),
     } : null,
+    squareGridParent: squareGridParent ? { tag: squareGridParent.localName, square: squareGridParent.hasAttribute("square"), naturalHeightApplied: squareGridParent === card._naturalGridParent } : null,
     ancestors,
   };
 }
