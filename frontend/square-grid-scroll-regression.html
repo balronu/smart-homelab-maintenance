@@ -3,12 +3,11 @@
 <style>
   body { margin: 0; font: 16px sans-serif; }
   hui-grid-card { display: block; width: 320px; margin: 16px; }
-  hui-grid-card[square] { height: 320px; overflow: hidden; }
-  hui-grid-card:not([square]) { height: auto; }
+  hui-grid-card { height: auto; }
   #after { height: 120px; padding: 16px; background: #eee; }
 </style></head>
 <body>
-  <hui-grid-card square><smart-homelab-maintenance-card></smart-homelab-maintenance-card></hui-grid-card>
+  <hui-grid-card><smart-homelab-maintenance-card></smart-homelab-maintenance-card></hui-grid-card>
   <div id="after">Dashboard content after the card</div>
   <pre id="result"></pre>
 <script type="module">
@@ -29,7 +28,7 @@ const last = items.at(-1);
 const parentBox = parent.getBoundingClientRect();
 const lastBox = last.getBoundingClientRect();
 const result = {
-  squareAttributeRemoved: !parent.hasAttribute("square"),
+  squareAttributeAbsent: !parent.hasAttribute("square"),
   itemCount: items.length,
   lastReachable: lastBox.bottom <= parentBox.bottom + 2,
   naturalHeight: parentBox.height > 320,

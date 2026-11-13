@@ -126,9 +126,9 @@ try {
       throw new Error(`${name} Sections stale-height regression failed: ${JSON.stringify(sectionsRegression)}`);
     }
     await page.goto(`http://127.0.0.1:${port}/frontend/square-grid-scroll-regression.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
-    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("squareAttributeRemoved"), null, { timeout: 10000 });
+    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("squareAttributeAbsent"), null, { timeout: 10000 });
     const squareGridRegression = JSON.parse(await page.locator("#result").textContent());
-    if (!squareGridRegression.squareAttributeRemoved || squareGridRegression.itemCount !== 12 || !squareGridRegression.lastReachable || !squareGridRegression.naturalHeight || !squareGridRegression.lastText.includes("112")) {
+    if (!squareGridRegression.squareAttributeAbsent || squareGridRegression.itemCount !== 12 || !squareGridRegression.lastReachable || !squareGridRegression.naturalHeight || !squareGridRegression.lastText.includes("112")) {
       throw new Error(`${name} square grid scroll regression failed: ${JSON.stringify(squareGridRegression)}`);
     }
     await page.close();

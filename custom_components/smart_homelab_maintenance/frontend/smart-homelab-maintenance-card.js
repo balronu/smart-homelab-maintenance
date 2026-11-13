@@ -47,34 +47,13 @@ const premiumCss = `.card{background:linear-gradient(145deg,var(--ha-card-backgr
 const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch;margin-top:10px}.action-row button{width:100%;min-width:0;height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.vm-exclusion{margin:10px 0 0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--secondary-background-color);overflow-wrap:anywhere}.simulation-result,.permission-result{margin-top:8px;min-width:0;overflow-wrap:anywhere}.simulation-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.simulation-summary strong{font-size:1.05em}.package-list{margin-top:8px}.package-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:5px 0;border-top:1px solid var(--divider-color,#ddd);min-width:0}.package-name,.package-version{min-width:0;overflow-wrap:anywhere;word-break:break-word}@media(max-width:600px){.simulation-summary{grid-template-columns:1fr}.package-row{grid-template-columns:1fr}.action-row button{font-size:.92em}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
   constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._permissionStates = new Map(); this._lastConfirmedPermissions = new Map(); this._updateSnapshots = new Map(); this._lastSize = null; this._resizeObserver = null; }
-  connectedCallback() { this._ensureShell(); this._ensureRefreshButton(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this._ensureNaturalGridParent(); this.render(); this._observeSize(); }
-  disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; this._restoreNaturalGridParent(); }
+  connectedCallback() { this._ensureShell(); this._ensureRefreshButton(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
+  disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; }
   setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
   set hass(value) { this._hass = value; this.render(); }
   get hass() { return this._hass; }
   getCardSize() { return 8; }
   getGridOptions() { return { columns: "full", rows: "auto" }; }
-  _ensureNaturalGridParent() {
-    if (this._naturalGridParent) return;
-    let parent = this.parentElement;
-    while (parent && parent !== document.body) {
-      // HA's grid card defaults to square=true. A single dynamic maintenance
-      // card in that wrapper is then clipped to the wrapper's aspect-ratio
-      // height, even though this card correctly reports rows:auto.
-      if (parent.localName === "hui-grid-card" && parent.hasAttribute("square")) {
-        this._naturalGridParent = parent;
-        parent.removeAttribute("square");
-        this.dispatchEvent(new CustomEvent("card-updated", { bubbles: true, composed: true }));
-        return;
-      }
-      parent = parent.parentElement;
-    }
-  }
-  _restoreNaturalGridParent() {
-    if (!this._naturalGridParent) return;
-    this._naturalGridParent.setAttribute("square", "");
-    this._naturalGridParent = null;
-  }
   _observeSize() {
     if (this._resizeObserver || typeof ResizeObserver === "undefined") return;
     this._resizeObserver = new ResizeObserver(([entry]) => {
