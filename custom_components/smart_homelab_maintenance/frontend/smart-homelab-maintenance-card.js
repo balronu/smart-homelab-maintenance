@@ -7,9 +7,10 @@ export function resolveLanguage(hass) {
   const raw = candidates.find((value) => typeof value === "string" && value.trim()) || "en";
   return raw.toLowerCase().startsWith("de") ? "de" : "en";
 }
-const textFor = (language) => language === "de" ? { connected: "Verbunden", offline: "Agent nicht erreichbar", hostOffline: "Host offline", overview: "Übersicht", host: "Proxmox-Host", lastUpdated: "Letzte Aktualisierung", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung", running: "laufend", stopped: "gestoppt", unknown: "unbekannt", cpu: "CPU", memory: "RAM", storage: "Speicher", availableMemory: "Freier RAM", freeStorage: "Freier Speicher", version: "Version", kernel: "Kernel", uptime: "Laufzeit", jobs: "Laufende Jobs", noData: "Keine Daten verfügbar", noVms: "Keine VMs erkannt", noContainers: "Keine Container erkannt", error: "Fehler", readOnly: "Nur-Lese-Modus", updates: "Updates", simulate: "Update simulieren", install: "Updates installieren", installDisabled: "Updatefunktion noch nicht freigegeben", simulateDisabled: "Simulation nicht verfügbar", unauthorizedReason: "Simulation nicht verfügbar: Ziel nicht autorisiert", helperUnavailableReason: "Simulation nicht verfügbar: Helper nicht eingerichtet", stoppedReason: "Simulation nicht verfügbar: Container ist gestoppt", unsupportedReason: "Simulation nicht verfügbar: Ziel nicht unterstützt", staleReason: "Simulation nicht verfügbar: Prüfdaten veraltet", notCheckedReason: "Simulation nicht verfügbar: Ziel noch nicht geprüft", vmExclusion: "Updates dieser virtuellen Maschine werden nicht über Smart Homelab Maintenance durchgeführt. Bitte die Updatefunktion des jeweiligen Gastbetriebssystems verwenden.", noUpdatesReason: "Keine verfügbaren Updates für die Simulation", current: "Aktuell", updatesAvailable: "verfügbar", notChecked: "Noch nicht geprüft", unsupported: "Nicht unterstützt", unauthorized: "Nicht autorisiert", failed: "Prüfung fehlgeschlagen", stale: "Daten veraltet", unknownUpdate: "Unbekannt", security: "Sicherheitsupdates", checked: "Letzte Prüfung", simulation: "Simulation", compatibility: "Agent-Kompatibilität", compatibilityCurrent: "Aktuell", compatibilityOutdated: "Veraltet", compatibilityIncompatible: "Inkompatibel", compatibilityUnknown: "Unbekannt" } : { connected: "Connected", offline: "Agent unreachable", hostOffline: "Host offline", overview: "Overview", host: "Proxmox host", lastUpdated: "Last updated", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance", running: "running", stopped: "stopped", unknown: "unknown", cpu: "CPU", memory: "RAM", storage: "Storage", availableMemory: "Free RAM", freeStorage: "Free storage", version: "Version", kernel: "Kernel", uptime: "Uptime", jobs: "Running jobs", noData: "No data available", noVms: "No virtual machines detected", noContainers: "No containers detected", error: "Error", readOnly: "Read-only mode", updates: "Updates", simulate: "Simulate update", install: "Install updates", installDisabled: "Update function not released", simulateDisabled: "Simulation unavailable", unauthorizedReason: "Simulation unavailable: target is not authorized", helperUnavailableReason: "Simulation unavailable: helper is not configured", stoppedReason: "Simulation unavailable: container is stopped", unsupportedReason: "Simulation unavailable: target is not supported", staleReason: "Simulation unavailable: check data is stale", notCheckedReason: "Simulation unavailable: target has not been checked", vmExclusion: "Updates for this virtual machine are not performed through Smart Homelab Maintenance. Please use the update function of the respective guest operating system.", noUpdatesReason: "No updates are available for simulation", current: "Up to date", updatesAvailable: "available", notChecked: "Not checked", unsupported: "Not supported", unauthorized: "Not authorized", failed: "Check failed", stale: "Data is stale", unknownUpdate: "Unknown", security: "security updates", checked: "Last checked", simulation: "Simulation", compatibility: "Agent compatibility", compatibilityCurrent: "Current", compatibilityOutdated: "Outdated", compatibilityIncompatible: "Incompatible", compatibilityUnknown: "Unknown" };
+const textFor = (language) => language === "de" ? { connected: "Verbunden", offline: "Agent nicht erreichbar", hostOffline: "Host offline", overview: "Übersicht", host: "Proxmox-Host", lastUpdated: "Letzte Aktualisierung", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung", running: "laufend", stopped: "gestoppt", unknown: "unbekannt", cpu: "CPU", memory: "RAM", storage: "Speicher", availableMemory: "Freier RAM", freeStorage: "Freier Speicher", version: "Version", kernel: "Kernel", uptime: "Laufzeit", jobs: "Laufende Jobs", noData: "Keine Daten verfügbar", noVms: "Keine VMs erkannt", noContainers: "Keine Container erkannt", error: "Fehler", readOnly: "Nur-Lese-Modus", updates: "Updates", simulate: "Update simulieren", install: "Updates installieren", installConfirm: "Die Simulation ist bestanden. Soll dieses konkrete Paket-Update jetzt wirklich installiert werden?", installDisabled: "Updatefunktion noch nicht freigegeben", simulateDisabled: "Simulation nicht verfügbar", unauthorizedReason: "Simulation nicht verfügbar: Ziel nicht autorisiert", helperUnavailableReason: "Simulation nicht verfügbar: Helper nicht eingerichtet", stoppedReason: "Simulation nicht verfügbar: Container ist gestoppt", unsupportedReason: "Simulation nicht verfügbar: Ziel nicht unterstützt", staleReason: "Simulation nicht verfügbar: Prüfdaten veraltet", notCheckedReason: "Simulation nicht verfügbar: Ziel noch nicht geprüft", vmExclusion: "Updates dieser virtuellen Maschine werden nicht über Smart Homelab Maintenance durchgeführt. Bitte die Updatefunktion des jeweiligen Gastbetriebssystems verwenden.", noUpdatesReason: "Keine verfügbaren Updates für die Simulation", current: "Aktuell", updatesAvailable: "verfügbar", notChecked: "Noch nicht geprüft", unsupported: "Nicht unterstützt", unauthorized: "Nicht autorisiert", failed: "Prüfung fehlgeschlagen", stale: "Daten veraltet", unknownUpdate: "Unbekannt", security: "Sicherheitsupdates", checked: "Letzte Prüfung", simulation: "Simulation", compatibility: "Agent-Kompatibilität", compatibilityCurrent: "Aktuell", compatibilityOutdated: "Veraltet", compatibilityIncompatible: "Inkompatibel", compatibilityUnknown: "Unbekannt" } : { connected: "Connected", offline: "Agent unreachable", hostOffline: "Host offline", overview: "Overview", host: "Proxmox host", lastUpdated: "Last updated", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance", running: "running", stopped: "stopped", unknown: "unknown", cpu: "CPU", memory: "RAM", storage: "Storage", availableMemory: "Free RAM", freeStorage: "Free storage", version: "Version", kernel: "Kernel", uptime: "Uptime", jobs: "Running jobs", noData: "No data available", noVms: "No virtual machines detected", noContainers: "No containers detected", error: "Error", readOnly: "Read-only mode", updates: "Updates", simulate: "Simulate update", install: "Install updates", installConfirm: "The simulation passed. Do you really want to install this specific package update now?", installDisabled: "Update function not released", simulateDisabled: "Simulation unavailable", unauthorizedReason: "Simulation unavailable: target is not authorized", helperUnavailableReason: "Simulation unavailable: helper is not configured", stoppedReason: "Simulation unavailable: container is stopped", unsupportedReason: "Simulation unavailable: target is not supported", staleReason: "Simulation unavailable: check data is stale", notCheckedReason: "Simulation unavailable: target has not been checked", vmExclusion: "Updates for this virtual machine are not performed through Smart Homelab Maintenance. Please use the update function of the respective guest operating system.", noUpdatesReason: "No updates are available for simulation", current: "Up to date", updatesAvailable: "available", notChecked: "Not checked", unsupported: "Not supported", unauthorized: "Not authorized", failed: "Check failed", stale: "Data is stale", unknownUpdate: "Unknown", security: "security updates", checked: "Last checked", simulation: "Simulation", compatibility: "Agent compatibility", compatibilityCurrent: "Current", compatibilityOutdated: "Outdated", compatibilityIncompatible: "Incompatible", compatibilityUnknown: "Unknown" };
 const editorText = (language) => language === "de" ? { title: "Titel", vms: "Virtuelle Maschinen", containers: "LXC-Container", maintenance: "Wartung" } : { title: "Title", vms: "Virtual machines", containers: "LXC containers", maintenance: "Maintenance" };
-const permissionText = (language) => language === "de" ? { allowSimulation: "Simulation freigeben", revokeSimulation: "Simulation widerrufen", allowUpdates: "Updates freigeben", revokeUpdates: "Updates widerrufen", permissionConfirm: "Berechtigung wirklich ändern?", permissionRunning: "Berechtigung wird geändert …", permissionSuccess: "Berechtigung erfolgreich geändert.", permissionFailed: "Berechtigungsänderung fehlgeschlagen" } : { allowSimulation: "Allow simulation", revokeSimulation: "Revoke simulation", allowUpdates: "Allow updates", revokeUpdates: "Revoke updates", permissionConfirm: "Really change this permission?", permissionRunning: "Changing permission …", permissionSuccess: "Permission changed successfully.", permissionFailed: "Permission change failed" };
+const labelsFor = (language) => ({ ...textFor(language), refresh: language === "de" ? "Jetzt auf Updates prüfen" : "Check for updates now", repairCheck: language === "de" ? "Reparatur prüfen" : "Check repair need", repair: language === "de" ? "Reparatur durchführen" : "Perform repair", repairDetails: language === "de" ? "Details anzeigen" : "Show details", closeDetails: language === "de" ? "Details schließen" : "Hide details", runningJob: language === "de" ? "Fortschritt anzeigen" : "Show progress" });
+const permissionText = (language) => language === "de" ? { allowSimulation: "Simulation freigeben", revokeSimulation: "Simulation widerrufen", allowUpdates: "Updates freigeben", revokeUpdates: "Updates widerrufen", permissionConfirm: "Berechtigung wirklich ändern?", permissionRunning: "Berechtigung wird geändert …", permissionPending: "Berechtigung geändert; HA-Rückread wird bestätigt …", permissionSuccess: "Berechtigung erfolgreich geändert.", permissionFailed: "Berechtigungsänderung fehlgeschlagen", permissionReadbackFailed: "Berechtigung geändert, aber der bestätigte Rückread fehlt." } : { allowSimulation: "Allow simulation", revokeSimulation: "Revoke simulation", allowUpdates: "Allow updates", revokeUpdates: "Revoke updates", permissionConfirm: "Really change this permission?", permissionRunning: "Changing permission …", permissionPending: "Permission changed; confirming HA readback …", permissionSuccess: "Permission changed successfully.", permissionFailed: "Permission change failed", permissionReadbackFailed: "Permission changed, but the confirmed readback is missing." };
 const esc = (value) => String(value ?? "").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 const bytes = (value) => { if (!Number.isFinite(Number(value))) return null; const units = ["B", "KB", "MB", "GB", "TB"]; let n = Number(value); let i = 0; while (Math.abs(n) >= 1024 && i < units.length - 1) { n /= 1024; i += 1; } return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${units[i]}`; };
 const finiteMetric = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
@@ -18,7 +19,9 @@ const uptime = (value) => Number.isFinite(Number(value)) ? `${Math.floor(Number(
 function model(hass, config) {
   const states = hass?.states || {}; const connection = states["sensor.smart_homelab_maintenance_agent_connection"]; const reachable = states["binary_sensor.smart_homelab_maintenance_agent_reachable"]; const hostState = states["sensor.smart_homelab_maintenance_host"];
   const entities = Object.entries(states).filter(([id, state]) => id.startsWith("sensor.smart_homelab_maintenance_") && state?.attributes);
-  const project = ([entity_id, state]) => ({ entity_id, ...state.attributes, name: state.attributes?.name || state.attributes?.friendly_name || entity_id, running: typeof state.attributes?.running === "boolean" ? state.attributes.running : state.state === "running" });
+  const jobs = Array.isArray(states["sensor.smart_homelab_maintenance_running_jobs"]?.attributes?.jobs) ? states["sensor.smart_homelab_maintenance_running_jobs"].attributes.jobs : [];
+  const jobsByTarget = new Map(jobs.map((job) => [job.target, job]));
+  const project = ([entity_id, state]) => { const value = { entity_id, ...state.attributes, name: state.attributes?.name || state.attributes?.friendly_name || entity_id, running: typeof state.attributes?.running === "boolean" ? state.attributes.running : state.state === "running" }; const target = value.container_id != null ? `container:${value.container_id}` : value.vmid != null ? `vm:${value.vmid}` : null; return { ...value, job: target ? jobsByTarget.get(target) || null : null }; };
   const vms = entities.filter(([, state]) => state.attributes.vmid != null).map(project);
   const containers = entities.filter(([, state]) => state.attributes.container_id != null).map(project);
   const compatibilityState = states["sensor.smart_homelab_maintenance_agent_compatibility"];
@@ -26,11 +29,13 @@ function model(hass, config) {
   const error = errorState && errorState !== "none" ? errorState : null;
   const connected = connection?.state === "connected" && reachable?.state === "on";
   const agentStatus = error ? "error" : connected ? "connected" : connection?.state === "offline" || reachable?.state === "off" ? "offline" : "unknown";
-  return { connected, agentStatus, error, compatibility: compatibilityState?.state || "unknown", host: hostState ? { name: hostState.state, ...hostState.attributes } : null, lastUpdated: hostState?.last_updated || connection?.last_updated || null, vms, containers, jobs: states["sensor.smart_homelab_maintenance_running_jobs"]?.state ?? null, config };
+  const jobSensor = states["sensor.smart_homelab_maintenance_running_jobs"];
+  return { connected, agentStatus, error, compatibility: compatibilityState?.state || "unknown", host: hostState ? { name: hostState.state, ...hostState.attributes } : null, lastUpdated: hostState?.last_updated || connection?.last_updated || null, vms, containers, jobs: jobSensor?.state ?? null, jobSummary: jobSensor?.attributes || {}, config };
 }
 const metric = (label, value, sub = "") => `<div class="metric"><span class="muted">${esc(label)}</span><strong>${esc(value ?? "–")}</strong>${sub ? `<span class="muted">${esc(sub)}</span>` : ""}</div>`;
 function bar(label, used, total) { const value = pct(used, total); return value === null ? "" : `<div class="bar-row"><span>${esc(label)}</span><progress max="100" value="${value.toFixed(1)}"></progress><span class="muted">${value.toFixed(0)}%</span></div>`; }
 function displayValue(value) { return value == null || value === "" || value === "unknown" || value === "unavailable" ? null : value; }
+function recoveryText(summary, german) { const states = summary?.lifecycle_states || {}; const legacy = Number(states.reconciled_legacy_state_verified || 0); const blocked = Number(states.recovery_blocked || 0) + Number(states.manual_recovery_required || 0); const pending = Number(states.recovery_pending || 0) + Number(states.interrupted || 0); if (blocked) return german ? `Manuelle Prüfung erforderlich (${blocked}); ${summary.recovery_reasons?.[0] || "Recovery blockiert"}` : `Manual review required (${blocked}); ${summary.recovery_reasons?.[0] || "recovery blocked"}`; if (pending) return german ? `Jobstatus wird geprüft (${pending})` : `Job status is being checked (${pending})`; if (legacy) return german ? `Legacy-Zustand verifiziert (${legacy}); Historie bleibt unklar` : `Legacy state verified (${legacy}); history remains unclear`; if (Number(states.reconciled_not_executed || 0)) return german ? "Keine Paketänderung nachgewiesen" : "No package change verified"; if (Number(states.reconciled_completed || 0)) return german ? "Job erfolgreich reconciliert" : "Job successfully reconciled"; return ""; }
 function localizedUpdateError(update, labels) { const raw = String(update?.error || "").toLowerCase(); if (update?.simulation_reason === "helper-unavailable" || raw.includes("helper is unavailable")) return labels.helperUnavailableReason; if (update?.simulation_reason === "target-not-running-or-not-checked") return labels.stoppedReason; if (update?.status === "unauthorized" || raw.includes("not authorized") || raw.includes("unauthorized")) return labels.unauthorizedReason; if (raw.includes("authorized guest package access is unavailable")) return labels.unauthorizedReason.startsWith("Simulation") ? "Gastzugriff für Pakete ist nicht verfügbar." : "Authorized guest package access is unavailable."; if (update?.status === "unsupported" || raw.includes("not supported") || raw.includes("unsupported")) return labels.unsupportedReason; if (update?.status === "stale" || raw.includes("stale")) return labels.staleReason; return update?.error || ""; }
 function updateText(update, labels) { if (!update || !update.status) return ""; const count = Number.isFinite(Number(update.available_count)) ? `: ${update.available_count} ${labels.updatesAvailable}` : ""; const security = Number(update.security_count) > 0 ? ` · ${update.security_count} ${labels.security}` : ""; const status = { updates_available: `${labels.updates}${count}${security}`, current: `${labels.updates}: ${labels.current}`, not_checked: `${labels.updates}: ${labels.notChecked}`, unsupported: `${labels.updates}: ${labels.unsupported}`, unauthorized: `${labels.updates}: ${labels.unauthorized}`, error: `${labels.updates}: ${labels.failed}`, stale: `${labels.updates}: ${labels.stale}`, unknown: `${labels.updates}: ${labels.unknownUpdate}` }[update.status] || `${labels.updates}: ${labels.unknownUpdate}`; const checked = update.checked_at ? ` · ${labels.checked}: ${new Date(update.checked_at).toLocaleString()}` : ""; const error = localizedUpdateError(update, labels); return `${status}${checked}${error && update.status !== "updates_available" ? ` · ${error}` : ""}`; }
 function simulationEnabled(update) { return update?.dry_run_supported === true && (update?.status === "updates_available" || update?.status === "current") && update?.fresh === true && update?.authorized !== false; }
@@ -41,8 +46,8 @@ const editorCss = `:host{display:block;box-sizing:border-box;color:var(--primary
 const premiumCss = `.card{background:linear-gradient(145deg,var(--ha-card-background,var(--card-background-color)),color-mix(in srgb,var(--ha-card-background,var(--card-background-color)) 86%,var(--primary-color,#03a9f4)));border:1px solid color-mix(in srgb,var(--divider-color,#ddd) 70%,transparent);}.header{padding-bottom:4px}.status{padding:5px 9px;border-radius:999px;background:var(--secondary-background-color);}.status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--success-color,#43a047) 18%,transparent)}.offline .status .dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--error-color,#db4437) 18%,transparent)}.section{border-top:1px solid color-mix(in srgb,var(--divider-color,#ddd) 55%,transparent);padding-top:14px}.item{background:color-mix(in srgb,var(--card-background-color,#fff) 76%,transparent);transition:border-color .18s ease,background .18s ease}.item[open]{border-color:color-mix(in srgb,var(--primary-color,#03a9f4) 55%,var(--divider-color,#ddd));background:color-mix(in srgb,var(--primary-color,#03a9f4) 5%,var(--card-background-color,#fff))}.item>summary{list-style:none}.item>summary::-webkit-details-marker{display:none}.item-head{cursor:pointer;padding:0}.item-head::after{content:"+";color:var(--secondary-text-color);font-weight:700}.item[open]>.item-head::after{content:"−"}.item-body{padding-top:10px}.metric strong{font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){.item{transition:none}}`;
 const stableActionCss = `.action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch;margin-top:10px}.action-row button{width:100%;min-width:0;height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.vm-exclusion{margin:10px 0 0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--secondary-background-color);overflow-wrap:anywhere}.simulation-result,.permission-result{margin-top:8px;min-width:0;overflow-wrap:anywhere}.simulation-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.simulation-summary strong{font-size:1.05em}.package-list{margin-top:8px}.package-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:5px 0;border-top:1px solid var(--divider-color,#ddd);min-width:0}.package-name,.package-version{min-width:0;overflow-wrap:anywhere;word-break:break-word}@media(max-width:600px){.simulation-summary{grid-template-columns:1fr}.package-row{grid-template-columns:1fr}.action-row button{font-size:.92em}}`;
 export class SmartHomelabMaintenanceCard extends HTMLElement {
-  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._lastSize = null; this._resizeObserver = null; this._resizeFrame = null; }
-  connectedCallback() { this._ensureShell(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
+  constructor() { super(); this.attachShadow({ mode: "open" }); this.config = { ...DEFAULTS }; this._items = { vm: new Map(), container: new Map() }; this._permissionOverrides = new Map(); this._permissionStates = new Map(); this._lastConfirmedPermissions = new Map(); this._updateSnapshots = new Map(); this._lastSize = null; this._resizeObserver = null; this._resizeFrame = null; }
+  connectedCallback() { this._ensureShell(); this._ensureRefreshButton(); this.shadowRoot.querySelector("style")?.append(stableActionCss); this.render(); this._observeSize(); }
   disconnectedCallback() { this._resizeObserver?.disconnect(); this._resizeObserver = null; if (this._resizeFrame !== null) cancelAnimationFrame(this._resizeFrame); this._resizeFrame = null; }
   setConfig(config) { this.config = { ...DEFAULTS, ...(config && typeof config === "object" ? config : {}) }; this.render(); }
   set hass(value) { this._hass = value; this.render(); }
@@ -88,13 +93,13 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   _item(kind, id) { const article = document.createElement("details"); article.className = "item"; article.dataset.itemId = String(id); const head = document.createElement("summary"); head.className = "item-head"; const strong = document.createElement("strong"); const pill = document.createElement("span"); pill.className = "pill"; head.append(strong, pill); const body = document.createElement("div"); body.className = "item-body"; article.append(head, body); const target = `${kind}:${id}`; const button = this._dryRunButton(target); const install = kind === "vm" ? null : this._installButton(target); const actions = document.createElement("div"); actions.className = "action-row"; actions.append(button); if (install) actions.append(install); body.append(actions); const permissionActions = document.createElement("div"); permissionActions.className = "action-row permission-row"; const permissionResult = document.createElement("div"); permissionResult.className = "muted permission-result"; permissionResult.setAttribute("role", "status"); permissionResult.hidden = true; const simulationPermission = kind === "vm" ? null : this._permissionButton(target, "simulation", permissionResult); const updatePermission = kind === "vm" ? null : this._permissionButton(target, "update", permissionResult); if (simulationPermission) permissionActions.append(simulationPermission); if (updatePermission) permissionActions.append(updatePermission); body.append(permissionActions, permissionResult); const bars = [this._bar(), this._bar(), this._bar()]; const updateText = document.createElement("div"); updateText.className = "muted"; body.append(updateText); const notice = document.createElement("p"); notice.className = "vm-exclusion"; notice.hidden = true; body.append(notice); const extra = document.createElement("div"); extra.className = "muted"; body.append(extra); bars.forEach((b) => body.append(b.node)); const refs = { article, strong, pill, actions, permissionActions, permissionResult, simulationPermission, updatePermission, bars, updateText, notice, button, install, extra }; this._items[kind].set(String(id), refs); return refs; }
   _updateItems(kind, items, labels, prefix) { const target = kind === "vm" ? this._shell.vm.grid : this._shell.container.grid; const seen = new Set(); const permissions = permissionText(resolveLanguage(this._hass)); [...items].sort((a, b) => Number(kind === "vm" ? a.vmid : a.container_id) - Number(kind === "vm" ? b.vmid : b.container_id)).forEach((item) => { const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id); let refs = this._items[kind].get(id); const isNew = !refs; if (!refs) refs = this._item(kind, id); seen.add(id); refs.strong.textContent = `${prefix} ${id} · ${item.name}`; refs.pill.textContent = item.running ? labels.running : labels.stopped; refs.article.ariaLabel = `${prefix} ${id} · ${item.name}`; this._setBar(refs.bars[0], labels.cpu, item.cpu_percent, 100); this._setBar(refs.bars[1], labels.memory, item.memory_used_bytes, item.memory_total_bytes, item.memory_available_bytes, labels.availableMemory); this._setBar(refs.bars[2], labels.storage, item.disk_used_bytes, item.disk_total_bytes, item.free_bytes, labels.freeStorage); const update = item.update === null ? { status: "not_checked" } : (item.update || {}); refs.updateText.textContent = kind === "vm" ? "" : updateText(update, labels); refs.updateText.hidden = kind === "vm" || !refs.updateText.textContent; const enabled = kind !== "vm" && simulationEnabled(update); const installEnabled = kind !== "vm" && update.update_supported === true && update.status === "updates_available" && update.fresh === true && Boolean(update.plan_digest); const eligible = kind === "container" && item.running === true && ["debian", "ubuntu"].includes(String(item.os_name || "").toLowerCase()) && String(item.package_manager || "").toLowerCase() === "apt"; const simulationAuthorized = update.simulation_authorized === true || update.authorized === true; const updateAuthorized = update.update_authorized === true; refs.actions.hidden = kind === "vm"; refs.permissionActions.hidden = !eligible; refs.button.textContent = labels.simulate; refs.button.hidden = false; refs.button.disabled = !enabled; refs.button.setAttribute("aria-disabled", String(!enabled)); refs.button.title = enabled ? "" : simulationReason(update, labels); if (refs.install) { refs.install._update = update; refs.install.disabled = !installEnabled; refs.install.hidden = false; refs.install.setAttribute("aria-disabled", String(!installEnabled)); refs.install.title = installEnabled ? "" : labels.installDisabled; } if (refs.simulationPermission) { refs.simulationPermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: updateAuthorized }; refs.simulationPermission.textContent = simulationAuthorized ? permissions.revokeSimulation : permissions.allowSimulation; refs.simulationPermission.setAttribute("aria-pressed", String(simulationAuthorized)); } if (refs.updatePermission) { refs.updatePermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: updateAuthorized }; refs.updatePermission.textContent = updateAuthorized ? permissions.revokeUpdates : permissions.allowUpdates; refs.updatePermission.setAttribute("aria-pressed", String(updateAuthorized)); refs.updatePermission.disabled = !simulationAuthorized && !updateAuthorized; } refs.notice.textContent = labels.vmExclusion; refs.notice.hidden = kind !== "vm"; const extra = [displayValue(item.os_name), displayValue(item.os_version)].filter(Boolean).join(" "); refs.extra.textContent = extra; refs.extra.hidden = !extra; if (isNew) target.append(refs.article); }); for (const [id, refs] of this._items[kind]) if (!seen.has(id)) { refs.article.remove(); this._items[kind].delete(id); } }
   render() {
-    queueMicrotask(() => this._ensureInstallButtons(textFor(resolveLanguage(this._hass))));
-    this._ensureShell(); const labels = textFor(resolveLanguage(this._hass)); const data = model(this._hass, this.config); const host = data.host; const s = this._shell; const statusLabel = data.agentStatus === "connected" ? labels.connected : data.agentStatus === "error" ? labels.error : data.agentStatus === "offline" ? labels.offline : labels.unknown; const compatibilityLabel = data.compatibility === "current" ? labels.compatibilityCurrent : data.compatibility === "outdated" ? labels.compatibilityOutdated : data.compatibility === "incompatible" ? labels.compatibilityIncompatible : labels.compatibilityUnknown;
+    queueMicrotask(() => this._ensureInstallButtons(labelsFor(resolveLanguage(this._hass))));
+    this._ensureShell(); this._ensureRefreshButton(); const labels = labelsFor(resolveLanguage(this._hass)); const data = model(this._hass, this.config); const host = data.host; const s = this._shell; s.refreshButton.textContent = labels.refresh; s.refreshButton.title = labels.refresh; const statusLabel = data.agentStatus === "connected" ? labels.connected : data.agentStatus === "error" ? labels.error : data.agentStatus === "offline" ? labels.offline : labels.unknown; const compatibilityLabel = data.compatibility === "current" ? labels.compatibilityCurrent : data.compatibility === "outdated" ? labels.compatibilityOutdated : data.compatibility === "incompatible" ? labels.compatibilityIncompatible : labels.compatibilityUnknown;
     s.card.classList.toggle("offline", !data.connected); s.card.ariaLabel = this.config.title; s.title.textContent = this.config.title; s.statusText.textContent = statusLabel; s.warning.hidden = !data.error; s.warning.textContent = data.error ? `${labels.error}: ${data.error}` : ""; s.compatibility.textContent = `${labels.compatibility}: ${compatibilityLabel}`; s.compatibility.dataset.status = data.compatibility; s.overviewTitle.textContent = labels.overview;
     this._setMetric(s.overviewMetrics[0], labels.host, host?.name || labels.noData, host?.online === false ? labels.hostOffline : host?.online === true ? labels.connected : labels.unknown); this._setMetric(s.overviewMetrics[1], labels.lastUpdated, data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : labels.noData); this._setMetric(s.overviewMetrics[2], labels.cpu, host?.cpu_percent != null ? `${Number(host.cpu_percent).toFixed(1)}%` : labels.noData, host?.cpu_cores ? `${host.cpu_cores} cores` : ""); this._setMetric(s.overviewMetrics[3], labels.memory, host?.memory_used_bytes != null ? bytes(host.memory_used_bytes) : labels.noData, host?.memory_total_bytes ? `of ${bytes(host.memory_total_bytes)}` : ""); this._setMetric(s.overviewMetrics[4], labels.storage, host?.storage_used_bytes != null ? bytes(host.storage_used_bytes) : labels.noData, host?.storage_total_bytes ? `of ${bytes(host.storage_total_bytes)}` : "");
     s.host.hidden = !host; s.hostTitle.textContent = host ? `${labels.host} · ${host.name}` : ""; const hostUpdate = host?.update || {}; const hostEnabled = simulationEnabled(hostUpdate); s.hostButton.textContent = labels.simulate; s.hostButton.hidden = false; s.hostButton.disabled = !hostEnabled; s.hostButton.setAttribute("aria-disabled", String(!hostEnabled)); s.hostButton.title = hostEnabled ? "" : simulationReason(hostUpdate, labels); s.hostUpdate.textContent = updateText(hostUpdate, labels); s.hostUpdate.hidden = !s.hostUpdate.textContent; this._setMetric(s.hostMetrics[0], labels.version, displayValue(host?.release)); this._setMetric(s.hostMetrics[1], labels.kernel, displayValue(host?.kernel)); this._setMetric(s.hostMetrics[2], labels.uptime, uptime(host?.uptime_seconds)); this._setBar(s.hostBars[0], labels.cpu, host?.cpu_percent, 100); this._setBar(s.hostBars[1], labels.memory, host?.memory_used_bytes, host?.memory_total_bytes, host?.memory_available_bytes, labels.availableMemory); this._setBar(s.hostBars[2], labels.storage, host?.storage_used_bytes, host?.storage_total_bytes, host?.storage_available_bytes, labels.freeStorage);
     s.vm.section.hidden = !this.config.show_vms; s.vm.heading.textContent = `${labels.vms} (${data.vms.length})`; this._updateItems("vm", data.vms, labels, "VM"); s.vm.empty.textContent = labels.noVms; s.vm.empty.hidden = data.vms.length !== 0; s.container.section.hidden = !this.config.show_containers; s.container.heading.textContent = `${labels.containers} (${data.containers.length})`; this._updateItems("container", data.containers, labels, "CT"); s.container.empty.textContent = labels.noContainers; s.container.empty.hidden = data.containers.length !== 0;
-    s.maintenance.section.hidden = !this.config.show_maintenance; s.maintenance.heading.textContent = labels.maintenance; this._setMetric(s.jobs, labels.jobs, data.jobs === null ? null : data.jobs); s.maintenance.section.querySelector(".readonly").textContent = labels.readOnly; this._ensureInstallButtons(labels);
+    s.maintenance.section.hidden = !this.config.show_maintenance; s.maintenance.heading.textContent = labels.maintenance; this._setMetric(s.jobs, labels.jobs, data.jobs === null ? null : data.jobs); const recoveryStatus = recoveryText(data.jobSummary, resolveLanguage(this._hass) === "de"); const readonly = s.maintenance.section.querySelector(".readonly"); readonly.textContent = recoveryStatus || labels.readOnly; readonly.title = data.jobSummary?.last_recovery_at ? `${labels.checked}: ${new Date(data.jobSummary.last_recovery_at).toLocaleString()}` : ""; this._ensureInstallButtons(labels);
   }
   _ensureInstallButtons(labels) {
     const add = (button) => {
@@ -108,6 +113,196 @@ export class SmartHomelabMaintenanceCard extends HTMLElement {
   static getConfigElement() { return document.createElement("smart-homelab-maintenance-card-editor"); }
   static getStubConfig() { return { title: "Smart Homelab Maintenance", show_vms: true, show_containers: true }; }
 }
+
+function scrollDiagnosticForCard(card) {
+  const style = (node) => {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return null;
+    const computed = getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    return {
+      tag: node.tagName.toLowerCase(), id: node.id || null, className: typeof node.className === "string" ? node.className : null,
+      rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+      clientHeight: node.clientHeight, scrollHeight: node.scrollHeight, scrollTop: node.scrollTop,
+      overflowY: computed.overflowY, overflow: computed.overflow, height: computed.height,
+      maxHeight: computed.maxHeight, position: computed.position, touchAction: computed.touchAction,
+    };
+  };
+  const ancestors = [];
+  let node = card;
+  while (node && node.nodeType === Node.ELEMENT_NODE && ancestors.length < 12) {
+    ancestors.push(style(node));
+    node = node.parentElement;
+  }
+  const root = card.shadowRoot;
+  const items = root ? [...root.querySelectorAll(".container-grid .item")] : [];
+  const last = items.at(-1);
+  let squareGridParent = card.parentElement;
+  while (squareGridParent && squareGridParent !== document.body && squareGridParent.localName !== "hui-grid-card") squareGridParent = squareGridParent.parentElement;
+  return {
+    generatedAt: new Date().toISOString(),
+    element: style(card),
+    shadowRoot: root ? {
+      host: style(card),
+      card: style(root.querySelector(".card")),
+      containerGrid: style(root.querySelector(".container-grid")),
+      itemCount: items.length,
+      lastItem: style(last),
+    } : null,
+    squareGridParent: squareGridParent ? { tag: squareGridParent.localName, square: squareGridParent.hasAttribute("square"), naturalHeightApplied: squareGridParent === card._naturalGridParent } : null,
+    ancestors,
+  };
+}
+
+// Read-only console probe for authenticated mobile/WebView diagnosis. It is
+// intentionally opt-in and does not change layout, focus, or scroll position.
+if (typeof window !== "undefined") {
+  window.smartHomelabMaintenanceScrollDiagnostics = () =>
+    [...document.querySelectorAll("smart-homelab-maintenance-card")].map(scrollDiagnosticForCard);
+}
+const originalUpdateItems = SmartHomelabMaintenanceCard.prototype._updateItems;
+SmartHomelabMaintenanceCard.prototype._updateItems = function (kind, items, labels, prefix) {
+  // Permission convergence and update freshness are independent per target.
+  // A matching readback must never acknowledge the next not_checked refresh
+  // for every other guest.
+  const permissions = permissionText(resolveLanguage(this._hass));
+  const normalized = items.map((item) => {
+    const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id);
+    const target = `${kind}:${id}`;
+    const base = item.update === null ? { status: "not_checked" } : (item.update || {});
+    const state = this._permissionStates.get(target);
+    const hasPermissionFields = typeof base.simulation_authorized === "boolean" && typeof base.update_authorized === "boolean";
+    if (hasPermissionFields) this._lastConfirmedPermissions.set(target, { simulation_authorized: base.simulation_authorized, update_authorized: base.update_authorized });
+    if (hasPermissionFields && state?.expected && samePermissions(base, state.expected)) {
+      this._permissionStates.set(target, { ...state, readback: { ...base }, status: "confirmed" });
+      this._permissionOverrides.delete(target);
+    } else if (hasPermissionFields && state?.status === "pending") {
+      this._permissionStates.set(target, { ...state, readback: { ...base }, status: "stale" });
+    }
+    const snapshot = this._updateSnapshots.get(target);
+    const persisted = base.dry_run;
+    if (!snapshot && persisted?.success === true && persisted?.plan_digest) {
+      this._updateSnapshots.set(target, { ...base, plan_digest: persisted.plan_digest, dry_run: persisted, historical: true });
+    }
+    const retainedSnapshot = this._updateSnapshots.get(target);
+    const stale = ["not_checked", "unknown", "error", "unavailable"].includes(base.status) || base.fresh === false;
+    // Historical data is display-only and cannot enable simulation/install.
+    const update = retainedSnapshot && stale ? { ...base, historical_dry_run: retainedSnapshot, historical: true, fresh: false } : { ...base };
+    return { ...item, __permissionSnapshot: Boolean(retainedSnapshot && stale), __permissionOverridePending: state?.status === "pending", __permissionOverride: state?.expected, update };
+  });
+  originalUpdateItems.call(this, kind, normalized, labels, prefix);
+  normalized.forEach((item) => {
+    const id = String(kind === "vm" ? item.vmid ?? item.entity_id : item.container_id ?? item.entity_id);
+    const refs = this._items[kind].get(id);
+    if (!refs || kind === "vm") return;
+    const target = `${kind}:${id}`;
+    const update = item.update || {};
+    const localSimulation = this._updateSnapshots.get(target);
+    const simulationVerified = Boolean(localSimulation?.dry_run?.success === true && localSimulation?.dry_run?.safe === true && localSimulation?.plan_digest === update.plan_digest);
+    if (refs.install) {
+      if (refs.install._attemptPlanDigest && refs.install._attemptPlanDigest !== update.plan_digest) {
+        refs.install._attemptId = null;
+        refs.install._attemptPlanDigest = null;
+      }
+      const safeToInstall = kind === "container" && update.update_supported === true && update.execution_enabled === true && update.backend_connected === true && update.status === "updates_available" && update.fresh === true && update.simulation_authorized === true && update.update_authorized === true && simulationVerified && update.job_conflict !== true && !(update.held_packages || []).length && !(update.conflicts || []).length && !(update.removals || []).length && Boolean(update.plan_digest);
+      refs.install.disabled = !safeToInstall;
+      refs.install.setAttribute("aria-disabled", String(!safeToInstall));
+    }
+    if (item.__permissionOverridePending && item.__permissionOverride) this._permissionOverrides.set(`${kind}:${id}`, { ...item.__permissionOverride });
+    if (["updates_available", "current"].includes(update.status)) this._updateSnapshots.set(target, { ...update });
+    if (refs.simulationPermission) {
+      const known = this._lastConfirmedPermissions.get(target);
+      const simulationAuthorized = typeof update.simulation_authorized === "boolean" ? update.simulation_authorized : known?.simulation_authorized === true;
+      const updateAuthorized = typeof update.update_authorized === "boolean" ? update.update_authorized === true : known?.update_authorized === true;
+      const permissionState = this._permissionStates.get(target);
+      const pending = permissionState?.status === "pending" && permissionState.expected && !samePermissions(update, permissionState.expected);
+      refs.simulationPermission._permissions = { simulation_authorized: simulationAuthorized, update_authorized: updateAuthorized };
+      refs.permissionActions.dataset.state = pending ? "pending" : (["not_checked", "unknown", "error", "unavailable"].includes(update.status) ? "stale" : "confirmed");
+      if (pending) {
+        refs.simulationPermission.textContent = permissions.permissionPending;
+        refs.simulationPermission.disabled = true;
+        refs.simulationPermission.setAttribute("aria-busy", "true");
+        if (refs.updatePermission) {
+          refs.updatePermission.textContent = permissions.permissionPending;
+          refs.updatePermission.disabled = true;
+          refs.updatePermission.setAttribute("aria-busy", "true");
+        }
+        refs.permissionResult.hidden = false;
+        refs.permissionResult.textContent = permissions.permissionPending;
+        refs.permissionResult.classList.add("warning");
+        refs.permissionResult.dataset.pending = "true";
+      } else {
+        refs.simulationPermission.textContent = simulationAuthorized ? permissions.revokeSimulation : permissions.allowSimulation;
+        refs.simulationPermission.disabled = false;
+        refs.simulationPermission.removeAttribute("aria-busy");
+        if (refs.updatePermission) {
+          refs.updatePermission.textContent = updateAuthorized ? permissions.revokeUpdates : permissions.allowUpdates;
+          refs.updatePermission.disabled = !simulationAuthorized && !updateAuthorized;
+          refs.updatePermission.removeAttribute("aria-busy");
+        }
+        if (permissionState?.status === "confirmed" && refs.permissionResult.dataset.pending === "true") {
+          refs.permissionResult.hidden = false;
+          refs.permissionResult.textContent = permissions.permissionSuccess;
+          refs.permissionResult.classList.remove("warning");
+          delete refs.permissionResult.dataset.pending;
+        }
+      }
+    }
+  });
+};
+
+SmartHomelabMaintenanceCard.prototype._renderJobStatus = function () {
+  const data = model(this._hass, this.config);
+  const labels = labelsFor(resolveLanguage(this._hass));
+  const active = new Set(["queued", "preflight", "running", "verifying", "postcheck"]);
+  const recoverable = new Set(["blocked", "manual_recovery_required", "recovery_pending", "recovery_blocked"]);
+  for (const item of data.containers) {
+    const id = String(item.container_id ?? item.entity_id);
+    const refs = this._items.container.get(id);
+    if (!refs) continue;
+    const job = item.job;
+    if (!job) { refs.jobText?.remove(); refs.jobActions?.remove(); delete refs.jobText; delete refs.jobActions; continue; }
+    if (!refs.jobText) { refs.jobText = document.createElement("div"); refs.jobText.className = "muted job-status"; refs.jobText.setAttribute("role", "status"); refs.article.querySelector(".item-body").append(refs.jobText); }
+    const phase = String(job.phase || job.state || "unknown");
+    refs.jobText.textContent = `${active.has(job.state) ? labels.runningJob : job.state} · ${phase} · ${job.message || ""} · ${job.job_id}`;
+    if (!refs.jobActions) { refs.jobActions = document.createElement("div"); refs.jobActions.className = "action-row job-actions"; refs.article.querySelector(".item-body").append(refs.jobActions); }
+    refs.jobActions.replaceChildren();
+    const detail = document.createElement("button"); detail.type = "button"; detail.textContent = labels.runningJob;
+    detail.addEventListener("click", async (event) => { event.preventDefault(); event.stopPropagation(); try { const response = await this._hass.callService("smart_homelab_maintenance", "get_job", { job_id: job.job_id }, undefined, true, true); const payload = response?.response?.data || response?.data || response; refs.jobText.textContent = `${payload?.state || job.state} · ${payload?.phase || phase} · ${payload?.message || job.message || ""} · ${job.job_id}`; } catch (error) { refs.jobText.textContent = `${labels.error}: ${error?.message || "job details unavailable"}`; } });
+    refs.jobActions.append(detail);
+    if (recoverable.has(job.state)) {
+      const repair = document.createElement("button"); repair.type = "button"; repair.textContent = labels.repairCheck;
+      repair.addEventListener("click", async (event) => {
+        event.preventDefault(); event.stopPropagation(); repair.disabled = true;
+        try {
+          const response = await this._hass.callService("smart_homelab_maintenance", "repair_check", { job_id: job.job_id }, undefined, true, true);
+          const result = response?.response?.data || response?.data || response;
+          const inspection = result?.inspection || {};
+          if (inspection.repairable === true) {
+            const perform = document.createElement("button"); perform.type = "button"; perform.textContent = labels.repair;
+            perform.addEventListener("click", async (repairEvent) => {
+              repairEvent.preventDefault(); repairEvent.stopPropagation(); perform.disabled = true;
+              try {
+                if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(`${labels.repair}?`)) return;
+                await this._hass.callService("smart_homelab_maintenance", "repair", { job_id: job.job_id, confirm: true }, undefined, true, true);
+                refs.jobText.textContent = `${labels.repair}: ${job.job_id}`;
+                perform.remove();
+              } catch (error) { refs.jobText.textContent = `${labels.error}: ${error?.message || "repair failed"}`; }
+              finally { perform.disabled = false; }
+            });
+            repair.replaceWith(perform);
+          } else {
+            refs.jobText.textContent = `${labels.error}: ${inspection.reason || "repair is not safe"}`;
+          }
+        } catch (error) { refs.jobText.textContent = `${labels.error}: ${error?.message || "repair inspection failed"}`; }
+        finally { repair.disabled = false; }
+      });
+      refs.jobActions.append(repair);
+    }
+  }
+};
+const originalCardRender = SmartHomelabMaintenanceCard.prototype.render;
+SmartHomelabMaintenanceCard.prototype.render = function () { originalCardRender.call(this); this._renderJobStatus(); };
+
 export class SmartHomelabMaintenanceCardEditor extends HTMLElement {
   constructor() { super(); this.config = { ...DEFAULTS }; this._rendered = false; this._hass = undefined; }
   set hass(value) { this._hass = value; this.render(); }
@@ -213,6 +408,13 @@ function permissionResponseError(response) {
   }
   return null;
 }
+function permissionResponseData(response) {
+  const candidates = [response?.response?.data, response?.data, response?.response, response];
+  return candidates.find((candidate) => candidate && typeof candidate === "object" && typeof candidate.simulation_authorized === "boolean" && typeof candidate.update_authorized === "boolean") || null;
+}
+function samePermissions(left, right) {
+  return Boolean(left && right) && left.simulation_authorized === right.simulation_authorized && left.update_authorized === right.update_authorized;
+}
 SmartHomelabMaintenanceCard.prototype._permissionButton = function (target, permission, result) {
   const button = document.createElement("button");
   button.className = "permission";
@@ -244,8 +446,33 @@ SmartHomelabMaintenanceCard.prototype._permissionButton = function (target, perm
       ]);
       const responseError = permissionResponseError(response);
       if (responseError) throw new Error(responseError);
-      button._permissions = next;
-      result.textContent = labels.permissionSuccess;
+      const readback = permissionResponseData(response);
+      if (!samePermissions(readback, next)) throw new Error(labels.permissionReadbackFailed);
+      this._permissionOverrides.set(target, { ...readback });
+      const previous = this._permissionStates.get(target);
+      this._permissionStates.set(target, { expected: { ...readback }, readback: { ...readback }, status: "pending", generation: (previous?.generation || 0) + 1 });
+      this.render();
+      result.textContent = labels.permissionPending;
+      result.classList.add("warning");
+      result.dataset.pending = "true";
+      // The set_permissions service refreshes HA before this handler receives
+      // its response. Trigger one additional read-only coordinator refresh
+      // after the pending generation exists, so the next HA state can confirm
+      // convergence instead of leaving the card on the pre-write snapshot.
+      try {
+        const refresh = this._hass?.callService?.("smart_homelab_maintenance", "check", {}, undefined, true, true);
+        if (refresh && typeof refresh.then === "function") {
+          const refreshTimeout = typeof globalThis !== "undefined" && Number.isFinite(globalThis.__SMART_HOMELAB_PERMISSION_REFRESH_TIMEOUT_MS__)
+            ? globalThis.__SMART_HOMELAB_PERMISSION_REFRESH_TIMEOUT_MS__ : 12000;
+          await Promise.race([
+            refresh,
+            new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("permission readback refresh timed out")), refreshTimeout); }),
+          ]);
+        }
+      } catch (_) {
+        // Keep the pending state fail-closed; a missing HA convergence must
+        // never be reported as a confirmed permission change.
+      }
     } catch (error) {
       result.textContent = `${labels.permissionFailed}: ${error?.message || "unknown error"}`;
       result.classList.add("warning");
@@ -270,6 +497,23 @@ SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
     event.stopPropagation();
     const update = button._update || {};
     const german = resolveLanguage(this._hass) === "de";
+    const labels = textFor(german ? "de" : "en");
+    const packages = Array.isArray(update.packages) ? update.packages : [];
+    const packageSummary = packages.length
+      ? packages.map((item) => `${item.name || "?"} ${item.installed_version || "?"} → ${item.available_version || "?"}`).join(", ")
+      : (german ? "keine Paketänderungen" : "no package changes");
+    const risks = update.removals?.length || update.conflicts?.length || update.held_packages?.length
+      ? (german ? "Warnungen: zurückgehaltene, konfliktbehaftete oder zu entfernende Pakete." : "Warnings: held, conflicting, or removing packages.")
+      : (german ? "Keine Paketentfernungen/Konflikte; möglicher Neustartbedarf der Dienste bleibt bestehen." : "No removals/conflicts; services may still require a restart.");
+    const confirmation = german
+      ? `Ziel: ${target}\nPakete (${packages.length}): ${packageSummary}\nRisiken: ${risks}\nNeustartbedarf: möglicherweise.\n\nDieses konkrete Update jetzt installieren?`
+      : `Target: ${target}\nPackages (${packages.length}): ${packageSummary}\nRisks: ${risks}\nRestart need: possible.\n\nInstall this exact update now?`;
+    if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(confirmation)) return;
+    if (button._attemptPlanDigest !== update.plan_digest || !button._attemptId) {
+      button._attemptPlanDigest = update.plan_digest;
+      button._attemptId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+    const attemptId = button._attemptId;
     const result = button._updateResult || document.createElement("div");
     result.className = "muted simulation-result";
     result.setAttribute("role", "status");
@@ -279,7 +523,7 @@ SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
     button.setAttribute("aria-busy", "true");
     let timer;
     try {
-      const call = this._hass?.callService?.("smart_homelab_maintenance", "execute", { target, confirm: true, plan_digest: update.plan_digest }, undefined, true, true);
+      const call = this._hass?.callService?.("smart_homelab_maintenance", "execute", { target, confirm: true, install_confirmed: true, plan_digest: update.plan_digest, attempt_id: attemptId }, undefined, true, true);
       if (!call || typeof call.then !== "function") throw new Error(german ? "Home Assistant hat keine Serviceantwort geliefert." : "Home Assistant returned no service response.");
       const response = await Promise.race([
         call,
@@ -287,8 +531,9 @@ SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
       ]);
       const data = dryRunData(response);
       if (!data || data.success !== true) throw new Error(data?.error || (german ? "Update fehlgeschlagen." : "Update failed."));
-      result.textContent = german ? "Update erfolgreich abgeschlossen." : "Update completed successfully.";
+      result.textContent = data.job_id ? `${german ? "Update erfolgreich abgeschlossen." : "Update completed successfully."} (${data.job_id})` : (german ? "Update erfolgreich abgeschlossen." : "Update completed successfully.");
       result.classList.remove("warning");
+      button._attemptId = null;
     } catch (error) {
       result.textContent = `${german ? "Update fehlgeschlagen" : "Update failed"}: ${error?.message || (german ? "unbekannter Fehler" : "unknown error")}`;
       result.classList.add("warning");
@@ -299,6 +544,27 @@ SmartHomelabMaintenanceCard.prototype._installButton = function (target) {
     }
   });
   return button;
+};
+SmartHomelabMaintenanceCard.prototype._ensureRefreshButton = function () {
+  if (this._refreshButton || !this._shell) return;
+  const button = document.createElement("button");
+  button.className = "refresh";
+  button.type = "button";
+  button.addEventListener("click", async (event) => {
+    event.preventDefault(); event.stopPropagation();
+    const german = resolveLanguage(this._hass) === "de";
+    button.disabled = true; button.setAttribute("aria-busy", "true");
+    try {
+      const call = this._hass?.callService?.("smart_homelab_maintenance", "refresh", {}, undefined, true, true);
+      if (!call || typeof call.then !== "function") throw new Error(german ? "Home Assistant hat keine Serviceantwort geliefert." : "Home Assistant returned no service response.");
+      await call;
+    } catch (error) {
+      button.title = `${german ? "Prüfung fehlgeschlagen" : "Refresh failed"}: ${error?.message || "unknown error"}`;
+    } finally { button.disabled = false; button.removeAttribute("aria-busy"); }
+  });
+  this._shell.card.querySelector(".header").append(button);
+  this._refreshButton = button;
+  this._shell.refreshButton = button;
 };
 SmartHomelabMaintenanceCard.prototype._dryRunButton = function (target) {
   const button = document.createElement("button");
@@ -325,6 +591,19 @@ SmartHomelabMaintenanceCard.prototype._dryRunButton = function (target) {
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Zeitüberschreitung bei der Simulation.")), Number(globalThis.__SMART_HOMELAB_DRY_RUN_TIMEOUT_MS__) || DRY_RUN_TIMEOUT_MS); }),
       ]);
       renderDryRunResult(result, response, resolveLanguage(this._hass) === "de");
+      const data = dryRunData(response);
+      if (data?.success === true && data?.safe === true && target.startsWith("container:")) {
+        const current = button._update || {};
+        this._updateSnapshots.set(target, {
+          ...current,
+          status: Array.isArray(data.packages) && data.packages.length ? "updates_available" : "current",
+          available_count: Array.isArray(data.packages) ? data.packages.length : current.available_count,
+          packages: data.packages || current.packages,
+          plan_digest: data.plan_digest || current.plan_digest,
+          fresh: true,
+          dry_run: data,
+        });
+      }
       result.classList.toggle("warning", Boolean(dryRunData(response)?.success === false || dryRunData(response)?.safe === false));
     } catch (error) {
       result.textContent = `Simulation fehlgeschlagen: ${localizedDryRunError(error?.message || "unbekannter Servicefehler", resolveLanguage(this._hass) === "de")}`;

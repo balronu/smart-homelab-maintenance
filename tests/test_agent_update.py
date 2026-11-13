@@ -28,6 +28,17 @@ def test_update_transaction_has_interrupted_swap_recovery():
     assert "trap rollback ERR" in script
     assert 'mv -T "$AGENT_ROOT/agent" "$previous_dir"' in script
     assert 'mv -T "$next_dir" "$AGENT_ROOT/agent"' in script
+    assert ".release-identity" in script
+    assert 'source_commit' in script
+    assert "legacy_rollback_evidence.py" in script
+    assert "--create" in script
+    assert ".legacy-rollback-evidence.json" in script
+
+
+def test_current_stable_update_does_not_create_legacy_evidence():
+    script = (ROOT / "scripts" / "update-agent.sh").read_text(encoding="utf-8")
+    assert '[[ -e "$AGENT_ROOT/agent/.release-identity" || -L "$AGENT_ROOT/agent/.release-identity" ]]' in script
+    assert '[[ ! -e "$AGENT_ROOT/agent/.legacy-rollback-evidence.json" ]]' in script
 
 
 def test_upgrade_recovers_from_explicit_exit_and_bounds_restart_race():
@@ -80,14 +91,29 @@ def test_upgrade_does_not_delete_existing_rollback_staging():
     assert "Manuelle Prüfung erforderlich" in script
     assert 'rm -rf -- "$rollback_dir"' not in script
     assert "Rollback-Staging bleibt erhalten" in script
+    assert "read_release_version" in script
+    assert "verifizierte Release-Identität" in script
 
 
 def test_historical_staging_requires_active_health_and_keeps_ambiguous_state_blocked():
     script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
     assert 'systemctl is-active --quiet "$SERVICE_NAME"' in script
-    assert 'wait_for_health "$current_version"' in script
-    assert "nicht eindeutig historisch" in script
-    assert "Mehrere Rollback-Stände passen" in script
+    assert 'current_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"' in script
+    assert 'wait_for_health "$current_agent_version"' in script
+    assert "Release-Inhaltsdigest stimmt nicht" in script
+    assert "nicht älter als der Ziel-Release" in script
+    assert "read_legacy_rollback_evidence" in script
+    assert "gültigen Legacy-Nachweis" in script
+    assert "nur Inhaltsnachweis; Release-Zuordnung unbekannt" in script
+
+
+def test_historical_staging_version_comparison_supports_stable_agent_releases():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert 're.fullmatch(r"0\\.1\\.0-beta\\.(\\d+)", value)' in script
+    assert 're.fullmatch(r"(\\d+)\\.(\\d+)\\.(\\d+)", value)' in script
+    assert "candidate < current" in script
+    assert "read_source_release_version" in script
+    assert 'check_historical_staging "$source_dir" "$expected_commit"' in script
 
 
 def test_readiness_requires_tls_contract_and_expected_version():
@@ -121,3 +147,75 @@ def test_upgrade_help_is_non_mutating():
     assert "-h|--help) usage; exit 0" in script
     assert "--apply" in script
     assert "--confirm" in script
+
+
+def test_staging_recovery_requires_explicit_confirmation_and_isolated_quarantine():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "--recover-staging" in script
+    assert "--quarantine-root" in script
+    assert 'recover_staging=""' in script
+    assert '[[ "$apply" -eq 0 ]] || die "--recover-staging kann nicht mit --apply kombiniert werden."' in script
+    assert "realpath -e" in script
+    assert 'canonical_state_root="$(realpath -e -- "$STATE_ROOT")"' in script
+    assert 'canonical_quarantine_parent="$(realpath -e -- "$quarantine_parent")"' in script
+    assert "! -L \"$recover_staging\"" in script
+    assert "staging_process_check" in script
+    assert "ancestor_pids" in script
+    assert "fields = (Path(\"/proc\") / str(cursor) / \"stat\").read_text().split()" in script
+    assert "active_script = re.search" in script
+    assert "active_rollback = re.search" in script
+    assert "/etc/systemd/system" in script
+    assert "Kein alternativer Rollback-Kandidat bleibt erhalten" in script
+    assert '[[ "$confirm" -ne 1 ]]' in script
+    assert 'mv -T -- "$canonical_stage" "$quarantine_target"' in script
+    assert "cmp -s \"$manifest_before\"" in script
+    assert '>> "$audit"' in script
+    assert 'rm -rf' not in script
+
+
+def test_staging_recovery_rejects_unsafe_paths_and_collision():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "Staging-Pfad liegt nicht als exaktes Rollback-Staging unter dem Agent-Root" in script
+    assert "Staging-Pfad ist kein echtes Verzeichnis oder ein Symlink" in script
+    assert "Quarantäneziel existiert bereits; keine Überschreibung" in script
+    assert "Aktiver Upgrade-/Rollback- oder Dateireferenz-Prozess gefunden" in script or "Aktiver Upgrade-, Rollback- oder Dateireferenz-Prozess gefunden" in script
+    assert "Symlink im Staging" in script
+    assert "Hash-/Strukturvergleich nach Quarantäne fehlgeschlagen" in script
+
+
+def test_staging_recovery_accepts_failed_staging_only_as_explicit_candidate():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "agent.previous.*.staging|agent.failed.*.staging" in script
+    assert 'dirname -- "$canonical_stage"' in script
+    assert 'for candidate in "$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging' in script
+
+
+def test_historical_preflight_inspects_failed_staging_instead_of_ignoring_it():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    start = script.index("check_historical_staging()")
+    end = script.index('if [[ "$apply" -ne 1 ]]', start)
+    historical = script[start:end]
+    assert '"$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging' in historical
+    assert "read_release_version" in historical
+    assert "Manuelle Prüfung erforderlich" in historical
+
+
+def test_rollback_binds_to_active_release_identity_and_new_staging_path():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    assert "read_release_identity()" in script
+    assert 'previous_release_identity="$(read_release_identity "$AGENT_ROOT/agent")"' in script
+    assert "snapshot_staging_paths" in script
+    assert "path_was_present_before_swap" in script
+    assert 'candidate_identity="$(read_release_identity "$candidate_dir")"' in script
+    assert 'candidate_identity" == "$previous_release_identity"' in script
+    assert "new_rollback_candidates" in script
+    assert "Kein eindeutig gebundener Rollback-Staging-Pfad" in script
+
+
+def test_rollback_does_not_select_candidates_by_compatibility_version():
+    script = (ROOT / "scripts" / "upgrade-agent.sh").read_text(encoding="utf-8")
+    apply_start = script.index('bash "$SCRIPT_DIR/update-agent.sh"')
+    apply_end = script.index('if ! wait_for_port_free', apply_start)
+    apply_resolution = script[apply_start:apply_end]
+    assert 'read_agent_version "$candidate_dir"' not in apply_resolution
+    assert 'read_release_identity "$candidate_dir"' in apply_resolution

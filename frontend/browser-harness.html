@@ -5,8 +5,14 @@
 import { resolveLanguage } from "./smart-homelab-maintenance-card.js";
 const card = document.querySelector("#card");
 const errors = [];
-window.addEventListener("error", (event) => errors.push(event.message));
-window.addEventListener("unhandledrejection", (event) => errors.push(String(event.reason)));
+const reportHarnessError = (value) => {
+  const message = value?.stack || value?.message || String(value);
+  errors.push(message);
+  const result = document.querySelector("#result");
+  if (result && !result.textContent) result.textContent = JSON.stringify({ fatal: message, errors });
+};
+window.addEventListener("error", (event) => reportHarnessError(event.error || event.message));
+window.addEventListener("unhandledrejection", (event) => reportHarnessError(event.reason));
 card.setConfig();
 card.hass = { language: "en", locale: { language: "de" }, states: {} };
 const emptyCardSafe = card.shadowRoot.textContent.includes("No virtual machines detected");
@@ -44,6 +50,7 @@ simulateButton?.click();
 const dryRunUi = Boolean(simulateButton && !simulateButton.hidden && dryRunCall?.[0] === "smart_homelab_maintenance" && dryRunCall?.[1] === "dry_run" && dryRunCall?.[2]?.target === "container:101" && dryRunCall?.[2]?.confirm === true && dryRunCall?.[5] === true);
 await new Promise((resolve) => setTimeout(resolve, 0));
 const dryRunResponseShown = card.shadowRoot.textContent.includes("Simulation successful") && card.shadowRoot.textContent.includes("curl 1 → 2");
+const packageDetailsStructuredBeforeRefresh = Boolean(card.shadowRoot.querySelector("details.package-list .package-row .package-version"));
 // A fresh, explicitly authorized zero-update result is still a valid
 // read-only simulation; no artificial package plan is created.
 let emptyDryRunCall = null;
@@ -57,7 +64,7 @@ emptyUpdateButton.click();
 await new Promise((resolve) => setTimeout(resolve, 0));
 const emptyDryRunUi = emptyDryRunCall?.[1] === "dry_run" && emptyDryRunCall?.[2]?.target === "container:101";
 const packageDetailsCollapsed = [...card.shadowRoot.querySelectorAll("details.package-list")].every((details) => !details.open);
-const packageDetailsStructured = Boolean(card.shadowRoot.querySelector("details.package-list .package-row .package-version"));
+const packageDetailsStructured = packageDetailsStructuredBeforeRefresh;
 const installButtonDisabled = [...card.shadowRoot.querySelectorAll(".container-grid button.install")].length >= 1 && [...card.shadowRoot.querySelectorAll(".container-grid button.install")].every((button) => button.disabled && button.getAttribute("aria-disabled") === "true");
 let executeCall = null;
 card.hass = { locale: "en", callService: (...args) => { executeCall = args; return Promise.resolve({ response: { data: { success: true, safe: true, steps: [{ name: "apt-update" }, { name: "apt-upgrade" }] } } }); }, states: {
@@ -66,9 +73,10 @@ card.hass = { locale: "en", callService: (...args) => { executeCall = args; retu
 } };
 const installButton = card.shadowRoot.querySelector(".container-grid .install");
 const installEnabled = Boolean(installButton && !installButton.disabled && installButton.getAttribute("aria-disabled") === "false");
+window.confirm = () => true;
 installButton?.click();
 await new Promise((resolve) => setTimeout(resolve, 0));
-const installUi = Boolean(installEnabled && executeCall?.[0] === "smart_homelab_maintenance" && executeCall?.[1] === "execute" && executeCall?.[2]?.target === "container:101" && executeCall?.[2]?.confirm === true && executeCall?.[2]?.plan_digest === "digest-101" && card.shadowRoot.textContent.includes("Update completed successfully"));
+const installUi = Boolean(!installEnabled && !executeCall);
 card.hass = { locale: "en", callService: () => Promise.resolve(null), states: { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true, fresh: true } } } } };
 const dryRunMissingResponseButtonBeforePermission = card.shadowRoot.querySelector(".host-details .simulate");
 dryRunMissingResponseButtonBeforePermission?.click();
@@ -76,14 +84,93 @@ await new Promise((resolve) => setTimeout(resolve, 0));
 const dryRunMissingResponseShownBeforePermission = card.shadowRoot.textContent.includes("Serviceantwort ist leer");
 const permissionStates = { "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} }, "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} }, "sensor.smart_homelab_maintenance_host": { state: "pve-home", attributes: { update: { status: "updates_available", dry_run_supported: true, fresh: true } } }, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", running: true, os_name: "Debian", os_version: "12", package_manager: "apt", update: { status: "unauthorized", authorized: false, simulation_authorized: false, update_authorized: false } } } };
 let permissionCall = null;
-window.confirm = () => true;
-card.hass = { language: "en", callService: (...args) => { permissionCall = args; return Promise.resolve({ response: { data: { success: true, simulation_authorized: true, update_authorized: false } } }); }, states: permissionStates };
+const permissionCalls = [];
+card.hass = { language: "en", callService: (...args) => {
+  permissionCalls.push(args);
+  if (args[1] === "set_permissions") {
+    permissionCall = args;
+    return Promise.resolve({ response: { data: { success: true, simulation_authorized: true, update_authorized: false } } });
+  }
+  if (args[1] === "check") {
+    return Promise.resolve({ response: { data: { success: true } } });
+  }
+  return Promise.resolve({ response: { data: { success: true } } });
+}, states: permissionStates };
 const permissionButton = card.shadowRoot.querySelector(".container-grid button.permission");
 permissionButton?.click();
 await new Promise((resolve) => setTimeout(resolve, 0));
+card.hass = { language: "en", states: { ...permissionStates, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { ...permissionStates["sensor.smart_homelab_maintenance_cloudflared"].attributes, update: { status: "updates_available", dry_run_supported: true, fresh: true, simulation_authorized: true, update_authorized: false, authorized: true } } } } };
+await new Promise((resolve) => setTimeout(resolve, 0));
 const permissionResult = card.shadowRoot.querySelector(".permission-result");
-const permissionSuccessShown = Boolean(permissionResult?.textContent.includes("Permission changed successfully") && !permissionResult.classList.contains("warning") && !permissionButton?.disabled);
+const permissionSuccessShown = Boolean(permissionResult?.textContent.includes("Permission changed successfully") && !permissionResult.classList.contains("warning") && !permissionButton?.disabled && permissionCalls.some((args) => args[1] === "check"));
 const permissionCallCorrect = permissionCall?.[0] === "smart_homelab_maintenance" && permissionCall?.[1] === "set_permissions" && permissionCall?.[2]?.target === "container:101" && permissionCall?.[2]?.confirm === true && permissionCall?.[2]?.simulation_authorized === true && permissionCall?.[2]?.update_authorized === false;
+const permissionReadbackRequired = (() => {
+  card.hass = { language: "en", callService: () => Promise.resolve({ response: { data: { success: true } } }), states: permissionStates };
+  card.shadowRoot.querySelector(".container-grid button.permission")?.click();
+  return true;
+})();
+await new Promise((resolve) => setTimeout(resolve, 0));
+const permissionReadbackFailure = Boolean(card.shadowRoot.querySelector(".permission-result")?.textContent.includes("confirmed readback is missing") && card.shadowRoot.querySelector(".permission-result")?.classList.contains("warning"));
+const permissionFlowStates = { ...permissionStates, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", running: true, os_name: "Debian", os_version: "12", package_manager: "apt", update: { status: "updates_available", available_count: 5, dry_run_supported: true, fresh: true, checked_at: "2026-11-09T16:33:38Z", simulation_authorized: false, update_authorized: false, authorized: false } } } };
+card.hass = { language: "en", callService: () => Promise.resolve({ response: { data: { success: true, simulation_authorized: true, update_authorized: true } } }), states: permissionFlowStates };
+const updatePermissionButton = card.shadowRoot.querySelector(".container-grid button.permission:last-of-type");
+updatePermissionButton?.click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+card.hass = { language: "en", states: { ...permissionFlowStates, "sensor.smart_homelab_maintenance_cloudflared": { state: "running", attributes: { container_id: 101, name: "cloudflared", running: true, os_name: "Debian", os_version: "12", package_manager: "apt", update: { status: "not_checked", dry_run_supported: true, fresh: false, simulation_authorized: false, update_authorized: false, authorized: false } } } } };
+const permissionFlowConsistent = Boolean(card.shadowRoot.textContent.includes("Updates: Not checked") && card.shadowRoot.querySelector(".container-grid button.install")?.disabled);
+// A permission write for CT108 invalidates the agent's update cache globally.
+// CT107 must retain its own successful simulation while CT108 adopts the
+// confirmed new grant; one guest must never overwrite another guest's state.
+const containerIsolationRegression = await (async () => {
+  const isolatedCard = document.createElement("smart-homelab-maintenance-card");
+  document.body.append(isolatedCard);
+  const states = (updates107, updates108) => ({
+    "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
+    "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
+    "sensor.smart_homelab_maintenance_container_107": { state: "running", attributes: { container_id: 107, name: "paperless-ngx", running: true, os_name: "Debian", os_version: "12", package_manager: "apt", update: updates107 } },
+    "sensor.smart_homelab_maintenance_container_108": { state: "running", attributes: { container_id: 108, name: "zigbee2mqtt-womo", running: true, os_name: "Debian", os_version: "12", package_manager: "apt", update: updates108 } },
+  });
+  const successful = { status: "updates_available", available_count: 5, dry_run_supported: true, fresh: true, simulation_authorized: true, update_authorized: false, authorized: true, plan_digest: "ct107-plan" };
+  isolatedCard.setConfig({ show_vms: false, show_containers: true });
+  isolatedCard.hass = { language: "en", callService: () => Promise.resolve({ response: { data: { success: true, safe: true, packages: Array.from({ length: 5 }, (_, i) => ({ name: `pkg-${i}`, installed_version: "1", available_version: "2" })), plan_digest: "ct107-plan" } } }), states: states(successful, { status: "current", available_count: 0, dry_run_supported: true, fresh: true, simulation_authorized: false, update_authorized: false, authorized: false }) };
+  isolatedCard.shadowRoot.querySelector('[data-item-id="107"] .simulate')?.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const ct107Before = isolatedCard.shadowRoot.querySelector('[data-item-id="107"] .update-text')?.textContent || isolatedCard.shadowRoot.querySelector('[data-item-id="107"] .muted')?.textContent || "";
+  isolatedCard.hass = { language: "en", callService: () => Promise.resolve({ response: { data: { success: true, simulation_authorized: true, update_authorized: false } } }), states: states(successful, { status: "current", available_count: 0, dry_run_supported: true, fresh: true, simulation_authorized: false, update_authorized: false, authorized: false }) };
+  isolatedCard.shadowRoot.querySelector('[data-item-id="108"] button.permission')?.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  isolatedCard.hass = { language: "en", states: states(
+    { status: "not_checked", dry_run_supported: true, fresh: false, simulation_authorized: true, update_authorized: false, authorized: true },
+    { status: "not_checked", dry_run_supported: true, fresh: false, simulation_authorized: true, update_authorized: false, authorized: true },
+  ) };
+  const ct107Text = isolatedCard.shadowRoot.querySelector('[data-item-id="107"]')?.textContent || "";
+  const ct108Text = isolatedCard.shadowRoot.querySelector('[data-item-id="108"]')?.textContent || "";
+  return ct107Text.includes("Updates: Not checked") && ct108Text.includes("Updates: Not checked") && ct107Text.includes("Simulation successful") && isolatedCard.shadowRoot.querySelector('[data-item-id="107"] button.install')?.disabled === true;
+})();
+const installationDialogContract = await (async () => {
+  const installCard = document.createElement("smart-homelab-maintenance-card");
+  document.body.append(installCard);
+  const base = (update) => ({
+    "sensor.smart_homelab_maintenance_agent_connection": { state: "connected", attributes: {} },
+    "binary_sensor.smart_homelab_maintenance_agent_reachable": { state: "on", attributes: {} },
+    "sensor.smart_homelab_maintenance_container_107": { state: "running", attributes: { container_id: 107, name: "paperless-ngx", running: true, os_name: "Debian", os_version: "12", package_manager: "apt", update } },
+  });
+  const update = { status: "updates_available", available_count: 1, dry_run_supported: true, update_supported: true, fresh: true, execution_enabled: true, backend_connected: true, simulation_authorized: true, update_authorized: true, plan_digest: "install-plan", packages: [{ name: "curl", installed_version: "1", available_version: "2" }] };
+  let executeCall = null;
+  let confirmText = "";
+  installCard.setConfig({ show_vms: false, show_containers: true });
+  installCard.hass = { language: "en", callService: (...args) => { if (args[1] === "dry_run") return Promise.resolve({ response: { data: { success: true, safe: true, plan_digest: "install-plan", packages: update.packages } } }); executeCall = args; return Promise.resolve({ response: { data: { success: true } } }); }, states: base(update) };
+  installCard.shadowRoot.querySelector('[data-item-id="107"] .simulate')?.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  installCard.hass = { language: "en", callService: (...args) => { executeCall = args; return Promise.resolve({ response: { data: { success: true } } }); }, states: base(update) };
+  const originalConfirm = window.confirm;
+  window.confirm = (value) => { confirmText = value; return true; };
+  const button = installCard.shadowRoot.querySelector('[data-item-id="107"] button.install');
+  button?.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  window.confirm = originalConfirm;
+  return Boolean(!button?.disabled && confirmText.includes("Target: container:107") && confirmText.includes("curl 1 → 2") && executeCall?.[1] === "execute" && executeCall?.[2]?.install_confirmed === true);
+})();
 card.hass = { language: "en", callService: () => Promise.resolve({ response: { error: { message: "administrator_required" } } }), states: permissionStates };
 card.shadowRoot.querySelector(".container-grid button.permission")?.click();
 await new Promise((resolve) => setTimeout(resolve, 0));
@@ -164,6 +251,6 @@ const reopenedEditorSafe = editor.querySelector('[data-field="title"]').value ==
 const barRects = [...card.shadowRoot.querySelectorAll(".bar-row span")].map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
 const hasTextOverlap = barRects.some((left, index) => barRects.slice(index + 1).some((right) => Math.abs(left.top - right.top) < 2 && left.left < right.right && right.left < left.right));
 const initialCardSafe = (() => { const initial = document.createElement("smart-homelab-maintenance-card"); document.body.append(initial); return Boolean(initial.shadowRoot.querySelector(".card")); })();
-window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), hasAvailableResources: card.shadowRoot.textContent.includes("Free RAM") && card.shadowRoot.textContent.includes("Free storage"), inventoryCounts, cardHasSize: card.getCardSize() >= 1, dryRunUi, dryRunResponseShown, emptyDryRunUi, packageDetailsCollapsed, packageDetailsStructured, installButtonDisabled, installUi, permissionSuccessShown, permissionCallCorrect, permissionResolvedErrorShown, permissionErrors: permissionErrors.every(Boolean), permissionTimeoutShown, dryRunMissingResponseShown: dryRunMissingResponseShownBeforePermission || dryRunMissingResponseShownAfterPermission, dryRunServiceErrorShown, dryRunTimeoutShown, dryRunLocalizedAuthorizationShown, unauthorizedSimulationUiSafe, actionLayoutContractSafe, stableButtonGeometry, vmExclusionEnglish, vmExclusionGerman, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, initialCardSafe, unknownSafe, unknownContainerSafe, unknownVmMemorySafe, guestAccessGermanSafe, updateStatusLabelsSafe, hostDetailsPreservedAfterUpdates, languageEnglish, languageGerman, localeObjectSafe, missingLanguageFallback, hostOfflineWithoutAgentContradiction, statusStatesSafe, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+window.__HARNESS__ = { connected: card.shadowRoot.querySelector(".status").textContent.includes("Connected"), hasContainer: card.shadowRoot.textContent.includes("cloudflared"), hasVm: card.shadowRoot.textContent.includes("haos"), hasHost: card.shadowRoot.textContent.includes("pve-home"), hasAvailableResources: card.shadowRoot.textContent.includes("Free RAM") && card.shadowRoot.textContent.includes("Free storage"), inventoryCounts, cardHasSize: card.getCardSize() >= 1, dryRunUi, dryRunResponseShown, emptyDryRunUi, packageDetailsCollapsed, packageDetailsStructured, installButtonDisabled, installUi, permissionSuccessShown, permissionCallCorrect, permissionReadbackRequired, permissionReadbackFailure, permissionFlowConsistent, containerIsolationRegression, installationDialogContract, permissionResolvedErrorShown, permissionErrors: permissionErrors.every(Boolean), permissionTimeoutShown, dryRunMissingResponseShown: dryRunMissingResponseShownBeforePermission || dryRunMissingResponseShownAfterPermission, dryRunServiceErrorShown, dryRunTimeoutShown, dryRunLocalizedAuthorizationShown, unauthorizedSimulationUiSafe, actionLayoutContractSafe, stableButtonGeometry, vmExclusionEnglish, vmExclusionGerman, localizedEditor, editorChanged, editorPreservesFocusedDraft, reopenedEditorSafe, emptyCardSafe, initialCardSafe, unknownSafe, unknownContainerSafe, unknownVmMemorySafe, guestAccessGermanSafe, updateStatusLabelsSafe, hostDetailsPreservedAfterUpdates, languageEnglish, languageGerman, localeObjectSafe, missingLanguageFallback, hostOfflineWithoutAgentContradiction, statusStatesSafe, errors, hasTextOverlap, hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
 document.querySelector("#result").textContent = JSON.stringify(window.__HARNESS__);
 </script></body></html>

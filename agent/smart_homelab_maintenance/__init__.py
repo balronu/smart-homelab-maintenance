@@ -5,5 +5,5 @@ configuration integration.  Those boundaries belong to later gated phases.
 """
 
 __all__ = ["adapters", "api", "api_models", "apply_controller", "authorization", "discovery", "discovery_probe", "discovery_socket", "discovery_transport", "errors", "helper_apply_controller", "inventory", "jobs", "orchestration_service", "orchestration_status", "orchestrator", "policy", "reconcile", "security", "types", "versions"]
-__version__ = "0.1.0-beta.49"
+__version__ = "1.0.27"
 API_CONTRACT_VERSION = "1.1"

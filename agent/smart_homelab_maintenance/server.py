@@ -36,6 +36,7 @@ from .discovery_socket import DiscoverySocketTransport
 from .helper_apply_controller import HelperAllowlistApplyController
 from .orchestrator import LxcOrchestrator
 from .orchestration_service import OrchestrationService
+from .agent_recovery import AgentRecoveryInspector
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ def load_runtime_config(path: str | os.PathLike[str]) -> AgentRuntimeConfig:
     return AgentRuntimeConfig(server, state_directory, proxmox, max_bytes, update_targets, helper_enabled, policy_mode)
 
 
-def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str) -> tuple[ApiApplication, JobRepository]:
+def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_token: str, recovery_admin_token: str | None = None) -> tuple[ApiApplication, JobRepository]:
     """Construct the live bounded application from validated settings."""
 
     if not agent_token or not proxmox_token:
@@ -147,10 +148,17 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
         api_token=proxmox_token, ca_file=config.proxmox.ca_file,
         timeout=config.proxmox.timeout, max_bytes=config.proxmox.max_bytes,
     )
+    guest_transport = RootHelperTransport() if config.lxc_helper_enabled else None
     repository = JobRepository(str(Path(config.state_directory) / "jobs.sqlite"))
     backend = ProxmoxInventoryBackend(ProxmoxApiClient(proxmox_config))
     discovery = DiscoveryService(backend)
-    guest_transport = RootHelperTransport() if config.lxc_helper_enabled else None
+    recovery_runner = None
+    if guest_transport is not None:
+        inspector = AgentRecoveryInspector(guest_transport)
+        recovery_runner = lambda job_id=None: repository.run_recovery(inspector, limit=8, job_id=job_id)
+        # Agent-start trigger is read-only and bounded; failed inspection is
+        # persisted as recovery_blocked, never retried as an update.
+        recovery_runner()
     policy_transport = PolicyHelperTransport()
     policy_store = PolicyStore(Path(config.state_directory) / "policy.json", initial=Policy(PolicyMode(config.policy_mode)))
     runtime_status = OrchestrationStatus(policy_mode=config.policy_mode)
@@ -171,12 +179,14 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
             require_root=True,
             privileged_transport=policy_transport,
         ),
+        jobs=repository,
     )
     application = ApiApplication(
         discovery,
         repository,
         updates=updates,
         read_token=agent_token,
+        admin_token=recovery_admin_token,
         max_bytes=config.max_response_bytes,
         orchestration_status=lambda: read_installation_status(
             policy_reader=policy_transport.read,
@@ -185,6 +195,7 @@ def build_application(config: AgentRuntimeConfig, *, agent_token: str, proxmox_t
             runtime_status=runtime_status,
         ),
         orchestration=orchestration,
+        recovery_runner=recovery_runner,
     )
     return application, repository
 
@@ -320,7 +331,12 @@ def main(argv: list[str] | None = None) -> int:
         config = load_runtime_config(args.config)
         agent_token = credential_from_systemd("api_token")
         proxmox_token = credential_from_systemd("proxmox_api_token")
-        application, repository = build_application(config, agent_token=agent_token, proxmox_token=proxmox_token)
+        recovery_admin_token = None
+        try:
+            recovery_admin_token = credential_from_systemd("recovery_admin_token")
+        except (OSError, ValueError):
+            _LOGGER.warning("recovery admin credential is unavailable; job reconciliation remains disabled")
+        application, repository = build_application(config, agent_token=agent_token, proxmox_token=proxmox_token, recovery_admin_token=recovery_admin_token)
         try:
             serve_forever(application, config.server)
         finally:

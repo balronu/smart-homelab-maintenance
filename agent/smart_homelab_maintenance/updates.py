@@ -14,17 +14,20 @@ import os
 import socket
 import re
 import shutil
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Sequence
 
-from .errors import ValidationError
+from .errors import DuplicateJobError, ValidationError
+from .jobs import JobRepository
 from .permissions import PermissionStore
-from .types import utc_now
+from .types import JobPhase, JobRequest, JobState, Verification, utc_now
 
 _VMID = re.compile(r"^[1-9][0-9]{0,5}$")
 _TARGET = re.compile(r"^(host|container:[1-9][0-9]{0,5}|vm:[1-9][0-9]{0,5})$")
+_ATTEMPT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$")
 _INST = re.compile(r"^Inst\s+(\S+)(?:\s+\[([^]]*)\])?\s+\(([^ )]+)")
 _REMV = re.compile(r"^Remv\s+(\S+)")
 LXC_HELPER_SOCKET = "/run/smart-homelab-maintenance/lxc-apt-helper.sock"
@@ -82,6 +85,14 @@ class UpdateResult:
         if self.status in {"current", "updates_available"} and not result["fresh"]:
             result["status"] = "stale"
         return result
+
+    @property
+    def fresh(self) -> bool:
+        return self.is_fresh()
+
+    @property
+    def authorized(self) -> bool:
+        return bool(self.simulation_authorized)
 
     def is_fresh(self, now: float | None = None) -> bool:
         if not self.checked_at or self.status in {"unknown", "error", "unsupported"}:
@@ -190,6 +201,11 @@ class AptCommandRunner:
             raise FileNotFoundError("LXC update helper is unavailable")
         return self._guest_transport.update(vmid)
 
+    def inspect(self, vmid: int) -> dict[str, Any]:
+        if self._guest_transport is None:
+            raise GuestHelperUnavailableError("LXC inspection helper is unavailable")
+        return self._guest_transport.inspect(vmid)
+
 
 class AptUpdateReader:
     """Read the existing APT cache without refreshing indexes or simulating."""
@@ -252,7 +268,7 @@ class RootHelperTransport:
     def _call_response(self, operation: str, vmid: int) -> dict[str, Any]:
         if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
             raise ValidationError("container id is invalid")
-        if operation not in {"read", "simulate", "update", "probe"}:
+        if operation not in {"read", "simulate", "update", "inspect", "probe"}:
             raise ValidationError("guest operation is not allowed")
         request = json.dumps({"container_id": vmid, "operation": operation}, separators=(",", ":"))
         payload = (request + "\n").encode("utf-8")
@@ -309,6 +325,13 @@ class RootHelperTransport:
             raise ValidationError(str(response.get("stderr", "eligibility probe failed")))
         return response
 
+    def inspect(self, vmid: int) -> dict[str, Any]:
+        """Collect fixed, read-only package forensic observations."""
+        response = self._call_response("inspect", vmid)
+        if response.get("ok") is not True:
+            raise GuestHelperUnavailableError(str(response.get("stderr", "guest inspection failed")))
+        return response
+
 
 def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     packages: list[PackageChange] = []
@@ -334,9 +357,22 @@ def _parse_apt(stdout: str, stderr: str) -> tuple[tuple[PackageChange, ...], tup
     return tuple(unique.values()), tuple(sorted(set(held))), tuple(sorted(set(conflicts))), tuple(sorted(set(removals)))
 
 
+def _inspection_packages(response: Mapping[str, Any]) -> dict[str, str]:
+    observations = response.get("observations") if isinstance(response, Mapping) else None
+    package_observation = observations.get("packages", {}) if isinstance(observations, Mapping) else {}
+    if not isinstance(package_observation, Mapping) or package_observation.get("returncode") != 0:
+        return {}
+    result: dict[str, str] = {}
+    for line in str(package_observation.get("stdout", "")).splitlines():
+        name, separator, version = line.partition("\t")
+        if separator and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9+_.:-]*", name) and version:
+            result[name] = version[:256]
+    return result
+
+
 _APT_UPGRADABLE = re.compile(
     r"^(\S+?)/\S+\s+(\S+)"
-    r"(?:\s+\S+)?"
+    r"(?:\s+(?!\[)\S+)?"
     r"(?:\s+\[[^]]*upgradable from:\s*([^]]+)\])?"
 )
 
@@ -370,7 +406,7 @@ def _package_digest(packages: Sequence[PackageChange]) -> str:
 class UpdateService:
     """Passive checks plus explicitly confirmed, separately authorized updates."""
 
-    def __init__(self, targets: Callable[[], Sequence[ProbeTarget]], *, runner: AptCommandRunner | None = None, reader: AptUpdateReader | None = None, clock: Callable[[], float] | None = None, execution_enabled: bool = False, permission_store: PermissionStore | None = None) -> None:
+    def __init__(self, targets: Callable[[], Sequence[ProbeTarget]], *, runner: AptCommandRunner | None = None, reader: AptUpdateReader | None = None, clock: Callable[[], float] | None = None, execution_enabled: bool = False, permission_store: PermissionStore | None = None, jobs: JobRepository | None = None) -> None:
         self._targets = targets
         self._runner = runner or AptCommandRunner()
         self._reader = reader
@@ -379,6 +415,7 @@ class UpdateService:
         self._active_simulations: set[str] = set()
         self.execution_enabled = execution_enabled
         self._permission_store = permission_store
+        self._jobs = jobs
 
     def target_map(self) -> dict[str, ProbeTarget]:
         targets = {target.target: target for target in self._targets()}
@@ -421,7 +458,9 @@ class UpdateService:
         # incomplete; it never grants access and preserves existing metadata.
         if not simulation_authorized and not update_authorized:
             metadata = {key: existing.get(key) for key in ("os_name", "os_version", "package_manager")}
-            return self._permission_store.set_permissions(target_id, simulation_authorized=False, update_authorized=False, metadata=metadata)
+            result = self._permission_store.set_permissions(target_id, simulation_authorized=False, update_authorized=False, metadata=metadata)
+            self._cache.pop(target_id, None)
+            return result
         try:
             probe = self._runner.probe(target.vmid)
         except AttributeError as exc:
@@ -435,7 +474,9 @@ class UpdateService:
         package_manager = str(probe.get("package_manager", ""))
         if os_name.lower() not in {"debian", "ubuntu"} or not os_version or package_manager != "apt":
             raise ValidationError("target is not a proven Debian/Ubuntu apt LXC")
-        return self._permission_store.set_permissions(target_id, simulation_authorized=simulation_authorized, update_authorized=update_authorized, metadata={"os_name": os_name, "os_version": os_version, "package_manager": package_manager})
+        result = self._permission_store.set_permissions(target_id, simulation_authorized=simulation_authorized, update_authorized=update_authorized, metadata={"os_name": os_name, "os_version": os_version, "package_manager": package_manager})
+        self._cache.pop(target_id, None)
+        return result
 
     def _check_uncached(self, target: ProbeTarget) -> UpdateResult:
         if target.target.startswith("vm:"):
@@ -491,8 +532,8 @@ class UpdateService:
         self._cache[target_id] = (result, self._clock())
         return result
 
-    def all(self) -> list[dict[str, Any]]:
-        return [self.check(target.target).as_dict() for target in self._targets()]
+    def all(self, *, force: bool = False) -> list[dict[str, Any]]:
+        return [self.check(target.target, force=force).as_dict() for target in self._targets()]
 
     def dry_run(self, target_id: str, *, confirmed: bool) -> dict[str, Any]:
         if confirmed is not True:
@@ -528,9 +569,11 @@ class UpdateService:
         finally:
             self._active_simulations.discard(target_id)
 
-    def execute_update(self, target_id: str, *, confirmed: bool, plan_digest: str | None) -> dict[str, Any]:
-        if confirmed is not True:
-            raise ValidationError("real update requires explicit confirmation")
+    def execute_update(self, target_id: str, *, confirmed: bool, install_confirmed: bool = False, plan_digest: str | None, attempt_id: str | None = None) -> dict[str, Any]:
+        if confirmed is not True or install_confirmed is not True:
+            raise ValidationError("explicit simulation and installation confirmations are both required")
+        if attempt_id is not None and (not isinstance(attempt_id, str) or not _ATTEMPT_ID.fullmatch(attempt_id)):
+            raise ValidationError("attempt_id is invalid")
         if not self.execution_enabled:
             return {"target": target_id, "success": False, "safe": False, "error": "update execution is disabled"}
         target = self.target_map().get(target_id)
@@ -538,25 +581,203 @@ class UpdateService:
             return {"target": target_id, "success": False, "safe": False, "error": "only authorized LXC targets may be updated"}
         if not target.update_authorized:
             return {"target": target_id, "success": False, "safe": False, "error": "target is not authorized for real updates"}
-        current = self.check(target_id, force=True)
-        if current.status != "updates_available" or not current.fresh:
+        if self._jobs is not None and attempt_id is None and self._jobs.has_unresolved_target(target_id):
+            return {"target": target_id, "success": False, "safe": False,
+                    "error": "another update is active or requires manual recovery",
+                    "error_code": "target_busy", "status": "manual_recovery_required"}
+        # Use the already-fetched, user-confirmed plan for the HTTP admission
+        # decision. A fresh helper check here would defeat async acceptance;
+        # the worker repeats it before any mutating operation.
+        current = self.check(target_id)
+        if current.status != "updates_available" or not current.is_fresh():
             return {"target": target_id, "success": False, "safe": False, "error": "fresh updates are not available"}
         if current.plan_digest != plan_digest:
             return {"target": target_id, "success": False, "safe": False, "error": "update plan changed; confirmation is stale", "plan_digest": current.plan_digest}
         if current.held_packages or current.conflicts or current.removals:
             return {"target": target_id, "success": False, "safe": False, "error": "update plan contains held, conflicting, or removing packages"}
-        if target_id in self._active_simulations:
-            return {"target": target_id, "success": False, "safe": False, "error": "another update is already running for target"}
+        job_id: str | None = None
+        if self._jobs is not None:
+            idempotency_key = f"{target_id}:{current.plan_digest}"
+            if attempt_id:
+                idempotency_key += f":{attempt_id}"
+            existing = self._jobs.get_by_idempotency_key(idempotency_key)
+            if existing is not None and attempt_id is not None:
+                if existing.get("target") != target_id or existing.get("confirmation_hash") != current.plan_digest:
+                    raise DuplicateJobError("installation attempt identity conflicts with the confirmed update plan")
+                return {
+                    "target": target_id,
+                    "operation": "update",
+                    "success": True,
+                    "accepted": True,
+                    "replayed": True,
+                    "safe": True,
+                    "job_id": existing["job_id"],
+                    "status": existing["state"],
+                    "plan_digest": current.plan_digest,
+                    "message": "existing installation attempt returned; no second job was created",
+                }
+            if self._jobs.has_unresolved_target(target_id):
+                return {"target": target_id, "success": False, "safe": False,
+                        "error": "another update is active or requires manual recovery",
+                        "error_code": "target_busy", "status": "manual_recovery_required"}
+            if existing is not None:
+                raise DuplicateJobError("installation attempt identity already exists; a new attempt identity is required")
+            if target_id in self._active_simulations:
+                return {"target": target_id, "success": False, "safe": False, "error": "another update is already running for target", "error_code": "target_busy"}
+            try:
+                job_id = self._jobs.create(JobRequest(
+                    target=target_id,
+                    operation="update",
+                    expected_version=None,
+                    idempotency_key=idempotency_key,
+                    confirmation_hash=current.plan_digest,
+                ))
+                self._jobs.transition(job_id, JobState.PREFLIGHT, phase=JobPhase.PREFLIGHT, progress=10, message="fresh update plan validated")
+                self._jobs.append_log(job_id, "fresh plan and target authorization validated")
+            except DuplicateJobError:
+                existing = self._jobs.get_by_idempotency_key(idempotency_key)
+                if attempt_id is not None and existing is not None and existing.get("target") == target_id and existing.get("confirmation_hash") == current.plan_digest:
+                    return {
+                        "target": target_id,
+                        "operation": "update",
+                        "success": True,
+                        "accepted": True,
+                        "replayed": True,
+                        "safe": True,
+                        "job_id": existing["job_id"],
+                        "status": existing["state"],
+                        "plan_digest": current.plan_digest,
+                        "message": "existing installation attempt returned; no second job was created",
+                    }
+                raise DuplicateJobError("installation attempt identity already exists")
+            except Exception as exc:
+                return {"target": target_id, "success": False, "safe": False, "error": "update job could not be created", "job_error": type(exc).__name__}
+        elif target_id in self._active_simulations:
+            return {"target": target_id, "success": False, "safe": False, "error": "another update is already running for target", "error_code": "target_busy"}
         self._active_simulations.add(target_id)
         try:
+            if job_id and self._jobs:
+                # Persist and acknowledge the job before any guest helper call.
+                # The HA client has a deliberately short transport timeout;
+                # final inspection/simulation belongs to the worker lifetime.
+                self._jobs.append_log(job_id, "update job accepted; APT worker queued")
+                worker = threading.Thread(
+                    target=self._run_update_job,
+                    args=(job_id, target, current.plan_digest),
+                    name=f"smh-update-{target.vmid}",
+                    daemon=True,
+                )
+                worker.start()
+                return {
+                    "target": target_id,
+                    "operation": "update",
+                    "success": True,
+                    "accepted": True,
+                    "safe": True,
+                    "job_id": job_id,
+                    # Keep the public response contract stable: accepted is
+                    # the asynchronous running lifecycle even while the
+                    # persisted row remains in preflight until the worker
+                    # completes final validation.
+                    "status": "running",
+                    "plan_digest": current.plan_digest,
+                    "message": "update job accepted; poll the job endpoint for completion",
+                }
+            # A persistent job repository is required for real execution.  It
+            # provides duplicate protection and restart-safe recovery.
+            return {"target": target_id, "success": False, "safe": False, "error": "persistent job tracking is required for update execution", "job_id": job_id}
+        except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
+            if job_id and self._jobs:
+                self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="execution status is uncertain; manual recovery required", error_code="execution_status_unknown")
+                self._jobs.append_log(job_id, "preflight transport or timeout failure; no automatic retry was attempted", level="warning")
+            return {"target": target_id, "operation": "update", "success": False, "safe": False, "error": type(exc).__name__, "status": "manual_recovery_required", "job_id": job_id}
+        finally:
+            # The worker owns this guard after dispatch; failed preflight must
+            # release it here so a safe retry is not falsely blocked.
+            if not job_id or not self._jobs or not self._jobs.has_unresolved_target(target_id):
+                self._active_simulations.discard(target_id)
+
+    def _run_update_job(self, job_id: str, target: ProbeTarget, plan_digest: str | None) -> None:
+        """Run the mutating helper outside the HTTP request lifetime."""
+        target_id = target.target
+        preflight_complete = False
+        try:
+            assert self._jobs is not None
+            # All guest inspection and final simulation remain fail-closed, but
+            # run after the persistent job acknowledgement so HA never waits
+            # for a slow helper during the execute request.
+            fresh = self.check(target_id, force=True)
+            if fresh.status != "updates_available" or not fresh.is_fresh():
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="fresh update plan is unavailable", error_code="fresh_plan_unavailable")
+                return
+            if fresh.plan_digest != plan_digest:
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="plan changed before execution", error_code="stale_plan")
+                return
+            inspect_method = getattr(self._runner, "inspect", None)
+            inspection = inspect_method(target.vmid) if callable(inspect_method) else {"observations": {}}
+            baseline = _inspection_packages(inspection)
+            self._jobs.set_execution_context(job_id, plan_digest=plan_digest or "", baseline_packages=baseline)
+            simulation_code, simulation_stdout, simulation_stderr = self._runner.simulate(target.vmid)
+            if simulation_code != 0:
+                self._jobs.transition(job_id, JobState.FAILED, phase=JobPhase.PREFLIGHT, progress=20, message="pre-execution simulation failed", error_code="simulation_failed")
+                return
+            simulated, held, conflicts, removals = _parse_apt(simulation_stdout, simulation_stderr)
+            simulation_digest = _package_digest(simulated) if self._reader is not None else hashlib.sha256((simulation_stdout + "\n" + simulation_stderr).encode("utf-8", "replace")).hexdigest()
+            if simulation_digest != plan_digest:
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="plan changed before execution", error_code="stale_plan")
+                return
+            if held or conflicts or removals:
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="simulation contains unsafe changes", error_code="unsafe_plan")
+                return
+            preflight_complete = True
+            self._jobs.transition(job_id, JobState.RUNNING, phase=JobPhase.EXECUTION, progress=30, message="fixed APT update started")
+            self._jobs.append_log(job_id, "apt update and no-remove upgrade started")
             update_result = self._runner.update(target.vmid)
             code, stdout, stderr = update_result[:3]
             steps = list(update_result[3]) if len(update_result) > 3 else [{"name": "apt-update"}, {"name": "apt-upgrade"}]
-            return {"target": target_id, "operation": "update", "success": code == 0, "safe": code == 0, "returncode": code, "stdout": stdout, "stderr": stderr, "steps": steps, "plan_digest": current.plan_digest, "error": None if code == 0 else "apt update or upgrade failed"}
+            postcheck = {"performed": False}
+            postcheck_passed = True
+            if code == 0 and self._reader is not None:
+                try:
+                    post_code, post_stdout, post_stderr = self._reader.list_upgradable(target.vmid)
+                    remaining = _parse_apt_upgradable(post_stdout, post_stderr)
+                    postcheck = {"performed": True, "returncode": post_code, "remaining_packages": len(remaining)}
+                    postcheck_passed = post_code == 0
+                except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
+                    postcheck = {"performed": True, "returncode": None, "error": type(exc).__name__}
+                    postcheck_passed = False
+            if code == 0 and postcheck_passed:
+                self._jobs.transition(job_id, JobState.POSTCHECK, phase=JobPhase.POSTCHECK, progress=90, message="update command completed; postcheck required")
+                self._jobs.complete(job_id, Verification(True, True, message="fixed APT update completed"), message="fixed APT update completed")
+                self._jobs.append_log(job_id, "update completed and postcheck passed")
+            else:
+                self._jobs.transition(job_id, JobState.MANUAL_RECOVERY if code == 0 else JobState.FAILED, phase=JobPhase.RECOVERY, progress=100, message="postcheck failed" if code == 0 else "APT update failed", error_code="postcheck_failed" if code == 0 else "apt_failed")
+                self._jobs.append_log(job_id, "postcheck failed" if code == 0 else "APT update failed", level="error")
         except (FileNotFoundError, PermissionError, OSError, asyncio.TimeoutError) as exc:
-            return {"target": target_id, "operation": "update", "success": False, "safe": False, "error": type(exc).__name__}
+            if not preflight_complete:
+                # No mutating helper call has been dispatched until this point.
+                # A slow/failing read-only inspection must not poison the job
+                # with an execution-uncertain recovery lock.
+                timeout = isinstance(exc, (TimeoutError, asyncio.TimeoutError))
+                error_code = "preflight_helper_timeout" if timeout else "preflight_helper_unavailable"
+                self._jobs.transition(job_id, JobState.BLOCKED, phase=JobPhase.PREFLIGHT, progress=20, message="read-only preflight failed; no package update was started", error_code=error_code, error_message=type(exc).__name__)
+                self._jobs.append_log(job_id, "read-only preflight failed before mutation; no package update was started", level="warning")
+            else:
+                self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="execution status is uncertain; manual recovery required", error_code="execution_status_unknown")
+                self._jobs.append_log(job_id, "transport or timeout failure after mutation dispatch; no automatic retry was attempted", level="warning")
+        except Exception as exc:  # pragma: no cover - defensive worker boundary
+            self._jobs.transition(job_id, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY, progress=100, message="worker failed; manual recovery required", error_code="worker_failed", error_message=type(exc).__name__)
+            self._jobs.append_log(job_id, "unexpected worker failure; no automatic retry was attempted", level="error")
         finally:
             self._active_simulations.discard(target_id)
+
+    def cancel_job(self, job_id: str, *, confirmed: bool) -> dict[str, Any]:
+        """Cancel only pre-mutation work; running helper jobs remain locked."""
+        if confirmed is not True:
+            raise ValidationError("explicit cancellation confirmation is required")
+        if self._jobs is None:
+            raise ValidationError("persistent job tracking is unavailable")
+        return self._jobs.request_cancel(job_id)
 
 
 def make_targets(host: Mapping[str, Any], containers: Sequence[Mapping[str, Any]], target_overrides: Mapping[str, Mapping[str, Any]] | None = None, virtual_machines: Sequence[Mapping[str, Any]] = ()) -> list[ProbeTarget]:

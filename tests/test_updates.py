@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,6 +12,7 @@ from agent.smart_homelab_maintenance.discovery import DiscoveryService, FixtureP
 from agent.smart_homelab_maintenance.errors import ValidationError
 from agent.smart_homelab_maintenance.jobs import JobRepository
 from agent.smart_homelab_maintenance.permissions import PermissionStore
+from agent.smart_homelab_maintenance.types import JobPhase, JobRequest, JobState
 from agent.smart_homelab_maintenance.updates import AptCommandRunner, AptUpdateReader, GuestHelperUnavailableError, ProbeTarget, RootHelperTransport, UpdateService, _parse_apt, _parse_apt_upgradable, make_targets
 
 
@@ -34,6 +36,20 @@ class Runner:
     def probe(self, vmid):
         self.calls.append(("probe", vmid))
         return {"running": True, "supported": True, "os_name": "Debian", "os_version": "12", "package_manager": "apt"}
+
+
+class SlowUpdateRunner(Runner):
+    def update(self, vmid):
+        self.calls.append(("update", vmid))
+        time.sleep(0.15)
+        return self.code, self.stdout, self.stderr
+
+
+class SlowSimulationRunner(Runner):
+    def simulate(self, vmid=None):
+        self.calls.append(vmid)
+        time.sleep(0.15)
+        return self.code, self.stdout, self.stderr
 
 
 def service(runner, targets=(target(),), clock=None):
@@ -174,6 +190,19 @@ def test_permission_grant_probes_unknown_discovery_before_writing_policy(tmp_pat
     assert store.read()["102"]["os_name"] == "Debian"
 
 
+def test_permission_change_invalidates_cached_update_authorization(tmp_path):
+    store = PermissionStore(tmp_path / "policy.toml")
+    runner = Runner("0 upgraded, 0 newly installed, 0 to remove.")
+    service = UpdateService(
+        lambda: (ProbeTarget("container:102", "cloudflared", 102, "Debian", "12", "apt", False, True),),
+        runner=runner,
+        permission_store=store,
+    )
+    assert service.check("container:102").status == "unauthorized"
+    service.set_permissions("container:102", simulation_authorized=True, update_authorized=False, confirmed=True)
+    assert service.check("container:102").status == "current"
+
+
 def test_permission_metadata_is_reused_for_followup_update_checks(tmp_path):
     store = PermissionStore(tmp_path / "policy.toml")
     store.set_permissions(
@@ -274,27 +303,33 @@ def test_simulation_command_is_fixed_and_never_an_install_or_refresh():
 def test_real_update_requires_explicit_permission_fresh_plan_and_confirmation():
     runner = Runner("Inst curl [1] (2)")
     authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
-    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True)
-    result = checked.check("container:107")
-    assert result.update_authorized is True and result.update_supported is True
-    # Validation is deliberately raised before any guest call.
-    runner.calls.clear()
-    with pytest.raises(ValidationError, match="explicit confirmation"):
-        checked.execute_update("container:107", confirmed=False, plan_digest=result.plan_digest)
-    success = checked.execute_update("container:107", confirmed=True, plan_digest=result.plan_digest)
-    assert success["success"] is True and success["operation"] == "update"
-    assert ("update", 107) in runner.calls
-    stale = checked.execute_update("container:107", confirmed=True, plan_digest="wrong-digest")
-    assert stale["success"] is False and "stale" in stale["error"]
+    with tempfile.TemporaryDirectory() as directory:
+        jobs = JobRepository(str(Path(directory) / "jobs.sqlite"))
+        checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+        result = checked.check("container:107")
+        assert result.update_authorized is True and result.update_supported is True
+        # Validation is deliberately raised before any guest call.
+        runner.calls.clear()
+        with pytest.raises(ValidationError, match="explicit.*confirmation"):
+            checked.execute_update("container:107", confirmed=False, plan_digest=result.plan_digest)
+        accepted = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=result.plan_digest)
+        assert accepted["success"] is True and accepted["accepted"] is True and accepted["status"] == "running"
+        for _ in range(50):
+            if jobs.get(accepted["job_id"])["state"] == "succeeded":
+                break
+            time.sleep(0.01)
+        assert jobs.get(accepted["job_id"])["state"] == "succeeded"
+        assert ("update", 107) in runner.calls
+        jobs.close()
 
 
 def test_real_update_is_disabled_or_rejected_for_unauthorized_and_vm_targets():
     runner = Runner("Inst curl [1] (2)")
     disabled = UpdateService(lambda: (target(),), runner=runner, execution_enabled=False)
-    assert disabled.execute_update("container:107", confirmed=True, plan_digest="x")["error"] == "update execution is disabled"
+    assert disabled.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest="x")["error"] == "update execution is disabled"
     vm = ProbeTarget("vm:104", "haos", 104, "Home Assistant OS", "unknown", None, True, True, True)
     enabled = UpdateService(lambda: (vm,), runner=runner, execution_enabled=True)
-    result = enabled.execute_update("vm:104", confirmed=True, plan_digest="x")
+    result = enabled.execute_update("vm:104", confirmed=True, install_confirmed=True, plan_digest="x")
     assert result["success"] is False and "only authorized LXC" in result["error"]
     assert runner.calls == []
 
@@ -302,16 +337,21 @@ def test_real_update_is_disabled_or_rejected_for_unauthorized_and_vm_targets():
 def test_api_execute_returns_structured_update_result_after_fresh_check():
     runner = Runner("Inst curl [1] (2)")
     authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
-    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True)
     with tempfile.TemporaryDirectory() as directory:
         repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+        updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=repo)
         api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), repo, updates=updates, read_token="token")
         headers = {"Authorization": "Bearer token"}
         _, check_body = api.handle("GET", "/api/v1/updates/container:107", headers=headers)
         digest = check_body["data"]["plan_digest"]
-        status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=(f'{{"confirm":true,"plan_digest":"{digest}"}}').encode())
-        assert status == 200 and body["data"]["success"] is True
-        assert [step["name"] for step in body["data"]["steps"]] == ["apt-update", "apt-upgrade"]
+        status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=(f'{{"confirm":true,"install_confirmed":true,"plan_digest":"{digest}"}}').encode())
+        assert status == 200 and body["data"]["success"] is True and body["data"]["accepted"] is True
+        assert body["data"]["status"] == "running"
+        for _ in range(50):
+            if repo.get(body["data"]["job_id"])["state"] == "succeeded":
+                break
+            time.sleep(0.01)
+        assert repo.get(body["data"]["job_id"])["state"] == "succeeded"
         repo.close()
 
 
@@ -381,6 +421,244 @@ def test_api_exposes_dry_run_and_rejects_future_execution():
         assert status == 200 and body["data"]["status"] == "updates_available"
         status, body = api.handle("POST", "/api/v1/updates/container:107/dry-run", headers=headers, body=b'{"confirm":true}')
         assert status == 200 and body["data"]["simulation"] is True
-        status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=b'{}')
+        status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=b'{"confirm":true}')
         assert status == 400 and body["error"]["code"] == "invalid_request"
         repo.close()
+
+
+def test_execute_requires_a_separate_installation_confirmation():
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True)
+    plan = checked.check("container:107")
+    with pytest.raises(ValidationError, match="both required"):
+        checked.execute_update("container:107", confirmed=True, plan_digest=plan.plan_digest)
+    assert runner.calls == [107]
+
+
+def test_execute_revalidates_simulation_before_mutation_and_persists_job(tmp_path):
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    result = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
+    assert result["success"] is True and result["accepted"] is True and result["job_id"]
+    for _ in range(50):
+        if jobs.get(result["job_id"])["state"] == "succeeded":
+            break
+        time.sleep(0.01)
+    stored = jobs.get(result["job_id"])
+    assert stored["state"] == "succeeded"
+    assert [call for call in runner.calls if call == 107] == [107, 107, 107]
+    jobs.close()
+
+
+def test_execute_returns_before_slow_update_and_blocks_duplicate_click(tmp_path):
+    runner = SlowUpdateRunner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    started = time.monotonic()
+    accepted = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
+    elapsed = time.monotonic() - started
+    assert elapsed < 0.1
+    assert accepted["accepted"] is True and accepted["status"] == "running"
+    duplicate = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
+    assert duplicate["success"] is False and "another update is active" in duplicate["error"]
+    for _ in range(50):
+        if jobs.get(accepted["job_id"])["state"] == "succeeded":
+            break
+        time.sleep(0.01)
+    assert jobs.get(accepted["job_id"])["state"] == "succeeded"
+    jobs.close()
+
+
+def test_reconciled_historical_job_allows_new_confirmed_attempt(tmp_path):
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    historical = jobs.create(JobRequest(
+        target="container:107", operation="update", expected_version=None,
+        idempotency_key=f"container:107:{plan.plan_digest}", confirmation_hash=plan.plan_digest,
+    ))
+    jobs.transition(historical, JobState.PREFLIGHT, phase=JobPhase.PREFLIGHT)
+    jobs.transition(historical, JobState.MANUAL_RECOVERY, phase=JobPhase.RECOVERY)
+    jobs.transition(historical, JobState.RECONCILED_LEGACY_STATE_VERIFIED, phase=JobPhase.RECOVERY)
+    accepted = checked.execute_update(
+        "container:107", confirmed=True, install_confirmed=True,
+        plan_digest=plan.plan_digest, attempt_id="attempt-new-12345678",
+    )
+    assert accepted["success"] is True and accepted["job_id"] != historical
+    for _ in range(50):
+        if jobs.get(accepted["job_id"])["state"] == JobState.SUCCEEDED:
+            break
+        time.sleep(0.01)
+    assert jobs.count() == 2
+    assert jobs.get(historical)["state"] == JobState.RECONCILED_LEGACY_STATE_VERIFIED
+    jobs.close()
+
+
+def test_identical_attempt_retry_replays_same_job_without_second_job(tmp_path):
+    runner = SlowUpdateRunner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    request = dict(confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest, attempt_id="attempt-retry-12345678")
+    first = checked.execute_update("container:107", **request)
+    retry = checked.execute_update("container:107", **request)
+    assert first["success"] is True and retry["replayed"] is True
+    assert retry["job_id"] == first["job_id"]
+    assert jobs.count() == 1
+    for _ in range(50):
+        if jobs.get(first["job_id"])["state"] == JobState.SUCCEEDED:
+            break
+        time.sleep(0.01)
+    assert [call for call in runner.calls if call == ("update", 107)] == [("update", 107)]
+    jobs.close()
+
+
+def test_api_execute_persists_and_replays_attempt_identity(tmp_path):
+    runner = Runner("Inst curl [7.0] (7.1)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), jobs, updates=updates, read_token="token")
+    plan = updates.check("container:107")
+    body = {"confirm": True, "install_confirmed": True, "plan_digest": plan.plan_digest, "attempt_id": "attempt-api-12345678"}
+    headers = {"Authorization": "Bearer token"}
+    import json
+    status, first = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=json.dumps(body).encode())
+    status_retry, retry = api.handle("POST", "/api/v1/updates/container:107/execute", headers=headers, body=json.dumps(body).encode())
+    assert status == 200 and status_retry == 200
+    assert first["data"]["job_id"] == retry["data"]["job_id"]
+    assert retry["data"]["replayed"] is True
+    assert jobs.count() == 1
+    for _ in range(50):
+        if jobs.get(first["data"]["job_id"])["state"] in {JobState.SUCCEEDED, JobState.FAILED, JobState.BLOCKED, JobState.MANUAL_RECOVERY}:
+            break
+        time.sleep(0.01)
+    jobs.close()
+
+
+def test_changed_update_plan_requires_new_confirmation_and_creates_no_job(tmp_path):
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = updates.check("container:107")
+    result = updates.execute_update(
+        "container:107", confirmed=True, install_confirmed=True,
+        plan_digest="0" * 64, attempt_id="attempt-stale-12345678",
+    )
+    assert result["success"] is False and "confirmation is stale" in result["error"]
+    assert jobs.count() == 0
+    assert not any(call == ("update", 107) for call in runner.calls)
+    jobs.close()
+
+
+def test_duplicate_without_attempt_identity_is_structured_conflict(tmp_path):
+    runner = Runner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = updates.check("container:107")
+    jobs.create(JobRequest(
+        target="container:107", operation="update", expected_version=None,
+        idempotency_key=f"container:107:{plan.plan_digest}", confirmation_hash=plan.plan_digest,
+    ))
+    api = ApiApplication(DiscoveryService(FixtureProxmoxBackend(phase1_fixture())), jobs, updates=updates, read_token="token")
+    import json
+    status, body = api.handle("POST", "/api/v1/updates/container:107/execute", headers={"Authorization": "Bearer token"}, body=json.dumps({"confirm": True, "install_confirmed": True, "plan_digest": plan.plan_digest}).encode())
+    assert status == 409
+    assert body["error"]["code"] == "duplicate_job"
+    assert jobs.count() == 1
+    jobs.close()
+
+
+def test_execute_returns_before_slow_final_preflight(tmp_path):
+    runner = SlowSimulationRunner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    checked = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = checked.check("container:107")
+    started = time.monotonic()
+    accepted = checked.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest)
+    assert time.monotonic() - started < 0.1
+    assert accepted["accepted"] is True and accepted["status"] == "running"
+    for _ in range(80):
+        if jobs.get(accepted["job_id"])["state"] == "succeeded":
+            break
+        time.sleep(0.01)
+    assert jobs.get(accepted["job_id"])["state"] == "succeeded"
+    jobs.close()
+
+
+def test_preflight_timeout_is_blocked_without_manual_recovery_or_update(tmp_path):
+    class InspectTimeoutRunner(Runner):
+        def inspect(self, vmid):
+            self.calls.append(("inspect", vmid))
+            raise TimeoutError("helper inspection exceeded timeout")
+
+    runner = InspectTimeoutRunner("Inst curl [1] (2)")
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    updates = UpdateService(lambda: (authorized,), runner=runner, execution_enabled=True, jobs=jobs)
+    plan = updates.check("container:107")
+    accepted = updates.execute_update(
+        "container:107", confirmed=True, install_confirmed=True, plan_digest=plan.plan_digest,
+        attempt_id="preflight-timeout-1",
+    )
+    assert accepted["accepted"] is True
+    for _ in range(80):
+        if jobs.get(accepted["job_id"])["state"] == JobState.BLOCKED:
+            break
+        time.sleep(0.01)
+    job = jobs.get(accepted["job_id"])
+    assert job["state"] == JobState.BLOCKED
+    assert job["phase"] == JobPhase.PREFLIGHT.value
+    assert job["error_code"] == "preflight_helper_timeout"
+    assert not any(call == ("update", 107) for call in runner.calls)
+    jobs.close()
+
+
+def test_cancel_is_persistent_before_mutation_and_api_requires_confirmation(tmp_path):
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    request = __import__("agent.smart_homelab_maintenance.types", fromlist=["JobRequest"]).JobRequest(
+        target="container:107", operation="update", expected_version=None,
+        idempotency_key="cancel-before-run", confirmation_hash="a" * 64)
+    job_id = jobs.create(request)
+    jobs.transition(job_id, __import__("agent.smart_homelab_maintenance.types", fromlist=["JobState", "JobPhase"]).JobState.PREFLIGHT,
+                    phase=__import__("agent.smart_homelab_maintenance.types", fromlist=["JobPhase"]).JobPhase.PREFLIGHT)
+    updates = UpdateService(lambda: (target(),), runner=Runner(), execution_enabled=True, jobs=jobs)
+    with pytest.raises(ValidationError, match="confirmation"):
+        updates.cancel_job(job_id, confirmed=False)
+    result = updates.cancel_job(job_id, confirmed=True)
+    assert result["accepted"] is True and result["state"] == "cancelled"
+    assert jobs.get(job_id)["cancel_requested"] == 1
+    assert jobs.has_unresolved_target("container:107") is False
+    jobs.close()
+
+
+def test_running_cancellation_is_refused_and_manual_recovery_blocks_new_mutation(tmp_path):
+    jobs = JobRepository(str(tmp_path / "jobs.sqlite"))
+    request = __import__("agent.smart_homelab_maintenance.types", fromlist=["JobRequest"]).JobRequest(
+        target="container:107", operation="update", expected_version=None,
+        idempotency_key="running-job", confirmation_hash="b" * 64)
+    job_id = jobs.create(request)
+    types = __import__("agent.smart_homelab_maintenance.types", fromlist=["JobState", "JobPhase"])
+    jobs.transition(job_id, types.JobState.PREFLIGHT, phase=types.JobPhase.PREFLIGHT)
+    jobs.transition(job_id, types.JobState.RUNNING, phase=types.JobPhase.EXECUTION)
+    authorized = ProbeTarget("container:107", "fixture", 107, "Debian", "12", "apt", True, True, True)
+    updates = UpdateService(lambda: (authorized,), runner=Runner("Inst curl [1] (2)"), execution_enabled=True, jobs=jobs)
+    result = updates.cancel_job(job_id, confirmed=True)
+    assert result == {"accepted": False, "state": types.JobState.RUNNING, "reason": "running_cancellation_not_safe"}
+    assert jobs.get(job_id)["state"] == "running"
+    jobs.transition(job_id, types.JobState.MANUAL_RECOVERY, phase=types.JobPhase.RECOVERY, message="manual recovery required")
+    blocked = updates.execute_update("container:107", confirmed=True, install_confirmed=True, plan_digest="anything")
+    assert blocked["status"] == "manual_recovery_required"
+    jobs.close()

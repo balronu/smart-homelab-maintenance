@@ -1,8 +1,9 @@
-# Beta.34 update execution / Updateausführung
+# Stable update execution / Stable-Updateausführung
 
 ## Deutsch
 
-Beta.34 ergänzt einen echten, aber ausdrücklich opt-in geschützten Updatepfad
+Der in Beta.34 eingeführte Updatepfad ist in Stable enthalten. Er bleibt ein
+echter, aber ausdrücklich opt-in geschützter Updatepfad
 für laufende Debian-/Ubuntu-LXCs mit APT. `simulation_authorized` erlaubt nur
 den Dry Run; `update_authorized` erlaubt zusätzlich echte Updates. Beide
 Berechtigungen, ein frischer Check, ein passender Plan-Digest und eine
@@ -22,7 +23,8 @@ LXC und genau einen begrenzten Lauf.
 
 ## English
 
-Beta.34 adds a real but explicitly opt-in update path for running Debian/Ubuntu
+The update path introduced in Beta.34 is included in Stable. It is a real but
+explicitly opt-in update path for running Debian/Ubuntu
 LXCs using APT. `simulation_authorized` permits only dry runs;
 `update_authorized` additionally permits real updates. Both permissions, a
 fresh check, a matching plan digest, and explicit confirmation are required.

@@ -17,7 +17,7 @@ class SensorValue:
 def coordinator_sensors(data: Any) -> tuple[SensorValue, ...]:
     return (
         SensorValue("agent_connection", "Agent-Verbindung", "connected" if data.connected else "offline", {"error": data.error, "update_error": data.update_error}),
-        SensorValue("agent_running_jobs", "Laufende Jobs", len([j for j in data.jobs if j.get("state") in {"preflight", "running", "postcheck"}]), {}),
+        SensorValue("agent_running_jobs", "Laufende Jobs", len([j for j in data.jobs if j.get("state") in {"queued", "preflight", "running", "verifying", "postcheck", "interrupted", "recovery_pending", "recovery_blocked", "manual_recovery_required"}]), {"jobs": _job_summaries(data.jobs), "lifecycle_states": {state: sum(1 for j in data.jobs if j.get("state") == state) for state in sorted({j.get("state") for j in data.jobs})}}),
         SensorValue("agent_last_error", "Letzter Fehler", data.error or data.update_error or "none", {}),
         SensorValue("agent_compatibility", "Agent-Kompatibilität", data.compatibility.status, data.compatibility.as_attributes()),
         SensorValue("agent_helper_status", "LXC-Helper-Status", _helper_status(data.orchestration), _orchestration_attributes(data.orchestration)),
@@ -40,6 +40,11 @@ def _helper_status(value: Mapping[str, Any] | None) -> str:
 
 def _orchestration_attributes(value: Mapping[str, Any] | None) -> dict[str, Any]:
     return dict(_orchestration_data(value))
+
+
+def _job_summaries(jobs: Any) -> list[dict[str, Any]]:
+    fields = ("job_id", "target", "state", "phase", "progress", "message", "error_code", "error_message", "created_at", "started_at", "finished_at")
+    return [{key: job.get(key) for key in fields if key in job} for job in jobs if isinstance(job, Mapping)]
 
 
 def container_sensors(container: Mapping[str, Any]) -> tuple[SensorValue, ...]:
@@ -135,7 +140,7 @@ try:
         coordinator._inventory_entity_manager = inventory
         entities = [
             _ProjectedSensor(coordinator, "agent_connection", "Agent connection", lambda d: "connected" if d.connected else "offline", lambda d: {"error": d.error}),
-            _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"preflight", "running", "postcheck"}])),
+            _ProjectedSensor(coordinator, "agent_running_jobs", "Running jobs", lambda d: len([j for j in d.jobs if j.get("state") in {"queued", "preflight", "running", "verifying", "postcheck", "interrupted", "recovery_pending", "recovery_blocked", "manual_recovery_required"}]), lambda d: {"jobs": _job_summaries(d.jobs), "lifecycle_states": {state: sum(1 for j in d.jobs if j.get("state") == state) for state in sorted({j.get("state") for j in d.jobs})}, "last_recovery_at": max((j.get("last_recovery_at") or "" for j in d.jobs), default=None), "recovery_reasons": [j.get("message") for j in d.jobs if j.get("state") in {"recovery_pending", "recovery_blocked", "manual_recovery_required"} and j.get("message")] } ),
             _ProjectedSensor(coordinator, "agent_last_error", "Last error", lambda d: d.error or "none"),
             _ProjectedSensor(coordinator, "agent_compatibility", "Agent compatibility", lambda d: d.compatibility.status, lambda d: d.compatibility.as_attributes()),
             _ProjectedSensor(coordinator, "agent_helper_status", "LXC helper status", lambda d: _helper_status(d.orchestration), lambda d: _orchestration_attributes(d.orchestration)),

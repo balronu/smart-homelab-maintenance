@@ -15,6 +15,7 @@ import re
 import socket
 import socketserver
 import selectors
+import signal
 import subprocess
 import sys
 import time
@@ -30,7 +31,7 @@ from typing import Any, Mapping
 DEFAULT_ALLOWLIST = Path("/etc/smart-homelab-maintenance/lxc-apt-allowlist.toml")
 MAX_OUTPUT_BYTES = 256_000
 COMMAND_TIMEOUT_SECONDS = 10
-ALLOWED_OPERATIONS = {"read", "simulate", "update"}
+ALLOWED_OPERATIONS = {"read", "simulate", "update", "inspect"}
 PROBE_OPERATION = "probe"
 POLICY_OPERATIONS = {"policy_read", "policy_set"}
 EXPECTED_CLIENT_USER = "smart-homelab-maintenance"
@@ -266,6 +267,48 @@ def build_argv(vmid: int, operation: str) -> list[str]:
     return ["/usr/sbin/pct", "exec", str(vmid), "--", *guest_command]
 
 
+def build_inspect_argv(vmid: int, name: str) -> list[str]:
+    """Build one fixed read-only forensic command; no guest input is accepted."""
+    if not isinstance(vmid, int) or isinstance(vmid, bool) or not 1 <= vmid <= 999_999:
+        raise HelperError("invalid_container", "container id is invalid")
+    lock_paths = {
+        "apt_lock": "/var/lib/apt/lists/lock",
+        "apt_archives_lock": "/var/cache/apt/archives/lock",
+        "dpkg_lock": "/var/lib/dpkg/lock",
+        "dpkg_frontend_lock": "/var/lib/dpkg/lock-frontend",
+    }
+    commands = {
+        "processes": ["/usr/bin/ps", "-eo", "pid=,comm=,args="],
+        "packages": ["/usr/bin/dpkg-query", "-W", "-f=${Package}\\t${Version}\\n"],
+        "dpkg_audit": ["/usr/bin/dpkg", "--audit"],
+        "apt_check": ["/usr/bin/apt-get", "check"],
+        "apt_history": ["/usr/bin/tail", "-n", "200", "/var/log/apt/history.log"],
+        "dpkg_log": ["/usr/bin/tail", "-n", "200", "/var/log/dpkg.log"],
+    }
+    if name in lock_paths:
+        # /proc/locks is the kernel's lock table and does not require fuser in
+        # the guest.  Missing lock files are unheld (rc 1); an unavailable
+        # table, stat failure, or parse failure is unknown (rc 2) and remains
+        # fail-closed in the agent.
+        path = lock_paths[name]
+        commands[name] = [
+            "/bin/sh", "-c",
+            "path=$1; if [ ! -e \"$path\" ]; then exit 1; fi; "
+            "if [ ! -r /proc/locks ]; then exit 2; fi; "
+            "set -- $(/usr/bin/stat -c '%D %i' \"$path\") || exit 2; "
+            "[ $# -eq 2 ] || exit 2; device=$1; inode=$2; "
+            "/usr/bin/awk -v device=\"$device\" -v inode=\"$inode\" '"
+            "{ candidate=$5; gsub(\":\", \"\", candidate); "
+            "if (candidate == device && $6 == inode) found=1 } "
+            "END { exit found ? 0 : 1 }' /proc/locks; "
+            "rc=$?; [ $rc -eq 0 ] && exit 0; [ $rc -eq 1 ] && exit 1; exit 2",
+            "lock", path,
+        ]
+    if name not in commands:
+        raise HelperError("invalid_inspection", "inspection command is not allowed")
+    return ["/usr/sbin/pct", "exec", str(vmid), "--", *commands[name]]
+
+
 def _parse_os_release(raw: str) -> tuple[str, str]:
     values: dict[str, str] = {}
     for line in raw.splitlines():
@@ -350,7 +393,7 @@ def _run(argv: list[str]) -> tuple[int, str, str]:
     return int(returncode), bytes(output["stdout"]).decode("utf-8", "replace"), bytes(output["stderr"]).decode("utf-8", "replace")
 
 
-_UPDATE_LOCK = threading.Lock()
+_PACKAGE_OPERATION_LOCK = threading.Lock()
 
 
 def handle(request: Any, *, allowed_ids: set[int], update_ids: set[int] | None = None, run=_run) -> dict[str, Any]:
@@ -358,13 +401,24 @@ def handle(request: Any, *, allowed_ids: set[int], update_ids: set[int] | None =
         if isinstance(request, dict) and request.get("operation") == PROBE_OPERATION:
             return probe_target(request, run=run)
         vmid, operation = validate_request(request, allowed_ids, update_ids)
-        lock = _UPDATE_LOCK if operation == "update" else threading.Lock()
+        # Inspection must not race an update: otherwise a lock/process check
+        # could describe the state immediately before a package mutation.
+        # Read-only operations unrelated to package execution remain concurrent.
+        lock = _PACKAGE_OPERATION_LOCK if operation in {"update", "inspect"} else threading.Lock()
         with lock:
             status_code, status_out, status_err = run(["/usr/sbin/pct", "status", str(vmid)])
             if status_code != 0:
                 raise HelperError("status_failed", "container status could not be read")
             if status_out.strip() != "status: running":
                 raise HelperError("not_running", "stopped containers are never started or probed")
+            if operation == "inspect":
+                observations: dict[str, Any] = {}
+                for name in ("processes", "packages", "dpkg_audit", "apt_check", "apt_history", "dpkg_log", "apt_lock", "apt_archives_lock", "dpkg_lock", "dpkg_frontend_lock"):
+                    code, stdout, stderr = run(build_inspect_argv(vmid, name))
+                    observations[name] = {"returncode": code, "stdout": stdout, "stderr": stderr}
+                if len(json.dumps(observations, separators=(",", ":"))) > MAX_OUTPUT_BYTES:
+                    raise HelperError("output_limit", "inspection output exceeded the limit")
+                return {"ok": True, "container_id": vmid, "operation": operation, "observations": observations}
             steps = []
             code, stdout, stderr = run(build_argv(vmid, operation))
             steps.append({"name": "apt-update" if operation == "update" else operation, "returncode": code})
@@ -443,6 +497,10 @@ class _UnixHelperServer(socketserver.ThreadingUnixStreamServer):
         super().__init__(socket_path, _SocketHandler)
 
 
+def _raise_interrupt(_signum: int, _frame: Any) -> None:
+    raise KeyboardInterrupt
+
+
 def serve(socket_path: str, *, allowlist: Path = DEFAULT_ALLOWLIST) -> None:
     """Serve the fixed protocol from a root-owned systemd service."""
     if socket_path != "/run/smart-homelab-maintenance/lxc-apt-helper.sock":
@@ -466,4 +524,6 @@ def serve(socket_path: str, *, allowlist: Path = DEFAULT_ALLOWLIST) -> None:
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _raise_interrupt)
+    signal.signal(signal.SIGINT, _raise_interrupt)
     raise SystemExit(main())

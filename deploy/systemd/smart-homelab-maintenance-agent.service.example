@@ -15,6 +15,8 @@ Environment=SMART_HOMELAB_AGENT_CONFIG=/etc/smart-homelab-maintenance/agent.toml
 Environment=PYTHONPATH=/opt/smart-homelab-maintenance/agent
 LoadCredential=api_token:/etc/smart-homelab-maintenance/api-token
 LoadCredential=proxmox_api_token:/etc/smart-homelab-maintenance/proxmox-api-token
+# Optional, separate administrator credential. Without it, recovery remains disabled.
+LoadCredential=recovery_admin_token:?/etc/smart-homelab-maintenance/recovery-admin-token
 ExecStart=/opt/smart-homelab-maintenance/venv/bin/python -m smart_homelab_maintenance.server
 Restart=on-failure
 RestartSec=5

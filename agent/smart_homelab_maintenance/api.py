@@ -13,7 +13,7 @@ from typing import Any, Mapping
 
 from .api_models import ApiError
 from .discovery import DiscoveryService
-from .errors import MaintenanceError, ValidationError
+from .errors import DuplicateJobError, MaintenanceError, ValidationError
 from .jobs import JobRepository
 from .security import redact_secrets
 from .updates import UpdateService
@@ -21,14 +21,16 @@ from . import API_CONTRACT_VERSION, __version__
 
 
 class ApiApplication:
-    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None, orchestration: Any | None = None) -> None:
+    def __init__(self, discovery: DiscoveryService, jobs: JobRepository, *, updates: UpdateService | None = None, read_token: str | None = None, admin_token: str | None = None, max_bytes: int = 256_000, orchestration_status: Any | None = None, orchestration: Any | None = None, recovery_runner: Any | None = None) -> None:
         self.discovery = discovery
         self.jobs = jobs
         self.updates = updates
         self.read_token = read_token
+        self.admin_token = admin_token
         self.max_bytes = max_bytes
         self.orchestration_status = orchestration_status
         self.orchestration = orchestration
+        self.recovery_runner = recovery_runner
 
     def handle(self, method: str, path: str, *, headers: Mapping[str, str] | None = None, body: bytes | None = None) -> tuple[int, dict[str, Any]]:
         request_id = secrets.token_hex(8)
@@ -44,9 +46,9 @@ class ApiApplication:
             method = method.upper()
             if method not in {"GET", "POST"}:
                 raise ValidationError("method is not supported")
-            if raw_path != "/api/v1/health" and not self._authorized(headers):
+            if raw_path != "/api/v1/health" and not (self._authorized(headers) or self._admin_authorized(headers)):
                 return 401, self._error("authentication_required", "authentication required", request_id)
-            payload = self._route(raw_path, query, method=method, body=body or b"")
+            payload = self._route(raw_path, query, method=method, body=body or b"", headers=headers)
             body = {"schema_version": "1", "data": payload, "request_id": request_id}
             encoded = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode()
             if len(encoded) > self.max_bytes:
@@ -54,6 +56,8 @@ class ApiApplication:
             return 200, body
         except KeyError:
             return 404, self._error("not_found", "resource not found", request_id)
+        except DuplicateJobError as exc:
+            return 409, self._error(exc.code, str(exc), request_id)
         except MaintenanceError as exc:
             return 400, self._error(exc.code, str(exc), request_id)
         except (TypeError, ValueError) as exc:
@@ -63,11 +67,32 @@ class ApiApplication:
         supplied = headers.get("authorization", "")
         return bool(self.read_token and secrets.compare_digest(supplied, "Bearer " + self.read_token))
 
-    def _route(self, path: str, query: Mapping[str, list[str]], *, method: str, body: bytes) -> Any:
+    def _admin_authorized(self, headers: Mapping[str, str]) -> bool:
+        supplied = headers.get("authorization", "")
+        return bool(self.admin_token and secrets.compare_digest(supplied, "Bearer " + self.admin_token))
+
+    def _route(self, path: str, query: Mapping[str, list[str]], *, method: str, body: bytes, headers: Mapping[str, str]) -> Any:
         if path == "/api/v1/health":
             return {"status": "ok", "mode": "offline", "agent_version": __version__, "api_contract": API_CONTRACT_VERSION}
         if path == "/api/v1/capabilities":
             return {"execution_enabled": bool(getattr(self.updates, "execution_enabled", False)), "dry_run_enabled": self.updates is not None, "adapters": [{"app_id": s.app_id, **s.capability_dict()} for s in self.discovery.registry.all()]}
+        if path == "/api/v1/execution-preflight" and method == "GET":
+            return {
+                "execution_enabled": bool(getattr(self.updates, "execution_enabled", False)),
+                "activation_requires_explicit_policy_confirmation": True,
+                "productive_activation_performed": False,
+                "requirements": [
+                    "agent_health_and_api_readback",
+                    "helper_integrity_and_private_tls",
+                    "policy_and_root_allowlist_readback",
+                    "running_reachable_debian_or_ubuntu_apt_container",
+                    "simulation_and_update_grants_for_the_same_ctid",
+                    "fresh_safe_simulation_and_matching_plan_digest",
+                    "no_unresolved_or_manual_recovery_job",
+                    "separate_explicit_confirmation_for_execution_enabled",
+                ],
+                "prohibited_automatic_actions": ["package_install", "reboot", "retry", "repair"],
+            }
         if path == "/api/v1/orchestration":
             if self.orchestration_status is None:
                 return {"status": "unavailable", "policy_mode": "discover_only"}
@@ -86,17 +111,19 @@ class ApiApplication:
         if path == "/api/v1/containers":
             return self._page([item.as_dict() for item in self.discovery.containers()], query)
         if path == "/api/v1/jobs":
+            if callable(self.recovery_runner):
+                self.recovery_runner()
             return self._page(self.jobs.list(offset=self._int(query, "offset", 0), limit=self._int(query, "limit", 50)), query)
         if path == "/api/v1/updates" and method == "GET":
             if self.updates is None:
                 return {"items": [], "status": "unknown"}
-            items = self.updates.all()
+            items = self.updates.all(force=query.get("force", ["0"])[0] == "1")
             return {"items": items, "checked_at": max((item.get("checked_at") or "" for item in items), default=None)}
         parts = path.strip("/").split("/")
         if len(parts) == 4 and parts[:3] == ["api", "v1", "updates"] and method == "GET":
             if self.updates is None:
                 return {"status": "unknown", "error": "update checks are unavailable"}
-            return self.updates.check(parts[3]).as_dict()
+            return self.updates.check(parts[3], force=query.get("force", ["0"])[0] == "1").as_dict()
         if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] == "dry-run" and method == "POST":
             if self.updates is None:
                 return {"simulation": True, "success": False, "safe": False, "error": "dry run is unavailable"}
@@ -114,9 +141,9 @@ class ApiApplication:
                 request = json.loads(body.decode("utf-8")) if body else {}
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise ValidationError("update body must be valid JSON") from exc
-            if not isinstance(request, dict) or set(request) - {"confirm", "plan_digest"}:
-                raise ValidationError("update accepts only confirm and plan_digest")
-            return self.updates.execute_update(parts[3], confirmed=request.get("confirm") is True, plan_digest=request.get("plan_digest"))
+            if not isinstance(request, dict) or set(request) - {"confirm", "install_confirmed", "plan_digest", "attempt_id"}:
+                raise ValidationError("update accepts confirm, install_confirmed, plan_digest and attempt_id")
+            return self.updates.execute_update(parts[3], confirmed=request.get("confirm") is True, install_confirmed=request.get("install_confirmed") is True, plan_digest=request.get("plan_digest"), attempt_id=request.get("attempt_id"))
         if len(parts) == 5 and parts[:3] == ["api", "v1", "updates"] and parts[4] == "permissions" and method == "POST":
             if self.updates is None:
                 raise ValidationError("permission management is unavailable")
@@ -151,8 +178,45 @@ class ApiApplication:
             return self.discovery.app(parts[3]).as_dict()
         if len(parts) == 4 and parts[:3] == ["api", "v1", "jobs"]:
             return self.jobs.get(parts[3])
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "cancel" and method == "POST":
+            if self.updates is None:
+                raise ValidationError("job cancellation is unavailable")
+            request = self._json_object(body, "cancel")
+            if set(request) - {"confirm"}:
+                raise ValidationError("cancel accepts confirm")
+            return self.updates.cancel_job(parts[3], confirmed=request.get("confirm") is True)
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "reconcile" and method == "POST":
+            if not self._admin_authorized(headers):
+                raise ValidationError("administrator authentication required")
+            request = self._json_object(body, "reconcile")
+            if set(request) != {"confirm", "container_id", "evidence"} or request.get("confirm") is not True:
+                raise ValidationError("reconcile requires confirm, container_id and evidence")
+            if not isinstance(request["container_id"], int) or isinstance(request["container_id"], bool) or not isinstance(request["evidence"], dict):
+                raise ValidationError("container_id and evidence are invalid")
+            return self.jobs.reconcile_not_executed(parts[3], container_id=request["container_id"], evidence=request["evidence"])
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "legacy-reconcile" and method == "POST":
+            if not self._admin_authorized(headers):
+                raise ValidationError("administrator authentication required")
+            request = self._json_object(body, "legacy reconcile")
+            required = {"confirm", "container_id", "evidence", "baseline_packages"}
+            if set(request) != required or request.get("confirm") is not True:
+                raise ValidationError("legacy reconcile requires confirm, container_id, evidence and baseline_packages")
+            if not isinstance(request["container_id"], int) or isinstance(request["container_id"], bool) or not isinstance(request["evidence"], dict) or not isinstance(request["baseline_packages"], dict):
+                raise ValidationError("legacy recovery fields are invalid")
+            return self.jobs.reconcile_legacy_state_verified(parts[3], container_id=request["container_id"], evidence=request["evidence"], baseline_packages=request["baseline_packages"])
         if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "events":
             return {"events": self.jobs.events(parts[3], after=self._int(query, "after", 0), limit=self._int(query, "limit", min(50, self.jobs.max_log_entries)))}
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "repair-check" and method == "POST":
+            inspection = self.jobs.repair_inspection(parts[3])
+            if not inspection["repairable"] and callable(self.recovery_runner):
+                recovery_result = self.recovery_runner(parts[3])
+                inspection["recovery_result"] = recovery_result
+            return {"job_id": parts[3], "inspection": inspection, "job": self.jobs.get(parts[3])}
+        if len(parts) == 5 and parts[:3] == ["api", "v1", "jobs"] and parts[4] == "repair" and method == "POST":
+            request = self._json_object(body, "repair")
+            if set(request) - {"confirm"} or request.get("confirm") is not True:
+                raise ValidationError("repair requires explicit confirmation")
+            return self.jobs.repair_preflight_block(parts[3])
         raise KeyError(path)
 
     @staticmethod

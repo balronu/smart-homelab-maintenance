@@ -8,8 +8,12 @@ Type=simple
 User=root
 Group=root
 ExecStart=/usr/bin/python3 /usr/libexec/smart-homelab-maintenance/lxc-discovery.py
-RuntimeDirectory=smart-homelab-maintenance
-RuntimeDirectoryMode=0750
+ExecStopPost=/usr/bin/rm -f /run/smart-homelab-maintenance/lxc-discovery.sock
+# Let Python unwind through serve()'s finally block so the fixed socket is
+# removed before a controlled restart can bind it again.
+KillSignal=SIGINT
+# The application owns its fixed socket and shared parent directory. systemd
+# must not remove or re-own the other service's socket during a restart.
 UMask=0007
 # pct exec needs root namespace setup for unprivileged LXCs; all other
 # filesystem, network and fixed-probe restrictions remain enforced below.
@@ -22,9 +26,12 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictRealtime=true
 LockPersonality=true
-RestrictAddressFamilies=AF_UNIX
+# pct exec needs AF_INET for Proxmox cluster transport; keep all other
+# address-family restrictions in place.
+RestrictAddressFamilies=AF_UNIX AF_INET
 ReadOnlyPaths=/usr/libexec/smart-homelab-maintenance/lxc-discovery.py
 Restart=on-failure
+RestartPreventExitStatus=SIGINT 130
 RestartSec=5
 
 [Install]

@@ -9,11 +9,17 @@ from .http_transport import AgentHttpTransport, TransportError
 from .const import ACTIONS
 
 
-async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, plan_digest: str | None = None, simulation_authorized: bool = False, update_authorized: bool = False, mode: str | None = None, generation: int | None = None, preview_token: str | None = None, manual_authorized_ids: list[int] | None = None) -> dict[str, Any]:
+async def async_action(transport: AgentHttpTransport, action: str, *, job_id: str | None = None, cursor: int = 0, target: str | None = None, confirm: bool = False, install_confirmed: bool = False, plan_digest: str | None = None, attempt_id: str | None = None, simulation_authorized: bool = False, update_authorized: bool = False, mode: str | None = None, generation: int | None = None, preview_token: str | None = None, manual_authorized_ids: list[int] | None = None) -> dict[str, Any]:
     if action not in ACTIONS:
         raise ValueError("unknown action")
     if action == "check":
         return {"health": await transport.health(), "capabilities": await transport.capabilities()}
+    if action == "refresh":
+        return await transport.updates(force=True)
+    if action == "refresh_target":
+        if not target:
+            raise ValueError("target is required")
+        return await transport.update_check(target, force=True)
     if action == "get_job":
         if not job_id:
             raise ValueError("job_id is required")
@@ -29,7 +35,17 @@ async def async_action(transport: AgentHttpTransport, action: str, *, job_id: st
     if action == "execute":
         if not target or confirm is not True:
             raise ValueError("target and explicit confirmation are required")
-        return await transport.execute_update(target, plan_digest=plan_digest)
+        if install_confirmed is not True:
+            raise ValueError("separate installation confirmation is required")
+        return await transport.execute_update(target, plan_digest=plan_digest, attempt_id=attempt_id, install_confirmed=True)
+    if action == "repair_check":
+        if not job_id:
+            raise ValueError("job_id is required")
+        return await transport.repair_check(job_id)
+    if action == "repair":
+        if not job_id or confirm is not True:
+            raise ValueError("job_id and explicit confirmation are required")
+        return await transport.repair(job_id)
     if action == "set_permissions":
         if not target or confirm is not True:
             raise ValueError("target and explicit confirmation are required")

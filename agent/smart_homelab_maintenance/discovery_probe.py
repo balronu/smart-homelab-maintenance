@@ -93,12 +93,18 @@ def evaluate_probe(record: Mapping[str, Any], *, transport: DiscoveryProbeTransp
     try:
         payload = transport.probe(container_id)
         os_id, version_id = parse_os_release(payload.get("os_release", ""))
-        apt_version = _bounded(payload.get("apt_version"))
-        dpkg_version = _bounded(payload.get("dpkg_version"))
-    except (KeyError, TypeError, ValueError, OSError, TimeoutError):
+        raw_apt_version = payload.get("apt_version")
+        raw_dpkg_version = payload.get("dpkg_version")
+        if any(not isinstance(value, str) or len(value.encode("utf-8", "replace")) > MAX_PROBE_OUTPUT_BYTES
+               for value in (raw_apt_version, raw_dpkg_version)):
+            return ProbeResult(container_id, ProbeState.PROBE_FAILED, os_id, version_id,
+                               error="probe-output-invalid-or-too-large")
+        apt_version = _bounded(raw_apt_version)
+        dpkg_version = _bounded(raw_dpkg_version)
+    except Exception:
         return ProbeResult(container_id, ProbeState.PROBE_FAILED, error="probe-output-invalid-or-unavailable")
-    if not os_id or not version_id or not apt_version or not dpkg_version:
-        return ProbeResult(container_id, ProbeState.UNKNOWN, os_id, version_id, apt_version, dpkg_version, "required-os-or-apt-evidence-missing")
     if os_id.lower() not in {"debian", "ubuntu"}:
         return ProbeResult(container_id, ProbeState.UNSUPPORTED, os_id, version_id, apt_version, dpkg_version, "operating-system-unsupported")
+    if not os_id or not version_id or not apt_version or not dpkg_version:
+        return ProbeResult(container_id, ProbeState.UNKNOWN, os_id, version_id, apt_version, dpkg_version, "required-os-or-apt-evidence-missing")
     return ProbeResult(container_id, ProbeState.PASS, os_id, version_id, apt_version, dpkg_version)

@@ -1,5 +1,800 @@
 # Changelog
 
+## 1.0.27 – Stable
+
+### Deutsch
+
+- Behebt die Klassifizierung von Helper-Timeouts vor der Paketmutation: Der Job
+  bleibt nachvollziehbar blockiert und wird nicht als erfolgreicher oder
+  unbekannter Paketlauf ausgegeben.
+- Ergänzt eine read-only Reparaturprüfung und eine ausdrücklich bestätigte,
+  zweistufige Reparatur sicherer Preflight-Fehler ohne APT/dpkg-Mutation.
+- Ergänzt globale und containerbezogene Updateprüfung, Live-Jobstatus,
+  Jobdetails und deutsche Bedienbeschriftungen im Dashboard.
+- Integration, Frontend und Agent werden gemeinsam als Version `1.0.27`
+  ausgeliefert.
+
+### English
+
+- Fixes classification of helper timeouts before package mutation: the job
+  remains audibly blocked and is never reported as a successful or unknown
+  package run.
+- Adds a read-only repair inspection and an explicitly confirmed two-step
+  repair for safe preflight failures without APT/dpkg mutation.
+- Adds global and per-container update checks, live job status, job details and
+  German dashboard action labels.
+- Integration, frontend and agent are released together as version `1.0.27`.
+
+**Compatibility/Migration:** API 1.1, existing Config Entries, permissions,
+allowlists, job data and helper socket paths remain compatible. / API 1.1,
+existing Config Entries, permissions, allowlists, job data and helper socket
+paths remain compatible.
+
+**Post-update:** Update the HA integration through HACS/Marketplace and run the
+official agent upgrade to `1.0.27`. No managed-container package update is
+performed by this release.
+
+**Limitations:** Authenticated HA-iOS WebView validation was unavailable;
+automated iPhone/iPad browser profiles passed, but real HA-app touch behavior
+remains a documented limitation.
+
+## 1.0.26 – Stable
+
+### Deutsch
+
+- Macht Installationsversuche über eine explizite `attempt_id` wiederholbar,
+  ohne doppelte Jobs zu erzeugen. Derselbe Versuch liefert den bestehenden
+  Job zurück; ein neuer Versuch darf nach einem terminal reconcilierten
+  historischen Job eine neue Idempotency-Identität verwenden.
+- Gibt echte doppelte Idempotency-Schlüssel als strukturierten HTTP-409-Fehler
+  aus und hält aktive beziehungsweise Recovery-gesperrte Ziele fail-closed.
+- Behebt das HA-Runtime-Test-Fixture für HA-Versionen mit Singleton-Registry
+  und für Versionen mit `device_registry.async_setup`.
+
+### English
+
+- Makes installation attempts retry-safe through an explicit `attempt_id`
+  without creating duplicate jobs. Retrying the same attempt returns the
+  existing job, while a new attempt may use a new idempotency identity after
+  a terminally reconciled historical job.
+- Returns genuine duplicate idempotency keys as structured HTTP 409 errors
+  and keeps active or recovery-blocked targets fail-closed.
+- Fixes the HA runtime test fixture for both singleton-registry HA versions
+  and versions exposing `device_registry.async_setup`.
+
+**Kompatibilität/Migration / Compatibility/Migration:** API 1.1,
+Kompatibilitätsversion `1.0.6`, bestehende Agent-/Helper-Socket-Pfade und
+historische Jobdaten bleiben unverändert. Der produktive Agent `1.0.25` mit
+API 1.1 bleibt kompatibel. / API 1.1, compatibility version `1.0.6`, existing
+agent/helper socket paths and historical job data remain unchanged. The
+productive `1.0.25` agent with API 1.1 remains compatible.
+
+**Nach dem Update / Post-update:** HA-Integration auf `1.0.26` aktualisieren
+und nach gesonderter Freigabe einen read-only Simulations-/Jobannahmetest
+ausführen. / Update the HA integration to `1.0.26` and, after separate
+approval, run a read-only simulation/job-admission test.
+
+**Einschränkungen / Limitations:** Dieses Release führt keinen echten
+Paketupdate, keine Container-/Host-Aktion, keinen HA-Reload/-Neustart und
+keine CT-Recovery aus. / This release performs no real package update,
+container/host action, HA reload/restart, or CT recovery.
+
+## 1.0.25 – Stable
+
+### Deutsch / English
+
+- Behebt die fehlerhafte Auswertung von Linux-`SO_PEERCRED` im Discovery-
+  Socket: Die Credentials werden korrekt als `(pid, uid, gid)` gelesen.
+  Dadurch werden berechtigte Discovery-Clients nicht mehr vor dem
+  read-only-`pct exec` als `probe_failed` abgewiesen. / Fixes incorrect Linux
+  `SO_PEERCRED` handling in the Discovery socket: credentials are now read as
+  `(pid, uid, gid)`, so authorized Discovery clients are no longer rejected
+  as `probe_failed` before the read-only `pct exec` probe.
+- Ergänzt Regressionstests für UID/PID/GID-Verwechslungen, unberechtigte
+  Clients und generische Fehlerantworten sowie echte systemd-Socket-
+  Acceptance-Tests für die Discovery-Probes. / Adds regression tests for
+  UID/PID/GID confusion, unauthorized clients and generic error responses,
+  plus real systemd socket acceptance tests for Discovery probes.
+
+**Kompatibilität/Migration / Compatibility/Migration:** API 1.1,
+Kompatibilitätsversion `1.0.6`, Socket-Pfade sowie Agent und Helper bleiben
+unverändert. Der Discovery-only-Installer bleibt der vorgesehene Weg für
+einen späteren administrativ freigegebenen Rollout. / API 1.1, compatibility
+version `1.0.6`, socket paths, agent and helper remain unchanged. The
+Discovery-only installer remains the supported path for a later separately
+authorized rollout.
+
+**Einschränkungen / Limitations:** Dieses Release führt keinen produktiven
+Dienstneustart, keine CT-Recovery und keine Paketänderung aus. / This release
+performs no productive service restart, CT recovery or package change.
+
+## 1.0.23 – Stable
+
+### Deutsch / English
+
+- Ergänzt den expliziten Discovery-only-Installer-Modus. Der Standard ist ein
+  read-only Preflight; Apply erfordert `--discovery-only --apply --confirm`,
+  und ein kontrollierter Start zusätzlich `--start-discovery`. / Adds the
+  explicit Discovery-only installer mode. The default is a read-only
+  preflight; apply requires `--discovery-only --apply --confirm`, and a
+  controlled start additionally requires `--start-discovery`.
+- Der Apply beschränkt sich auf Discovery-Dateien, bewahrt Agent und Helper
+  bytegleich, erstellt ein eigenes Rollback-Staging und stellt bei Fehlern den
+  vorherigen Zustand wieder her. Aktive, mehrdeutige oder unerwartete Zustände
+  bleiben fail-closed. / Apply is limited to Discovery files, preserves agent
+  and helper byte-for-byte, creates dedicated rollback staging, and restores
+  the previous state on errors. Active, ambiguous or unexpected states remain
+  fail closed.
+
+**Kompatibilität/Migration / Compatibility/Migration:** API 1.1,
+Kompatibilitätsversion `1.0.6`, Socket-Pfade und historische CT107/CT108-
+Recovery-Jobs bleiben unverändert. Bestehende Installationen benötigen den
+read-only Preflight und eine separate administrative Freigabe; der Installer
+löscht Sockets nicht pauschal. / API 1.1, compatibility version `1.0.6`,
+socket paths and historical CT107/CT108 recovery jobs remain unchanged.
+Existing installations require the read-only preflight and separate
+administrative approval; the installer does not blindly delete sockets.
+
+**Einschränkungen / Limitations:** Kein automatischer Discovery-Start,
+Agent-Swap, Helper-Neustart, Paketupdate oder produktive CT-Recovery durch
+dieses Release. / No automatic Discovery start, agent swap, helper restart,
+package update or productive CT recovery is performed by this release.
+
+## 1.0.22 – Stable
+
+### Deutsch / English
+
+- Behebt den Discovery-Startfehler `discovery socket already exists`, wenn ein
+  verwaister Legacy-Socket durch `RuntimeDirectoryPreserve=yes` erhalten blieb.
+  Der Dienst prüft Kernel-Inode-Nutzung, Eigentümer, Dateityp und Modus und
+  bereinigt nur den eindeutig verwaisten eigenen Socket; aktive oder
+  unerwartete Pfade führen fail-closed zum Abbruch. / Fixes the Discovery
+  startup error `discovery socket already exists` when a stale legacy socket
+  survived through `RuntimeDirectoryPreserve=yes`. The service verifies kernel
+  inode usage, ownership, file type and mode, and removes only its own
+  provably stale socket; active or unexpected paths fail closed.
+- Ein exklusiver Discovery-Start-Lock verhindert parallele Starts. Das
+  Shutdown-Cleanup ist an die eigene Socket-Inode gebunden und kann keinen
+  zwischenzeitlich ersetzten Socket entfernen. Der Helper-Socket bleibt
+  unberührt. / An exclusive Discovery start lock prevents parallel starts.
+  Shutdown cleanup is bound to the service's socket inode and cannot remove a
+  socket replaced in the meantime. The helper socket is unaffected.
+- Installer-/systemd-Akzeptanztests decken den Start mit vorhandenem verwaistem
+  Socket sowie unabhängige und wechselnde Neustarts ab. API 1.1,
+  Kompatibilitätsversion `1.0.6` und historische CT107/CT108-Recovery-Jobs
+  bleiben unverändert. / Installer/systemd acceptance tests cover startup with
+  an existing stale socket plus independent and alternating restarts. API 1.1,
+  compatibility version `1.0.6`, and historical CT107/CT108 recovery jobs are
+  unchanged.
+
+**Compatibility / Migration:** No productive deployment is performed by this
+release. Existing installations must use the official installer after a
+read-only preflight and separate administrative approval; no blanket socket
+deletion or agent swap is part of this fix. / Kein Produktivdeployment durch
+dieses Release. Bestehende Installationen müssen nach read-only Preflight und
+separater administrativer Freigabe den offiziellen Installer verwenden; keine
+pauschale Socket-Löschung oder Agent-Swap ist Bestandteil dieses Fixes.
+
+**Limitations:** CT107/CT108 recovery remains separate and unchanged. The
+productive Discovery service is not restarted by this release.
+
+## 1.0.21 – Stable
+
+### Deutsch / English
+
+- Behebt den Rollback-Resolver-Fehler, bei dem mehrere Staging-Bäume mit der
+  gleichen Agent-Kompatibilitätsversion `1.0.6` zu einer falschen Auswahl
+  führen konnten. Der Updater bindet den unmittelbar vorher aktiven Baum jetzt
+  an Release-Identität, Inhalts-Tree-Hash und den neu erzeugten konkreten
+  Staging-Pfad; Mehrdeutigkeiten und Integritätsabweichungen bleiben
+  fail-closed. / Fixes the rollback resolver defect where multiple staging
+  trees sharing agent compatibility version `1.0.6` could cause the wrong
+  rollback selection. The updater now binds the immediately previous tree to
+  its release identity, content tree digest, and the concrete staging path
+  created by the current transaction; ambiguity and integrity mismatches fail
+  closed.
+- Enthält den systemd-Socket-Lifecycle-Fix für unabhängige Helper- und
+  Discovery-Neustarts mit unveränderten Socket-Pfaden und Berechtigungen. /
+  Includes the systemd socket lifecycle fix for independent helper and
+  discovery restarts with unchanged socket paths and permissions.
+
+**Compatibility / Migration:** API 1.1, Agent-Kompatibilität `1.0.6` und
+historische CT107/CT108-Recovery-Jobs bleiben unverändert. Historische
+Staging-Bäume werden nicht automatisch bereinigt. Vor einem Produktivupgrade
+ist der offizielle read-only Preflight erforderlich; anschließend muss der
+Installer den neuen Updater und die beiden systemd-Units bereitstellen. /
+API 1.1, agent compatibility `1.0.6`, and historical CT107/CT108 recovery
+jobs are unchanged. Historical staging trees are not cleaned up automatically.
+The official read-only preflight is required before a productive upgrade, and
+the installer must deploy the new updater and both systemd units first.
+
+**Limitations:** Dieses Release führt keine produktive Wiederherstellung,
+keine Container-Recovery und keine Paketupdates aus. / This release performs
+no productive restoration, container recovery, or package updates.
+
+## 1.0.20 – Stable
+
+### Deutsch / English
+
+- Behebt den systemd-RuntimeDirectory-Lifecycle-Fehler, bei dem ein Neustart
+  des Helper- oder Discovery-Dienstes den Socket-Pfad des jeweils anderen
+  Dienstes entfernte. Beide Units verwenden jetzt
+  `RuntimeDirectoryPreserve=yes`; Discovery entfernt seinen eigenen Socket
+  beim Shutdown explizit. / Fixes the systemd RuntimeDirectory lifecycle bug
+  where restarting either the helper or discovery service removed the other
+  service's socket path. Both units now use `RuntimeDirectoryPreserve=yes`,
+  and discovery explicitly removes its own socket during shutdown.
+- Socket-Pfade, Eigentümer und Berechtigungen bleiben unverändert. Regressionstests
+  decken unabhängige und abwechselnde Neustarts sowie vollständiges Stop/Start
+  ohne verwaiste Socket-Dateien ab. API 1.1 und historische Recovery-Jobs
+  bleiben unverändert. / Socket paths, ownership and permissions remain
+  unchanged. Regression tests cover independent and alternating restarts plus
+  full stop/start without stale socket files. API 1.1 and historical recovery
+  jobs are unchanged.
+
+**Compatibility / Migration:** No productive deployment is performed by this
+release. Existing installations can receive the updated units through the
+official installer/upgrade path; no container or host restart is implied.
+CT107/CT108 historical recovery decisions remain separate and are not changed.
+/ Kein Produktivdeployment durch dieses Release. Bestehende Installationen
+erhalten die geänderten Units über den offiziellen Installer-/Upgradepfad;
+kein Container- oder Host-Neustart ist Bestandteil dieses Releases. Historische
+Recovery-Entscheidungen für CT107/CT108 bleiben getrennt und unverändert.
+
+## 1.0.19 – Stable
+
+### Deutsch / English
+
+- Behebt den Upgrade-Fehler, bei dem ein Legacy-Agentbaum ohne
+  `.release-identity` als neues Rollback-Staging erzeugt wurde und dadurch den
+  nächsten Upgrade-Preflight blockierte. Der Updater sichert vor dem Swap einen
+  separaten, inhaltsgebundenen Legacy-Rollback-Nachweis mit Manifest-SHA-256;
+  eine Release-Version oder ein Commit werden nicht erfunden. / Fixes the
+  upgrade defect where a legacy agent tree without `.release-identity` became
+  new rollback staging and blocked the next upgrade preflight. Before the
+  swap, the updater records a separate content-bound legacy rollback proof
+  with a manifest SHA-256; no release version or commit is invented.
+
+**Compatibility / Migration:** Existing legacy staging is not rewritten or
+quarantined automatically and remains a separate administrative decision. The
+new proof applies to future upgrades from a pre-identity active tree; regular
+release identities remain mandatory for identified Stable trees. / Vorhandenes
+Legacy-Staging wird weder automatisch umgeschrieben noch quarantänisiert und
+bleibt eine separate administrative Entscheidung. Der neue Nachweis gilt für
+zukünftige Upgrades aus einem alten aktiven Baum; reguläre Release-Identitäten
+bleiben für identifizierte Stable-Bäume verpflichtend.
+
+## 1.0.18 – Stable
+
+### Deutsch / English
+
+- Behebt die Legacy-Batch-Migration für ausdrücklich geprüfte
+  `agent.failed.*.staging`-Verzeichnisse. Der bestehende Recovery- und
+  historische Preflight prüft jetzt beide Legacy-Namensformen, während die
+  exakte Kandidatenliste, Manifest-Locking, Quarantäne, Auditierung und
+  Wiederaufnahme unverändert fail-closed bleiben. /
+  Fixes legacy batch migration for explicitly verified
+  `agent.failed.*.staging` directories. Existing recovery and historical
+  preflight now inspect both legacy name forms while exact candidate lists,
+  manifest locking, quarantine, audit, and resume remain fail-closed.
+
+**Compatibility / Migration:** No automatic migration or package/container
+change is performed. The administrative batch still requires explicit
+confirmation and aborts on active upgrade/rollback references, changed
+manifests, symlinks, unusual file types, missing recovery paths, or collisions.
+The agent upgrade remains a separate confirmed step. /
+Keine automatische Migration oder Paket-/Containeränderung; die administrative
+Batch-Operation benötigt weiterhin eine ausdrückliche Bestätigung und bricht
+bei Abweichungen ab. Das Agent-Upgrade bleibt ein separater Bestätigungsschritt.
+
+## 1.0.17 – Stable
+
+### Deutsch / English
+
+- Ergänzt einen ausdrücklich administrativen, einmaligen Migrationspfad für
+  historische Rollback-Stagings ohne `.release-identity`. Der Pfad arbeitet
+  ausschließlich mit einer exakten Kandidatenliste, Manifest-Locking,
+  Quarantäne statt Löschung, Append-only-Audit und sicherer Wiederaufnahme.
+  Die reguläre Release-Identitätsprüfung bleibt unverändert fail-closed. /
+  Adds an explicitly administrative one-time migration path for historical
+  rollback staging without `.release-identity`. It uses only an exact
+  candidate list, manifest locking, quarantine instead of deletion, append-only
+  audit, and safe resume. Normal release-identity verification remains
+  fail-closed.
+
+**Compatibility / Migration:** No package or container changes are performed.
+The migration requires a separately confirmed administrative action and aborts
+on any manifest, process, systemd, symlink, or rollback-path deviation. /
+Keine Paket- oder Containeränderungen; die Migration benötigt eine separate
+administrative Bestätigung und bricht bei jeder Abweichung ab.
+
+## 1.0.16 – Stable
+
+### Deutsch / English
+
+- Trennt die Agent-Kompatibilitätsversion `1.0.6` von der verifizierten
+  Stable-Release-Identität. Offizielle Rollback-Stagings speichern jetzt
+  Release-Version, Quell-Commit und einen deterministischen Inhaltsdigest;
+  der Updater prüft diese Identität und blockiert fehlende oder manipulierte
+  Metadaten weiterhin fail-closed. / Separates the agent compatibility
+  version `1.0.6` from verified Stable release identity. Official rollback
+  staging now records release version, source commit and a deterministic
+  content digest; the updater verifies that identity and continues to fail
+  closed on missing or tampered metadata.
+
+**Compatibility / Migration:** Existing legacy staging without release
+identity remains blocked and requires the existing administrator-approved
+quarantine path. No historical staging is deleted or rewritten. / Vorhandenes
+Legacy-Staging ohne Release-Identität bleibt blockiert und benötigt den
+bestehenden administrativ bestätigten Quarantänepfad. Historisches Staging
+wird weder gelöscht noch überschrieben.
+
+## 1.0.15 – Stable
+
+### Deutsch / English
+
+- Ersetzt die nicht portable `fuser`-Abhängigkeit der LXC-APT-Lockprüfung
+  durch eine fail-closed Prüfung der kanonischen Geräte-/Inode-Zuordnung gegen
+  `/proc/locks`; fehlende oder nicht auswertbare Kernel-Evidenz bleibt
+  blockierend. / Replaces the non-portable `fuser` dependency in LXC APT lock
+  inspection with a fail-closed canonical device/inode check against
+  `/proc/locks`; missing or unparseable kernel evidence remains blocked.
+
+**Compatibility / Migration:** API contract 1.1 remains unchanged. No package
+installation is required in target containers. / API-Vertrag 1.1 bleibt
+unverändert; in Zielcontainern ist keine Paketinstallation erforderlich.
+
+**Known limitation / Einschränkung:** Historical CT107/CT108 jobs still require
+their separate administrative recovery decision and are not automatically
+unlocked by this release.
+
+## 1.0.14 – Stable
+
+### Deutsch / English
+
+- Präzisiert die Erkennung echter laufender Upgrade-/Rollback-Prozesse:
+  Transport-Shells werden nicht anhand beliebiger Textfragmente blockiert,
+  sondern nur bei tatsächlichen Skriptpfaden oder Rollback-Pfaden. / Refines
+  detection of real active upgrade/rollback processes: transport shells are
+  no longer blocked by arbitrary command-text fragments, only by actual script
+  paths or rollback paths.
+
+## 1.0.13 – Stable
+
+### Deutsch / English
+
+- Korrigiert die Prozessprüfung des bestätigten Staging-Recovery-Modus, damit
+  übergeordnete Transport-/SSH-Shells nicht wegen eines enthaltenen
+  Skriptnamens fälschlich als aktiver Upgradeprozess blockieren. Die echte
+  Elternprozesskette bleibt ausgeschlossen; unabhängige Upgrade-/Rollback-
+  Prozesse bleiben blockierend. / Fixes the confirmed staging-recovery process
+  check so parent transport/SSH shells are not falsely classified as active
+  upgrade processes merely because their command text contains the script name.
+  The real ancestor chain remains excluded; independent upgrade/rollback
+  processes remain blocking.
+
+## 1.0.12 – Stable
+
+### Deutsch / English
+
+- Ergänzt einen ausdrücklich bestätigungspflichtigen, fail-closed Recovery-
+  Modus für verwaistes Rollback-Staging. Der Modus prüft kanonische Pfade,
+  Symlinks, laufende Prozesse, offene Referenzen, systemd-Verweise,
+  alternative Rollback-Kandidaten und Hash-Integrität und verschiebt das
+  Staging nur nach Bestätigung verlustfrei in eine isolierte Quarantäne. /
+  Adds an explicitly confirmed, fail-closed recovery mode for orphaned
+  rollback staging. It validates canonical paths, symlinks, active processes,
+  open references, systemd references, alternate rollback candidates and hash
+  integrity, and moves staging losslessly to an isolated quarantine only after
+  confirmation.
+
+**Compatibility / Migration:** API contract 1.1 and existing agent/job state
+remain unchanged. The recovery mode is read-only without `--confirm`; it never
+deletes or overwrites staging. / Der Recovery-Modus ist ohne `--confirm`
+rein lesend und löscht oder überschreibt kein Staging.
+
+**Known limitation / Einschränkung:** Productive quarantine still requires a
+separate administrator confirmation after a positive target-host preflight.
+
+## 1.0.11 – Stable
+
+### Deutsch / English
+
+- Der offizielle Agent-Updater akzeptiert nachweislich bytegleiche,
+  gleich versionierte Rollback-Staging-Duplikate; abweichende gleich
+  versionierte Stände bleiben fail-closed blockiert. / The official agent
+  updater accepts provably byte-identical, same-version rollback staging
+  duplicates; divergent same-version staging remains fail-closed.
+
+## 1.0.10 – Stable
+
+### Deutsch
+
+- Ergänzt `reconciled_legacy_state_verified` als ausdrücklich administrativen
+  Terminalstatus für historische Jobs ohne Paket-Baseline. Dieser Status
+  behauptet keine erfolgreiche oder nicht erfolgte historische Installation;
+  er bestätigt nur den aktuellen, unabhängigen Zustand für künftige Jobs.
+- Erzwingt CTID-/Jobbindung, vollständige Inspektion, sauberen dpkg-/APT-Zustand,
+  aktive Prozess- und Lockfreiheit, vollständigen Paketbestand, frische
+  Simulation, neue Baseline und Administratorbestätigung. Unverfügbare
+  Lockprüfungen bleiben blockierend.
+
+### English
+
+- Adds `reconciled_legacy_state_verified` as an explicitly administrative
+  terminal state for historical jobs without a package baseline. It does not
+  claim that the historical installation succeeded or did not run; it verifies
+  only the current state for future jobs.
+- Enforces CTID/job binding, complete inspection, clean dpkg/APT state, no
+  active processes or held locks, a complete package inventory, a fresh
+  simulation, a new baseline, and administrator confirmation. Unavailable lock
+  checks remain blocking.
+
+**Compatibility / Migration:** API contract 1.1 and existing job databases are
+preserved through additive state handling. No package installation, retry, or
+automatic legacy release is performed.
+
+## 1.0.9 – Stable
+
+### Deutsch
+
+- Behebt den offiziellen Agent-Upgrade-Preflight für einen stabilen Agenten
+  `1.0.6`: historische Beta-Rollback-Stagings werden korrekt als älter erkannt,
+  statt den sicheren Upgradeweg fälschlich zu blockieren.
+- Die fail-closed Prüfung, TLS-/Healthcheck-Gates und der Erhalt historischer
+  Rollback-Stagings bleiben unverändert.
+
+### English
+
+- Fixes the official agent-upgrade preflight for a stable `1.0.6` agent:
+  historical beta rollback staging is correctly recognized as older instead
+  of incorrectly blocking the safe upgrade path.
+- Fail-closed checks, TLS/health gates, and preservation of historical rollback
+  staging remain unchanged.
+
+**Compatibility / Migration:** API contract 1.1, existing Config Entries,
+grants, policies, job databases, and agent 1.0.6 remain compatible.
+
+**Post-update:** Reload the Lovelace resource or browser cache. No host or
+container restart is required by the integration update.
+
+**Known limitation:** CT107 and CT108 remain blocked until their existing
+manual-recovery evidence is independently reconciled; this release does not
+retry or alter job history.
+
+## 1.0.8 – Stable
+
+### Deutsch
+
+- Behebt die synchrone Freshness-/Helper-Prüfung vor der persistenten Jobannahme. Der Execute-Endpunkt bestätigt die Job-ID jetzt vor dem langsamen Worker-Preflight; Freshness, finale Simulation und Baseline-Inspektion bleiben vor jeder Paketmutation fail-closed.
+- Ergänzt eine Regression für langsames finales Preflight. Duplikatschutz, Plan-Digest-Prüfung und Recovery-Zustände bleiben erhalten.
+
+### English
+
+- Fixes the synchronous freshness/helper check before persistent job acceptance. The execute endpoint now acknowledges the job ID before the slow worker preflight; freshness, final simulation, and baseline inspection remain fail-closed before any package mutation.
+- Adds a regression for slow final preflight. Duplicate protection, plan-digest validation, and recovery states remain intact.
+
+**Compatibility / Migration:** API contract 1.1 is unchanged. Existing Config Entries, grants, policies, job databases, and the 1.0.6 agent remain compatible.
+
+**Post-update:** Reload the Lovelace resource or browser cache. No host/container restart is required.
+
+**Known limitation:** CT108 remains blocked by its existing manual-recovery job until independently reconciled. This release performs no retry or job-history mutation.
+
+## 1.0.7 – Stable
+
+### Deutsch
+
+- Verbindet den produktiven Agent-Inspector mit dem festen, ausschließlich
+  lesenden LXC-Helper und persistiert bounded Recovery-Prüfungen nach Start,
+  Timeout und Agent-Polling.
+- Prüft tatsächliche APT-/dpkg-Prozesse, Paketmanager-Konsistenz, Versionen,
+  Logs und Lock-Besitz. `fuser`-Code 1 bedeutet „nicht gehalten“; fehlende oder
+  fehlerhafte Lock-Prüfungen bleiben UNKNOWN und blockieren fail-closed.
+- Ergänzt Recovery-Status, Blockierungsgrund und letzten Prüfzeitpunkt in der
+  Lovelace-Karte. CT107 bleibt bei unklarer historischer Evidenz gesperrt; der
+  administrative Abschlussworkflow bleibt separat authentifiziert.
+
+### English
+
+- Connects the production agent inspector to the fixed read-only LXC helper and
+  persists bounded recovery checks after startup, timeout, and agent polling.
+- Checks actual APT/dpkg processes, package-manager consistency, versions, logs,
+  and lock ownership. `fuser` exit code 1 means “not held”; missing or failed
+  lock checks remain UNKNOWN and block fail-closed.
+- Adds recovery status, blocking reason, and last inspection time to the
+  Lovelace card. CT107 stays blocked when historical evidence is ambiguous; the
+  administrative completion workflow remains separately authenticated.
+
+**Compatibility / migration:** API contract `1.1`, existing Config Entries,
+grants, policies, and container isolation are preserved. Job databases migrate
+additively on first open.
+
+**Post-update:** reload the Lovelace resource or browser cache. No package
+installation, repair command, automatic retry, host/container restart, backup,
+or snapshot is performed by this release.
+
+**Known limitation:** a real Proxmox LXC acceptance guest is required for
+production transport verification; ambiguous package-manager evidence remains
+manual recovery.
+
+## 1.0.6 – Stable Agent
+
+### Deutsch
+
+- Ergänzt eine separat authentifizierte, CTID-gebundene administrative
+  Recovery-Route für Jobs in `manual_recovery_required`.
+- Führt den terminalen Zustand `reconciled_not_executed` mit unveränderlichem
+  Audit-Datensatz und Evidence-Hash ein; ein Job wird niemals nachträglich als
+  erfolgreich ausgeführt markiert.
+- Verweigert Recovery bei gestarteter, teilweiser, aktiver oder unklarer
+  Ausführung, falscher CTID und doppelter Recovery. Paketinstallation,
+  Wiederholung und Neustart bleiben ausgeschlossen.
+
+### English
+
+- Adds separately authenticated, CTID-bound administrative recovery for jobs
+  in `manual_recovery_required`.
+- Adds the terminal `reconciled_not_executed` state with an immutable audit
+  record and evidence hash; a job is never retroactively marked successful.
+- Refuses recovery for started, partial, active, or uncertain execution, wrong
+  CTIDs, and duplicate recovery. Package installation, retry, and restart
+  remain excluded.
+
+**Compatibility / migration:** API contract `1.1` is unchanged. The agent is
+released independently as `1.0.6`; the Home Assistant integration remains at
+`1.0.5` and requires no new integration release. Existing jobs and databases
+are migrated additively on first open.
+
+**Post-update:** provision the optional systemd credential
+`recovery_admin_token` only if administrative recovery is explicitly required;
+otherwise the recovery route remains disabled.
+
+**Known limitation:** only a proven `not_executed` outcome is supported. Jobs
+with any evidence of execution remain blocked for manual investigation.
+
+## 1.0.5 – Stable
+
+### Deutsch
+
+- Startet bestätigte Paketjobs nach den unveränderten Sicherheitsprüfungen
+  asynchron und gibt die Job-ID sofort zurück; der kurze HA-HTTP-Timeout kann
+  den APT-Lauf nicht mehr fälschlich als unmittelbaren Fehlschlag darstellen.
+- Nutzt die bestehende persistente Job-Orchestrierung für Polling,
+  Dashboard-Reloads, Container-Isolation und Duplikatschutz.
+- Belässt unklare Ausführungszustände in Manual-Recovery und führt keine
+  automatische Wiederholung durch.
+
+### English
+
+- Starts confirmed package jobs asynchronously after the existing security
+  checks and returns the job ID immediately, so the short HA HTTP timeout no
+  longer masks a running APT operation.
+- Uses the existing persistent job orchestration for polling, dashboard
+  reloads, container isolation, and duplicate protection.
+- Keeps uncertain execution states in manual recovery and never retries them
+  automatically.
+
+**Compatibility / migration:** API contract `1.1`, existing Config Entries,
+grants, and policies are preserved. The v1.0.4 agent remains compatible.
+
+**Post-update:** reload the Lovelace resource or browser cache. A full Home
+Assistant restart is not required.
+
+**Known limitation:** this release does not perform a package installation;
+the first CT107 attempt remains in manual recovery until independently
+reconciled.
+
+## 1.0.4 – Stable
+
+### Deutsch
+
+- Wartet nach einer Berechtigungsänderung auf die bestätigte Konvergenz von
+  HA-State und Backend-Readback, bevor Erfolg gemeldet wird.
+- Behandelt fehlende, widersprüchliche oder verspätete Readbacks fail-closed;
+  falsche Erfolgsmeldungen werden verhindert.
+- Bewahrt die containerbezogene Trennung von Berechtigungs-, Update- und
+  Simulationszuständen.
+
+### English
+
+- Waits for confirmed convergence between HA state and backend readback after a
+  permission change before reporting success.
+- Handles missing, contradictory, or delayed readback fail-closed and prevents
+  false success messages.
+- Preserves container-scoped isolation of permission, update, and simulation
+  state.
+
+**Compatibility / migration:** API contract `1.1`, existing Config Entries,
+grants, and policies are preserved. The external Agent 1.0.0 remains compatible.
+
+**Post-update:** reload the Lovelace resource or browser cache. A full Home
+Assistant restart is not required.
+
+**Known limitation:** `execution_enabled=false` remains unchanged and no
+package installation is performed by this release.
+
+## 1.0.3 – Stable candidate
+
+### Deutsch
+
+- Trennt Permission-Konvergenz, Update-Frische und historische Simulationen
+  strikt pro CTID; ein später globaler `not_checked`-Refresh kann keinen
+  fremden Containerzustand mehr löschen.
+- Die Installationsfreigabe ist fail-closed und benötigt Backend-Readback,
+  beide Container-Grants, globale Ausführungsfreigabe, frische erfolgreiche
+  Simulation, identischen Plan-Digest, bestandene Sicherheitsprüfung und
+  keinen widersprüchlichen Jobzustand.
+- Historische Simulationen werden nach Refresh/Remount nur als historisch
+  angezeigt und aktivieren niemals einen Installationsbutton.
+- `execution_enabled=false` bleibt unverändert; die produktive Policy wurde
+  nicht aktiviert.
+
+### English
+
+- Separates permission convergence, update freshness, and historical
+  simulations per CTID; a later global `not_checked` refresh cannot delete a
+  different container's state.
+- Installation is fail-closed and requires backend readback, both container
+  grants, global execution enablement, a fresh successful simulation, matching
+  plan digest, passed safety checks, and no conflicting job.
+- Historical simulations remain display-only after refresh/remount and never
+  enable installation.
+- `execution_enabled=false` is unchanged; the productive policy was not
+  enabled.
+
+**Compatibility / migration:** no agent change is required. Existing Config
+Entries and grants are preserved. A Lovelace resource/browser reload is
+required after the frontend update.
+
+**Known limitation:** productive HA readback remained unavailable during this
+work because the HA connector returned `CONNECTION_TIMEOUT`; no productive
+installation was performed.
+
+## 1.0.2 – Stable
+
+### Deutsch
+
+- Behebt die containerübergreifende Invalidierung der Lovelace-Karte nach einer
+  `set_permissions`-Änderung: CT107 behält seinen erfolgreichen
+  Simulationssnapshot, wenn CT108 geändert wird.
+- Verwendet bestätigte Berechtigungs-Readbacks ausschließlich für das betroffene
+  Ziel und behandelt den globalen kurzzeitigen `not_checked`-Zustand ohne fremde
+  Containerzustände zu überschreiben.
+- Fehlender Readback bleibt eine sichtbare Warnung; alte Berechtigungen werden
+  nicht dauerhaft als bestätigt dargestellt.
+- Das Agent-Verhalten bleibt unverändert; Agent 1.0.1 bleibt kompatibel.
+  `execution_enabled=false`,
+  Produktiv-Grants und Paketaktionen bleiben unverändert.
+
+### English
+
+- Fixes cross-container invalidation in the Lovelace card after a
+  `set_permissions` change: CT107 retains its successful simulation snapshot
+  when CT108 is changed.
+- Uses confirmed permission readback only for the affected target and handles a
+  brief global `not_checked` state without overwriting another container's
+  state.
+- Missing readback remains a visible warning; old permissions are never shown
+  as permanently confirmed.
+- Agent behavior remains unchanged; agent 1.0.1 remains compatible.
+  `execution_enabled=false`,
+  productive grants, and package actions remain unchanged.
+
+**Compatibility / migration:** no agent upgrade is required. Existing Config
+Entries and authorization state are preserved.
+
+**Post-update:** reload the Lovelace resource/browser cache. A Home Assistant
+restart is not required.
+
+**Known limitation:** live Home Assistant read-only access was unavailable
+during diagnosis; production grants and state were not modified.
+
+## 1.0.1 – Stable
+
+### Deutsch
+
+- Behebt den Berechtigungszustand der Lovelace-Karte nach `set_permissions`:
+  Der Backend-Readback von `simulation_authorized` und `update_authorized`
+  muss beide erwarteten Werte bestätigen.
+- Aktualisiert den gemeinsamen UI-Zustand nach erfolgreichem Readback und
+  behandelt einen kurzzeitigen `not_checked`-Zustand mit dem letzten sicheren
+  Snapshot.
+- Ein fehlender oder widersprüchlicher Readback führt zu einer sichtbaren
+  Fehlermeldung statt zu einer falschen Erfolgsmeldung.
+- Agent `1.0.0` bleibt mit API 1.1 kompatibel; Grants, Policies und
+  `execution_enabled=false` bleiben unverändert.
+
+### English
+
+- Fixes the Lovelace permission state after `set_permissions`: backend readback
+  must confirm both `simulation_authorized` and `update_authorized`.
+- Refreshes the combined UI state after confirmed readback and handles a brief
+  `not_checked` state using the last safe snapshot.
+- Missing or contradictory readback produces a visible error instead of a
+  false success message.
+- Agent `1.0.0` remains compatible with API 1.1; grants, policies, and
+  `execution_enabled=false` remain unchanged.
+
+**Compatibility / migration:** no agent upgrade is required for an installed
+`1.0.0` agent. Existing Config Entries and authorization state are preserved.
+
+**Post-update:** reload the Lovelace resource/browser cache. A Home Assistant
+restart is not required.
+
+**Known limitation:** no productive Home Assistant installation or live device
+actuation was performed as part of this release.
+
+## 1.0.0 – Stable
+
+### Deutsch
+
+- Veröffentlicht den fail-closed Update-Workflow mit persistenter Job-ID,
+  Fortschritt, Postcheck und `manual_recovery_required` bei unklarem Zustand.
+- Erzwingt eine frische Simulation, einen unveränderten Plan-Digest, getrennte
+  Simulations-/Updateberechtigungen und eine separate Installationsbestätigung.
+- Behält `execution_enabled=false` als sicheren Standard bei; Aktivierung und
+  Dienstneustart bleiben bewusste administrative Schritte.
+- Aktualisiert Agent-/Integrationsversion auf `1.0.0` und hält RC-/Beta-Agenten
+  mit API 1.1 während des Übergangs kompatibel.
+- Dokumentiert die externe echte Proxmox-LXC-Abnahmeplanung sowie die Desktop-
+  und iPhone/iPad-Abnahme. Der echte Proxmox-LXC-Pakettest wurde nicht
+  durchgeführt und ist keine bestandene Stable-Abnahme.
+
+### English
+
+- Publishes the fail-closed update workflow with persistent job IDs, progress,
+  postchecks, and `manual_recovery_required` for uncertain states.
+- Requires a fresh simulation, unchanged plan digest, separate simulation/update
+  permissions, and a separate installation confirmation.
+- Keeps `execution_enabled=false` as the safe default; activation and service
+  restart remain deliberate administrative steps.
+- Updates the agent/integration version to `1.0.0` and keeps RC/Beta agents
+  using API 1.1 compatible during the transition.
+- Documents the external real-Proxmox-LXC acceptance plan and desktop/iPhone/
+  iPad acceptance. The real Proxmox-LXC package test was not performed and is
+  not represented as passed Stable acceptance.
+
+**Compatibility / migration:** update the HA integration and the independently
+managed agent from the same Stable commit. Existing API 1.1 RC/Beta agents are
+recognized during transition; do not enable execution solely because the
+integration was updated.
+
+**Post-update step:** verify `/api/v1/health`, `/api/v1/capabilities`, TLS,
+`execution_enabled=false`, and the selected LXC's read-only status before any
+administrative activation.
+
+**Known limitation:** no productive installation was performed and no real
+Proxmox-LXC package transaction was executed for this release.
+
+## 1.0.0-rc.1 – Release Candidate
+
+### Deutsch
+
+- Behebt sieben reproduzierte Robustheits-/Sicherheitsfehler (sechs
+  Fehlerklassen) in Probe, Policy-Dateischutz, Reconciliation und
+  Allowlist-Status; fehlende Container werden nicht erfunden.
+- Persistiert Update-Jobs mit Cancel-Anforderung, Prozessidentitätsfeldern und
+  einer Sperre für aktive oder ungeklärte Jobs.
+- Abbruch ist nur vor der Paketmutation erlaubt. Laufende Helper-Updates werden
+  ohne verifizierbare PID/PGID nicht beendet; Unsicherheit führt zu
+  `manual_recovery_required` ohne Retry oder automatische Reparatur.
+- Browser-Regression prüft die zweistufige Installationsbestätigung.
+
+### English
+
+- Fixes seven reproduced regression failures across six probe, policy,
+  reconciliation, and allowlist robustness classes without inventing missing
+  containers.
+- Persists update jobs with cancellation requests, process-identity fields, and
+  a lock for active or unresolved jobs.
+- Cancellation is allowed only before package mutation. Running helper updates
+  are not killed without a verified PID/PGID; uncertainty becomes
+  `manual_recovery_required` with no retry or automatic repair.
+- Browser regression coverage checks the two-step installation confirmation.
+
+This is a Release Candidate, not a Stable release. Productive installation and
+real package actions remain separately gated.
+
 ## 0.1.0-beta.49 – Controlled LXC orchestration
 
 ### Deutsch

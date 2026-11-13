@@ -56,9 +56,12 @@ try {
       return typeof card.getGridOptions === "function" ? card.getGridOptions() : null;
     });
     if (sectionsSizing?.rows !== "auto" || Object.hasOwn(sectionsSizing, "min_rows") || sectionsSizing?.columns !== "full") throw new Error(`${name} Sections sizing failed: ${JSON.stringify(sectionsSizing)}`);
-    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("connected"), null, { timeout: 10000 });
+    await page.waitForFunction(() => {
+      const result = document.querySelector("#result")?.textContent || "";
+      return result.includes("connected") || result.includes('"fatal"');
+    }, null, { timeout: 10000 });
     const result = JSON.parse(await page.locator("#result").textContent());
-    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.hasAvailableResources || !result.inventoryCounts || !result.cardHasSize || !result.dryRunUi || !result.dryRunResponseShown || !result.installButtonDisabled || !result.permissionSuccessShown || !result.permissionCallCorrect || !result.permissionErrors || !result.permissionTimeoutShown || !result.dryRunMissingResponseShown || !result.dryRunServiceErrorShown || !result.dryRunTimeoutShown || !result.dryRunLocalizedAuthorizationShown || !result.unauthorizedSimulationUiSafe || !result.actionLayoutContractSafe || !result.stableButtonGeometry || !result.vmExclusionEnglish || !result.vmExclusionGerman || !result.localizedEditor || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.reopenedEditorSafe || !result.emptyCardSafe || !result.initialCardSafe || !result.unknownSafe || !result.unknownContainerSafe || !result.unknownVmMemorySafe || !result.guestAccessGermanSafe || !result.updateStatusLabelsSafe || !result.hostDetailsPreservedAfterUpdates || !result.languageEnglish || !result.languageGerman || !result.localeObjectSafe || !result.missingLanguageFallback || !result.hostOfflineWithoutAgentContradiction || !result.statusStatesSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasTextOverlap || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
+    if (!result.connected || !result.hasContainer || !result.hasVm || !result.hasHost || !result.hasAvailableResources || !result.inventoryCounts || !result.cardHasSize || !result.dryRunUi || !result.dryRunResponseShown || !result.installButtonDisabled || !result.installUi || !result.installationDialogContract || !result.permissionSuccessShown || !result.permissionCallCorrect || !result.permissionReadbackRequired || !result.permissionReadbackFailure || !result.permissionFlowConsistent || !result.containerIsolationRegression || !result.permissionErrors || !result.permissionTimeoutShown || !result.dryRunMissingResponseShown || !result.dryRunServiceErrorShown || !result.dryRunTimeoutShown || !result.dryRunLocalizedAuthorizationShown || !result.unauthorizedSimulationUiSafe || !result.actionLayoutContractSafe || !result.stableButtonGeometry || !result.vmExclusionEnglish || !result.vmExclusionGerman || !result.localizedEditor || !result.editorChanged || !result.editorPreservesFocusedDraft || !result.reopenedEditorSafe || !result.emptyCardSafe || !result.initialCardSafe || !result.unknownSafe || !result.unknownContainerSafe || !result.unknownVmMemorySafe || !result.guestAccessGermanSafe || !result.updateStatusLabelsSafe || !result.hostDetailsPreservedAfterUpdates || !result.languageEnglish || !result.languageGerman || !result.localeObjectSafe || !result.missingLanguageFallback || !result.hostOfflineWithoutAgentContradiction || !result.statusStatesSafe || result.errors.length || browserErrors.length || failedRequests.length || result.hasTextOverlap || result.hasHorizontalOverflow) throw new Error(`${name} failed: ${JSON.stringify({ result, browserErrors, failedRequests })}`);
     await page.screenshot({ path: `/tmp/card-${name}.png`, fullPage: true, timeout: ACTION_TIMEOUT });
     await page.goto(`http://127.0.0.1:${port}/frontend/ha-editor-harness.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
     await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("pickerRegistered"), null, { timeout: 10000 });
@@ -127,6 +130,12 @@ try {
     const layoutMatrix = JSON.parse(await page.locator("#result").textContent());
     if (!layoutMatrix.directFull || !layoutMatrix.dynamicTextVisible || !layoutMatrix.grewOrStable) {
       throw new Error(`${name} direct/nested Sections layout matrix failed: ${JSON.stringify(layoutMatrix)}`);
+    }
+    await page.goto(`http://127.0.0.1:${port}/frontend/square-grid-scroll-regression.html`, { timeout: NAVIGATION_TIMEOUT, waitUntil: "load" });
+    await page.waitForFunction(() => document.querySelector("#result")?.textContent.includes("squareAttributeAbsent"), null, { timeout: 10000 });
+    const squareGridRegression = JSON.parse(await page.locator("#result").textContent());
+    if (!squareGridRegression.squareAttributeAbsent || squareGridRegression.itemCount !== 12 || !squareGridRegression.lastReachable || !squareGridRegression.naturalHeight || !squareGridRegression.lastText.includes("112")) {
+      throw new Error(`${name} square grid scroll regression failed: ${JSON.stringify(squareGridRegression)}`);
     }
     await page.close();
     await context.close();

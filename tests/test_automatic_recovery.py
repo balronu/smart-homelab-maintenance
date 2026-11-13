@@ -1,0 +1,222 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from agent.smart_homelab_maintenance.jobs import JobRepository
+from agent.smart_homelab_maintenance.recovery import RecoveryEvidence, classify_recovery
+from agent.smart_homelab_maintenance.agent_recovery import AgentRecoveryInspector
+from agent.smart_homelab_maintenance.types import JobRequest, JobState
+from agent.smart_homelab_maintenance.errors import InvalidTransitionError, ValidationError
+
+
+def evidence(**changes):
+    value = RecoveryEvidence(
+        execution_started=False, package_mutation=False, partial_execution=False,
+        active_package_processes=False, package_locks=False,
+        start_marker_found=False, completion_marker_found=False,
+        job_logs_checked=True, apt_history_checked=True,
+        package_versions_checked=True, execution_markers_checked=True,
+        package_manager_consistent=True, side_effects_checked=True,
+    )
+    return RecoveryEvidence(**{**value.as_dict(), **changes})
+
+
+class AutomaticRecoveryTests(unittest.TestCase):
+    def test_preflight_repair_closes_only_proven_non_mutating_block(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "preflight-repair-101"))
+            repo.transition(job, JobState.PREFLIGHT, phase="preflight")
+            repo.transition(job, JobState.BLOCKED, phase="preflight", error_code="preflight_helper_timeout", message="read-only preflight failed")
+            result = repo.repair_preflight_block(job)
+            self.assertTrue(result["accepted"])
+            self.assertEqual(repo.get(job)["state"], JobState.RECONCILED_NOT_EXECUTED)
+            self.assertIn("package state was not touched", repo.get(job)["message"])
+            repo.close()
+
+    def test_preflight_repair_rejects_unknown_manual_recovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "manual-repair-101"))
+            repo.transition(job, JobState.PREFLIGHT, phase="preflight")
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery", error_code="execution_status_unknown")
+            with self.assertRaises(InvalidTransitionError):
+                repo.repair_preflight_block(job)
+            self.assertEqual(repo.get(job)["state"], JobState.MANUAL_RECOVERY)
+            repo.close()
+
+    def test_repair_inspection_is_read_only_and_marks_only_safe_preflight_blocks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "inspect-repair-101"))
+            repo.transition(job, JobState.PREFLIGHT, phase="preflight")
+            repo.transition(job, JobState.BLOCKED, phase="preflight", error_code="preflight_helper_timeout")
+            before = len(repo.audit_events(job))
+            result = repo.repair_inspection(job)
+            self.assertTrue(result["repairable"])
+            self.assertFalse(result["package_state_touched"])
+            self.assertEqual(repo.get(job)["state"], JobState.BLOCKED)
+            self.assertEqual(len(repo.audit_events(job)), before)
+            repo.close()
+
+    def test_repair_inspection_refuses_unknown_execution_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "inspect-unknown-101"))
+            repo.transition(job, JobState.PREFLIGHT, phase="preflight")
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery", error_code="execution_status_unknown")
+            result = repo.repair_inspection(job)
+            self.assertFalse(result["repairable"])
+            self.assertIsNone(result["package_state_touched"])
+            repo.close()
+
+    def test_legacy_recovery_requires_complete_current_evidence_and_persists_baseline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:107", "update", None, "legacy-107-123456"))
+            repo.transition(job, JobState.PREFLIGHT)
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery")
+            evidence = {name: True for name in (
+                "ctid_verified", "job_id_verified", "inspection_complete", "dpkg_audit_clean", "apt_check_clean",
+                "interrupted_transactions_absent", "partial_installation_absent", "logs_checked",
+                "package_inventory_complete", "fresh_simulation_passed", "lock_checks_complete",
+                "administrator_confirmed", "historical_execution_unclear")}
+            evidence.update({"active_package_processes": False, "package_locks": False, "writable_mutation": False})
+            result = repo.reconcile_legacy_state_verified(job, container_id=107, evidence=evidence, baseline_packages={"demo": "1.0"})
+            self.assertTrue(result["accepted"])
+            current = repo.get(job)
+            self.assertEqual(current["state"], JobState.RECONCILED_LEGACY_STATE_VERIFIED)
+            self.assertEqual(current["baseline_packages"], '{"demo":"1.0"}')
+            self.assertEqual(current["recovery_audit"]["outcome"], "legacy_state_verified")
+            repo.close()
+
+    def test_legacy_recovery_rejects_unknown_lock_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:108", "update", None, "legacy-108-123456"))
+            repo.transition(job, JobState.PREFLIGHT)
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery")
+            evidence = {"ctid_verified": True, "job_id_verified": True, "inspection_complete": True,
+                        "dpkg_audit_clean": True, "apt_check_clean": True, "interrupted_transactions_absent": True,
+                        "partial_installation_absent": True, "logs_checked": True, "package_inventory_complete": True,
+                        "fresh_simulation_passed": True, "lock_checks_complete": False, "administrator_confirmed": True,
+                        "historical_execution_unclear": True, "active_package_processes": False, "package_locks": False,
+                        "writable_mutation": False}
+            with self.assertRaises(ValidationError):
+                repo.reconcile_legacy_state_verified(job, container_id=108, evidence=evidence, baseline_packages={"demo": "1.0"})
+            repo.close()
+    def test_agent_inspector_blocks_ambiguous_apt_history_without_completion(self):
+        class Helper:
+            def inspect(self, _container_id):
+                return {"observations": {
+                    "processes": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
+                    "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_check": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_history": {"returncode": 0, "stdout": "Commandline: apt-get upgrade\n", "stderr": ""},
+                    "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_lock": {"returncode": 1}, "dpkg_lock": {"returncode": 1},
+                    "apt_archives_lock": {"returncode": 1},
+                    "dpkg_frontend_lock": {"returncode": 1},
+                }}
+        result = AgentRecoveryInspector(Helper())({"target": "container:107", "baseline_packages": '{"demo":"1.0"}'})
+        self.assertEqual(classify_recovery(result).outcome, "recovery_blocked")
+
+    def test_classifier_never_uses_versions_alone(self):
+        result = classify_recovery(evidence(side_effects_checked=False))
+        self.assertEqual(result.outcome, "recovery_blocked")
+
+    def test_classifier_distinguishes_running_completed_and_partial(self):
+        self.assertEqual(classify_recovery(evidence(active_package_processes=True)).outcome, "running")
+        self.assertEqual(classify_recovery(evidence(execution_started=True, start_marker_found=True,
+                                                     completion_marker_found=True)).outcome, "reconciled_completed")
+        self.assertEqual(classify_recovery(evidence(package_mutation=True)).outcome, "recovery_blocked")
+        self.assertEqual(classify_recovery(evidence()).outcome, "reconciled_not_executed")
+
+    def test_inspector_accepts_existing_unheld_lock_files(self):
+        class Helper:
+            def inspect(self, _container_id):
+                observations = {
+                    "processes": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
+                    "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_check": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_history": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "apt_archives_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "dpkg_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "dpkg_frontend_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                }
+                return {"observations": observations}
+        result = AgentRecoveryInspector(Helper())({"target": "container:107", "baseline_packages": '{"demo":"1.0"}'})
+        self.assertEqual(classify_recovery(result).outcome, "reconciled_not_executed")
+
+    def test_inspector_blocks_unknown_lock_check(self):
+        class Helper:
+            def inspect(self, _container_id):
+                observations = {
+                    "processes": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "packages": {"returncode": 0, "stdout": "demo\t1.0\n", "stderr": ""},
+                    "dpkg_audit": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_check": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_history": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "dpkg_log": {"returncode": 0, "stdout": "", "stderr": ""},
+                    "apt_lock": {"returncode": 127, "stdout": "", "stderr": "fuser missing"},
+                    "apt_archives_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "dpkg_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                    "dpkg_frontend_lock": {"returncode": 1, "stdout": "", "stderr": ""},
+                }
+                return {"observations": observations}
+        with self.assertRaises(ValueError):
+            AgentRecoveryInspector(Helper())({"target": "container:107", "baseline_packages": '{"demo":"1.0"}'})
+
+    def test_events_are_append_only_and_target_isolated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            first = repo.create(JobRequest("container:107", "update", None, "key-107-123456", "digest-107"))
+            second = repo.create(JobRequest("container:101", "update", None, "key-101-123456", "digest-101"))
+            repo.transition(first, JobState.PREFLIGHT)
+            repo.transition(first, JobState.MANUAL_RECOVERY, phase="recovery")
+            repo.transition(second, JobState.PREFLIGHT)
+            self.assertTrue(repo.has_unresolved_target("container:107"))
+            self.assertTrue(repo.has_unresolved_target("container:101"))
+            events = repo.audit_events(first)
+            self.assertGreaterEqual(len(events), 3)
+            self.assertEqual(events[0]["event"], "created")
+            self.assertEqual(events[-1]["event"], "state_changed")
+            repo.close()
+
+    def test_automatic_reconcile_completed_is_audited(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:101", "update", None, "key-complete-1234", "digest-12345678"))
+            repo.transition(job, JobState.PREFLIGHT)
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery")
+            result = repo.reconcile_from_evidence(job, container_id=101,
+                                                   evidence=evidence(execution_started=True,
+                                                                     start_marker_found=True,
+                                                                     completion_marker_found=True))
+            self.assertTrue(result["accepted"])
+            self.assertEqual(repo.get(job)["state"], JobState.RECONCILED_COMPLETED)
+            repo.close()
+
+    def test_bounded_runner_never_retries_and_records_context(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = JobRepository(str(Path(directory) / "jobs.sqlite"))
+            job = repo.create(JobRequest("container:102", "update", None, "key-runner-1234", "digest-12345678"))
+            repo.set_execution_context(job, plan_digest="sha256-plan", baseline_packages={"demo": "1.0"})
+            repo.transition(job, JobState.PREFLIGHT)
+            repo.transition(job, JobState.MANUAL_RECOVERY, phase="recovery")
+            calls = []
+            results = repo.run_recovery(lambda record: (calls.append(record["job_id"]) or evidence()), limit=1)
+            self.assertEqual(calls, [job])
+            self.assertEqual(results[0]["outcome"], "not_executed")
+            self.assertEqual(repo.get(job)["plan_digest"], "sha256-plan")
+            repo.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -15,8 +15,12 @@ health_url=""
 ca_file=""
 apply=0
 confirm=0
+recover_staging=""
+quarantine_root="$STATE_ROOT/staging-quarantine"
 rollback_dir=""
 previous_agent_version=""
+previous_release_identity=""
+existing_staging_paths=""
 expected_agent_version=""
 update_started=0
 recovery_running=0
@@ -26,12 +30,17 @@ usage() {
 Verwendung:
   upgrade-agent.sh --source-dir DIR --expected-commit SHA \
     --health-url https://PRIVATE/api/v1 --ca-file FILE [--apply --confirm]
+  upgrade-agent.sh --recover-staging PATH [--quarantine-root DIR] [--confirm]
 
 Ohne --apply bleibt der Dienst unverändert. --apply benötigt zusätzlich
 --confirm, stoppt ausschließlich den Agent-Dienst, wartet begrenzt auf den
 TLS-Healthcheck und stellt bei einem fehlgeschlagenen Healthcheck den
 vorherigen Code wieder her. Rollback-Staging bleibt zur manuellen Prüfung
 erhalten.
+
+--recover-staging bleibt ohne --confirm rein lesend. Mit --confirm wird nur
+ein zuvor positiv geprüftes, verwaistes Staging atomar in den Quarantänepfad
+verschoben; Dateien werden nicht gelöscht oder überschrieben.
 EOF
 }
 
@@ -41,6 +50,8 @@ while (($#)); do
         --expected-commit) expected_commit="${2:?Wert für --expected-commit fehlt}"; shift 2 ;;
         --health-url) health_url="${2:?Wert für --health-url fehlt}"; shift 2 ;;
         --ca-file) ca_file="${2:?Wert für --ca-file fehlt}"; shift 2 ;;
+        --recover-staging) recover_staging="${2:?Staging-Pfad fehlt}"; shift 2 ;;
+        --quarantine-root) quarantine_root="${2:?Quarantänepfad fehlt}"; shift 2 ;;
         --apply) apply=1; shift ;;
         --confirm) confirm=1; shift ;;
         -h|--help) usage; exit 0 ;;
@@ -54,6 +65,129 @@ require_command systemctl
 require_command curl
 require_command ss
 require_command python3
+if [[ -n "$recover_staging" ]]; then
+    [[ "$apply" -eq 0 ]] || die "--recover-staging kann nicht mit --apply kombiniert werden."
+    [[ "$recover_staging" = /* && "$quarantine_root" = /* ]] || die "Staging- und Quarantänepfad müssen absolut sein."
+    canonical_state_root="$(realpath -e -- "$STATE_ROOT")" || die "State-Root ist nicht kanonisch auflösbar."
+    [[ "$quarantine_root" == "$canonical_state_root"/* ]] || die "Quarantäne muss unter dem kanonischen State-Root liegen."
+    [[ -d "$AGENT_ROOT/agent" ]] || die "Aktiver Agent fehlt; kein sicherer Wiederherstellungspfad."
+    canonical_stage="$(realpath -e -- "$recover_staging")" || die "Staging-Pfad ist nicht kanonisch auflösbar."
+    canonical_root="$(realpath -e -- "$AGENT_ROOT")" || die "Agent-Root ist nicht kanonisch auflösbar."
+    case "$(basename -- "$canonical_stage")" in
+        agent.previous.*.staging|agent.failed.*.staging) ;;
+        *) die "Staging-Pfad liegt nicht als exaktes Rollback-Staging unter dem Agent-Root (agent.previous.*.staging oder agent.failed.*.staging)." ;;
+    esac
+    [[ "$(dirname -- "$canonical_stage")" == "$canonical_root" ]] || die "Staging-Pfad liegt nicht direkt unter dem Agent-Root."
+    [[ -d "$canonical_stage" && ! -L "$recover_staging" ]] || die "Staging-Pfad ist kein echtes Verzeichnis oder ein Symlink."
+    [[ ! -e "$quarantine_root" || ! -L "$quarantine_root" ]] || die "Quarantänepfad darf kein Symlink sein."
+    quarantine_parent="$(dirname -- "$quarantine_root")"
+    canonical_quarantine_parent="$(realpath -e -- "$quarantine_parent")" || die "Quarantäne-Elternpfad ist nicht kanonisch auflösbar."
+    [[ "$canonical_quarantine_parent" == "$canonical_state_root"/* || "$canonical_quarantine_parent" == "$canonical_state_root" ]] || die "Quarantäne-Elternpfad liegt nicht unter dem State-Root."
+    quarantine_name="$(basename -- "$canonical_stage")"
+    quarantine_root="$canonical_quarantine_parent/$(basename -- "$quarantine_root")"
+    quarantine_target="$quarantine_root/$quarantine_name"
+    [[ "$quarantine_target" != "$canonical_stage" ]] || die "Quarantäneziel darf nicht das Quellverzeichnis sein."
+    [[ ! -e "$quarantine_target" ]] || die "Quarantäneziel existiert bereits; keine Überschreibung."
+
+    staging_manifest() {
+        python3 - "$1" <<'PY'
+import hashlib
+import os
+import stat
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+rows = []
+for path in sorted(root.rglob("*")):
+    rel = path.relative_to(root).as_posix()
+    if path.is_symlink():
+        raise SystemExit(f"Symlink im Staging: {rel}")
+    if path.is_file():
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        rows.append(f"F {digest} {rel}")
+    elif not path.is_dir():
+        raise SystemExit(f"Nicht unterstützter Dateityp im Staging: {rel}")
+print("\n".join(rows))
+PY
+    }
+
+    staging_process_check() {
+        python3 - "$canonical_stage" <<'PY'
+import os
+import re
+import sys
+from pathlib import Path
+
+target = os.path.realpath(sys.argv[1])
+self_pid = os.getpid()
+ancestor_pids = {self_pid}
+cursor = self_pid
+while cursor > 1:
+    try:
+        fields = (Path("/proc") / str(cursor) / "stat").read_text().split()
+        cursor = int(fields[3])
+    except (FileNotFoundError, PermissionError, OSError, ValueError, IndexError):
+        break
+    ancestor_pids.add(cursor)
+bad = []
+for entry in Path("/proc").iterdir():
+    if not entry.name.isdigit() or int(entry.name) in ancestor_pids:
+        continue
+    pid = entry.name
+    try:
+        cmd = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+        refs = [os.path.realpath(entry / "cwd"), os.path.realpath(entry / "root")]
+        refs += [os.path.realpath(fd) for fd in (entry / "fd").iterdir() if os.path.islink(fd)]
+    except (PermissionError, FileNotFoundError, OSError):
+        continue
+    if any(ref == target or ref.startswith(target + os.sep) for ref in refs):
+        bad.append(f"PID {pid} referenziert Staging: {cmd.strip()}")
+    active_script = re.search(r"(?:^|[\\s\"'])/[^\\s\"']*/(?:upgrade-agent|update-agent)\\.sh(?:$|[\\s\"'])", cmd)
+    active_rollback = re.search(r"(?:^|[\\s\"'])/[^\\s\"']*agent\\.(?:failed|previous)\\.[^\\s\"']*", cmd)
+    if active_script or active_rollback:
+        bad.append(f"aktiver Upgrade/Rollback-Prozess PID {pid}: {cmd.strip()}")
+if bad:
+    raise SystemExit("; ".join(sorted(set(bad))))
+PY
+    }
+
+    systemd_refs="$(grep -R -F -n -- "$canonical_stage" /etc/systemd/system /etc/systemd/system.d /etc/smart-homelab-maintenance 2>/dev/null || true)"
+    [[ -z "$systemd_refs" ]] || die "Systemd-/Konfigurationsreferenz auf Staging gefunden: $systemd_refs"
+    staging_process_check || die "Aktiver Upgrade-, Rollback- oder Dateireferenz-Prozess gefunden."
+    manifest_before="$(mktemp)"
+    active_manifest=""
+    trap 'rm -f -- "$manifest_before" "$active_manifest" "${manifest_before}.after"' EXIT
+    staging_manifest "$canonical_stage" > "$manifest_before" || die "Staging-Integrität konnte nicht erfasst werden."
+    candidate_count=0
+    for candidate in "$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging; do
+        [[ -d "$candidate" && ! -L "$candidate" && "$(realpath -e -- "$candidate")" != "$canonical_stage" ]] || continue
+        staging_manifest "$candidate" >/dev/null || die "Alternativer Rollback-Kandidat ist nicht verwendbar: $candidate"
+        candidate_count=$((candidate_count + 1))
+    done
+    (( candidate_count > 0 )) || die "Kein alternativer Rollback-Kandidat bleibt erhalten."
+    active_manifest="$(mktemp)"
+    staging_manifest "$AGENT_ROOT/agent" > "$active_manifest" || die "Aktiver Agent ist kein verwendbarer Wiederherstellungspfad."
+    info "Staging-Recovery-Preflight positiv: $canonical_stage"
+    info "Alternativer Rollback-Kandidaten: $candidate_count"
+    if [[ "$confirm" -ne 1 ]]; then
+        info "Keine Quarantäne ausgeführt; --confirm fehlt."
+        exit 0
+    fi
+    [[ ! -e "$quarantine_root" || -d "$quarantine_root" ]] || die "Quarantänepfad ist kein Verzeichnis."
+    install -d -m 0750 -o root -g root -- "$quarantine_root"
+    [[ ! -e "$quarantine_target" ]] || die "Quarantäneziel existiert bereits; keine Überschreibung."
+    mv -T -- "$canonical_stage" "$quarantine_target"
+    staging_manifest "$quarantine_target" > "${manifest_before}.after" || die "Integritätsprüfung nach Quarantäne fehlgeschlagen."
+    cmp -s "$manifest_before" "${manifest_before}.after" || die "Hash-/Strukturvergleich nach Quarantäne fehlgeschlagen."
+    audit="$quarantine_root/audit.log"
+    printf '%s staging_quarantine source=%s target=%s source_sha256=%s active_sha256=%s candidates=%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$canonical_stage" "$quarantine_target" \
+        "$(sha256sum "$manifest_before" | awk '{print $1}')" "$(sha256sum "$active_manifest" | awk '{print $1}')" "$candidate_count" >> "$audit"
+    chmod 0640 -- "$audit"
+    info "Staging in Quarantäne verschoben und Integrität verifiziert: $quarantine_target"
+    exit 0
+fi
 [[ -n "$source_dir" && -n "$expected_commit" && -n "$health_url" && -n "$ca_file" ]] || { usage >&2; die "Pflichtoption fehlt."; }
 [[ "$health_url" == https://* && "$health_url" != *\?* && "$health_url" != *\#* ]] || die "Health-URL muss HTTPS ohne Query/Fragment verwenden."
 [[ -r "$ca_file" && -f "$ca_file" ]] || die "Healthcheck-CA fehlt oder ist nicht lesbar."
@@ -219,42 +353,142 @@ version_is_older() {
 import re
 import sys
 
-pattern = re.compile(r"^0\.1\.0-beta\.(\d+)$")
-candidate = pattern.fullmatch(sys.argv[1])
-current = pattern.fullmatch(sys.argv[2])
-if not candidate or not current:
+def parse(value):
+    beta = re.fullmatch(r"0\.1\.0-beta\.(\d+)", value)
+    if beta:
+        return (0, 1, 0, 0, int(beta.group(1)))
+    stable = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", value)
+    if stable:
+        return (1, int(stable.group(1)), int(stable.group(2)), int(stable.group(3)), 0)
+    return None
+
+candidate = parse(sys.argv[1])
+current = parse(sys.argv[2])
+if candidate is None or current is None:
     raise SystemExit(1)
-raise SystemExit(0 if int(candidate.group(1)) < int(current.group(1)) else 1)
+raise SystemExit(0 if candidate < current else 1)
 PY
 }
 
+read_release_version() {
+    local package_root="$1"
+    python3 - "$package_root" <<'PY'
+import json
+import hashlib
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+path = root / ".release-identity"
+data = json.loads(path.read_text(encoding="utf-8"))
+version = data.get("release_version")
+commit = data.get("source_commit")
+tree_sha256 = data.get("tree_sha256")
+if data.get("schema") != 1 or not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    raise SystemExit("Release-Identität fehlt oder ist ungültig")
+if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+    raise SystemExit("Release-Commit fehlt oder ist ungültig")
+if not isinstance(tree_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", tree_sha256):
+    raise SystemExit("Release-Inhaltsdigest fehlt oder ist ungültig")
+rows = []
+for child in sorted(root.rglob("*")):
+    rel = child.relative_to(root).as_posix()
+    if child == path:
+        continue
+    if child.is_symlink():
+        raise SystemExit(f"Symlink im Rollback-Staging: {rel}")
+    if child.is_file():
+        rows.append(f"F {hashlib.sha256(child.read_bytes()).hexdigest()} {rel}")
+    elif not child.is_dir():
+        raise SystemExit(f"Nicht unterstützter Dateityp im Rollback-Staging: {rel}")
+actual = hashlib.sha256(("\n".join(rows) + "\n").encode()).hexdigest()
+if actual != tree_sha256:
+    raise SystemExit("Release-Inhaltsdigest stimmt nicht mit dem Rollback-Staging überein")
+print(version)
+PY
+}
+
+read_release_identity() {
+    local package_root="$1"
+    read_release_version "$package_root" >/dev/null
+    python3 - "$package_root/.release-identity" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(json.dumps({
+    "schema": data["schema"],
+    "release_version": data["release_version"],
+    "source_commit": data["source_commit"],
+    "tree_sha256": data["tree_sha256"],
+}, sort_keys=True, separators=(",", ":")))
+PY
+}
+
+snapshot_staging_paths() {
+    local candidate
+    for candidate in "$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging; do
+        [[ -d "$candidate" && ! -L "$candidate" ]] || continue
+        realpath -e -- "$candidate"
+    done
+}
+
+path_was_present_before_swap() {
+    local candidate="$1"
+    [[ -n "$existing_staging_paths" ]] && grep -F -x -q -- "$candidate" <<<"$existing_staging_paths"
+}
+
+read_source_release_version() {
+    local source="$1"
+    python3 - "$source/custom_components/smart_homelab_maintenance/manifest.json" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+version = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")).get("version")
+if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    raise SystemExit("Quell-Release-Version fehlt oder ist ungültig")
+print(version)
+PY
+}
+
+read_legacy_rollback_evidence() {
+    python3 "$SCRIPT_DIR/legacy_rollback_evidence.py" --verify "$1" >/dev/null
+}
+
 check_historical_staging() {
-    local dirs=() dir staged_version
-    for dir in "$AGENT_ROOT"/agent.previous.*.staging; do
+    local source="$1" _expected_commit="$2" dirs=() dir staged_version source_release current_agent_version
+    source_release="$(read_source_release_version "$source")"
+    for dir in "$AGENT_ROOT"/agent.previous.*.staging "$AGENT_ROOT"/agent.failed.*.staging; do
         [[ -d "$dir" ]] || continue
         dirs+=("$dir")
     done
     ((${#dirs[@]} == 0)) && return 0
     systemctl is-active --quiet "$SERVICE_NAME" || die "Rollback-Staging vorhanden, aber Agent-Dienst ist nicht aktiv. Manuelle Prüfung erforderlich."
-    local current_version
-    if ! current_version="$(read_agent_version "$AGENT_ROOT/agent")"; then
+    for dir in "${dirs[@]}"; do
+        if ! staged_version="$(read_release_version "$dir")"; then
+            read_legacy_rollback_evidence "$dir" \
+                || die "Rollback-Staging enthält weder eine verifizierte Release-Identität noch einen gültigen Legacy-Nachweis. Manuelle Prüfung erforderlich."
+            info "Legacy-Rollback-Staging bleibt erhalten: $dir (nur Inhaltsnachweis; Release-Zuordnung unbekannt)"
+        else
+            if ! version_is_older "$staged_version" "$source_release"; then
+                die "Rollback-Staging ist nicht älter als der Ziel-Release ($staged_version vs. $source_release). Manuelle Prüfung erforderlich."
+            fi
+            info "Historisches Rollback-Staging bleibt erhalten: $dir (Release $staged_version; Agent-Kompatibilität bleibt separat)"
+        fi
+    done
+    if ! current_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"; then
         die "Aktive Agent-Version ist bei vorhandenem Rollback-Staging nicht lesbar. Manuelle Prüfung erforderlich."
     fi
-    for dir in "${dirs[@]}"; do
-        if ! staged_version="$(read_agent_version "$dir")"; then
-            die "Rollback-Staging enthält keine gültige Agent-Version. Manuelle Prüfung erforderlich."
-        fi
-        if ! version_is_older "$staged_version" "$current_version"; then
-            die "Rollback-Staging ist nicht eindeutig historisch ($staged_version vs. $current_version). Manuelle Prüfung erforderlich."
-        fi
-        info "Historisches Rollback-Staging bleibt erhalten: $dir ($staged_version)"
-    done
-    if ! wait_for_health "$current_version"; then
+    if ! wait_for_health "$current_agent_version"; then
         die "Aktiver Agent konnte bei vorhandenem Rollback-Staging nicht TLS-validiert bestätigt werden."
     fi
 }
 
-check_historical_staging
+check_historical_staging "$source_dir" "$expected_commit"
 
 if [[ "$apply" -ne 1 ]]; then
     info "Vorprüfung erfolgreich. Quelle, Commit, Dienst, Health-URL, CA und historisches Rollback-Staging sind plausibel. Kein Update ausgeführt."
@@ -315,6 +549,9 @@ systemctl is-active --quiet "$SERVICE_NAME" && was_active=1 || true
 [[ "$was_active" -eq 1 ]] || die "Agent-Dienst ist nicht aktiv; kein automatischer Start im Updatepfad."
 previous_agent_version="$(read_agent_version "$AGENT_ROOT/agent")"
 expected_agent_version="$(read_agent_version "$source_dir/agent")"
+previous_release_identity="$(read_release_identity "$AGENT_ROOT/agent")" \
+    || die "Aktive Release-Identität oder Inhaltsintegrität ist nicht verifizierbar; kein Update ausgeführt."
+existing_staging_paths="$(snapshot_staging_paths)"
 restart_count_before="$(systemctl show --property=NRestarts --value "$SERVICE_NAME" 2>/dev/null || true)"
 [[ "$restart_count_before" =~ ^[0-9]+$ ]] || die "systemd-Restartzähler ist nicht lesbar; kein Update ausgeführt."
 lifecycle_before="$(read_lifecycle_snapshot)" || die "systemd-Lebenszyklusdaten sind vor dem Update nicht lesbar; kein Update ausgeführt."
@@ -334,14 +571,23 @@ if ! wait_for_port_free; then
 fi
 port_forensics "vor-swap"
 bash "$SCRIPT_DIR/update-agent.sh" --source-dir "$source_dir" --expected-commit "$expected_commit" --apply --keep-rollback
+new_rollback_candidates=0
 for candidate_dir in "$AGENT_ROOT"/agent.previous.*.staging; do
-    [[ -d "$candidate_dir" ]] || continue
-    if [[ "$(read_agent_version "$candidate_dir")" == "$previous_agent_version" ]]; then
-        [[ -z "$rollback_dir" ]] || die "Mehrere Rollback-Stände passen zur vorherigen Agent-Version. Manuelle Prüfung erforderlich."
+    [[ -d "$candidate_dir" && ! -L "$candidate_dir" ]] || continue
+    candidate_path="$(realpath -e -- "$candidate_dir")" \
+        || die "Rollback-Staging-Pfad ist nach dem Swap nicht kanonisch auflösbar. Manuelle Prüfung erforderlich."
+    path_was_present_before_swap "$candidate_path" && continue
+    candidate_identity="$(read_release_identity "$candidate_dir")" \
+        || die "Neu erzeugtes Rollback-Staging ist nicht integer. Manuelle Prüfung erforderlich."
+    if [[ "$candidate_identity" == "$previous_release_identity" ]]; then
+        new_rollback_candidates=$((new_rollback_candidates + 1))
+        [[ "$new_rollback_candidates" -eq 1 ]] \
+            || die "Mehrere neu erzeugte Rollback-Stände passen exakt zur vorherigen Release-Identität. Manuelle Prüfung erforderlich."
         rollback_dir="$candidate_dir"
     fi
 done
-[[ -n "$rollback_dir" ]] || die "Rollback-Staging wurde nicht erzeugt."
+[[ "$new_rollback_candidates" -eq 1 && -n "$rollback_dir" ]] \
+    || die "Kein eindeutig gebundener Rollback-Staging-Pfad zur unmittelbar vorherigen Release-Identität erzeugt."
 if ! wait_for_port_free; then
     die "Portfreigabe vor dem neuen Agent-Start nicht nachweisbar; Rollback wird ausgeführt."
 fi

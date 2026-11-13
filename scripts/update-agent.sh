@@ -19,6 +19,7 @@ while (($#)); do
 done
 require_root
 require_command git
+require_command python3
 [[ -n "$source_dir" && -n "$expected_commit" ]] || die "Quelle und erwarteter Commit sind erforderlich."
 validate_source "$source_dir"
 verify_commit "$source_dir" "$expected_commit"
@@ -35,6 +36,44 @@ next_dir="$AGENT_ROOT/agent.next"
 previous_dir="$AGENT_ROOT/agent.previous.$$.staging"
 [[ ! -e "$next_dir" && ! -e "$previous_dir" ]] || die "Staging-Verzeichnis ist bereits vorhanden. Keine Änderung ausgeführt."
 copy_tree_without_git "$source_dir/agent" "$next_dir"
+python3 - "$source_dir/custom_components/smart_homelab_maintenance/manifest.json" "$next_dir" "$expected_commit" <<'PY'
+import json
+import hashlib
+import re
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+version = manifest.get("version")
+commit = sys.argv[3]
+if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    raise SystemExit("Stable release version fehlt oder ist ungültig")
+if not re.fullmatch(r"[0-9a-f]{40}", commit):
+    raise SystemExit("Quell-Commit ist ungültig")
+root = Path(sys.argv[2])
+rows = []
+for path in sorted(root.rglob("*")):
+    rel = path.relative_to(root).as_posix()
+    if path == root / ".release-identity":
+        continue
+    if path.is_symlink():
+        raise SystemExit(f"Symlink im Agentbaum: {rel}")
+    if path.is_file():
+        rows.append(f"F {hashlib.sha256(path.read_bytes()).hexdigest()} {rel}")
+    elif not path.is_dir():
+        raise SystemExit(f"Nicht unterstützter Dateityp im Agentbaum: {rel}")
+tree_sha256 = hashlib.sha256(("\n".join(rows) + "\n").encode()).hexdigest()
+Path(sys.argv[2], ".release-identity").write_text(
+    json.dumps({"schema": 1, "release_version": version, "source_commit": commit, "tree_sha256": tree_sha256}, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+PY
+if [[ -e "$AGENT_ROOT/agent/.release-identity" || -L "$AGENT_ROOT/agent/.release-identity" ]]; then
+    [[ ! -e "$AGENT_ROOT/agent/.legacy-rollback-evidence.json" ]] || die "Aktiver Agentbaum enthält widersprüchliche Release-/Legacy-Identitäten."
+else
+    python3 "$SCRIPT_DIR/legacy_rollback_evidence.py" --create "$AGENT_ROOT/agent" >/dev/null \
+        || die "Legacy-Rollback-Nachweis konnte vor dem Swap nicht sicher erstellt werden."
+fi
 rollback() {
     if [[ -d "$previous_dir" && ! -e "$AGENT_ROOT/agent" ]]; then
         mv -T "$previous_dir" "$AGENT_ROOT/agent" || true
