@@ -95,6 +95,13 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(record["state"], JobState.SUCCEEDED)
         self.assertEqual(record["postcheck_verified"], 1)
 
+    def test_job_list_exposes_last_activity_from_job_logs(self) -> None:
+        job = self.queued_job()
+        self.repo.append_log(job, "job accepted")
+        listed = self.repo.list()
+        self.assertEqual(listed[0]["job_id"], job)
+        self.assertIsNotNone(listed[0]["last_activity_at"])
+
     def test_process_exit_cannot_be_success(self) -> None:
         job = self.queued_job()
         self.repo.transition(job, JobState.PREFLIGHT)

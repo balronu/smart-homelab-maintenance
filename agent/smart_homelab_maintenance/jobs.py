@@ -570,7 +570,7 @@ class JobRepository:
             raise ValidationError("invalid job pagination")
         with self._lock:
             rows = self._connection.execute(
-                "SELECT job_id,target,operation,state,phase,progress,message,error_code,created_at,started_at,finished_at,last_recovery_at,recovery_attempts FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                "SELECT job_id,target,operation,state,phase,progress,message,error_code,created_at,started_at,finished_at,last_recovery_at,recovery_attempts,(SELECT MAX(created_at) FROM job_logs WHERE job_id=jobs.job_id) AS last_activity_at FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 (limit, offset),
             ).fetchall()
         return [dict(row) for row in rows]
